@@ -521,6 +521,7 @@ button:disabled {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  min-height: 24px;
 }
 
 .badge {
@@ -548,8 +549,18 @@ button:disabled {
   color: var(--accent);
 }
 
+.fetch-title {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .hidden {
   display: none;
+}
+
+.status-slot.hidden {
+  display: inline-flex;
+  visibility: hidden;
 }
 
 .preview-block {

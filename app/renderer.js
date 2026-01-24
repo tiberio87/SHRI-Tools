@@ -360,6 +360,79 @@ function setFetchBadge(mode, label) {
   ui.fetchBadge.textContent = label;
 }
 
+function mapTypeLabel(value) {
+  const normalized = String(value || '').toLowerCase();
+  if (!normalized) {
+    return '';
+  }
+  if (normalized.includes('movie')) {
+    return 'Film';
+  }
+  if (normalized.includes('tv') || normalized.includes('anime')) {
+    return 'Serie TV';
+  }
+  return '';
+}
+
+function renderFetchStatus(payload, data) {
+  const targetLabel = state.kind === 'dir' ? 'Serie TV' : 'File';
+  const parts = [];
+  const title = data.title || payload.title;
+  const year = data.year || payload.year;
+  const typeLabel = mapTypeLabel(data.type || payload.typeHint || ui.typeSelect.value);
+
+  if (title) {
+    parts.push({ label: 'Titolo', value: title, highlight: true });
+  }
+  if (year) {
+    parts.push({ label: 'Anno', value: year });
+  }
+  if (typeLabel) {
+    parts.push({ label: 'Tipo', value: typeLabel });
+  }
+  if (data.originalLanguage) {
+    parts.push({ label: 'Lingua originale', value: normalizeLangTag(data.originalLanguage) });
+  }
+  if (data.tvdbSeriesId) {
+    parts.push({ label: 'TVDB ID', value: data.tvdbSeriesId });
+  }
+  if (data.tvdbAttempted) {
+    const count = Array.isArray(data.episodes) ? data.episodes.length : 0;
+    const label = data.tmdbFallback ? 'Episodi TMDb' : 'Episodi TVDB';
+    parts.push({ label, value: String(count) });
+  }
+
+  ui.fetchStatus.innerHTML = '';
+  if (!parts.length) {
+    setHint(ui.fetchStatus, `Rilevato ${targetLabel}: Nessun dato rilevato.`);
+    return;
+  }
+
+  const prefix = document.createElement('span');
+  prefix.textContent = `Rilevato ${targetLabel}: `;
+  ui.fetchStatus.appendChild(prefix);
+
+  parts.forEach((part, index) => {
+    if (index > 0) {
+      ui.fetchStatus.appendChild(document.createTextNode(' | '));
+    }
+    const label = document.createElement('span');
+    label.textContent = `${part.label}: `;
+    ui.fetchStatus.appendChild(label);
+
+    const value = document.createElement('span');
+    value.textContent = part.value;
+    if (part.highlight) {
+      value.classList.add('fetch-title');
+    }
+    ui.fetchStatus.appendChild(value);
+  });
+
+  if (data.warnings && data.warnings.length) {
+    ui.fetchStatus.appendChild(document.createTextNode(` | ${data.warnings.join(' | ')}`));
+  }
+}
+
 function loadSettings() {
   try {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
@@ -1571,35 +1644,10 @@ async function fetchMetadataAuto(guess) {
       }
     }
 
-    const summaryParts = [];
-    if (data.title) {
-      summaryParts.push(`Titolo: ${data.title}`);
-    }
-    if (data.year) {
-      summaryParts.push(`Anno: ${data.year}`);
-    }
-    if (data.type) {
-      summaryParts.push(`Tipo: ${data.type}`);
-    }
-    if (data.originalLanguage) {
-      summaryParts.push(`Lingua originale: ${normalizeLangTag(data.originalLanguage)}`);
-    }
-    if (data.tvdbSeriesId) {
-      summaryParts.push(`TVDB ID: ${data.tvdbSeriesId}`);
-    }
-    if (data.tvdbAttempted) {
-      const count = Array.isArray(data.episodes) ? data.episodes.length : 0;
-      const label = data.tmdbFallback ? 'Episodi TMDb' : 'Episodi TVDB';
-      summaryParts.push(`${label}: ${count}`);
-    }
-
-    const summaryText = summaryParts.length ? summaryParts.join(' | ') : 'Nessun dato rilevato.';
-    const warningText = data.warnings && data.warnings.length ? ` | ${data.warnings.join(' | ')}` : '';
     const usedManualId = Boolean(payload.imdbId || payload.tvdbId);
     const modeLabel = usedManualId ? 'Matching manuale' : 'Auto Matching';
     setFetchBadge(usedManualId ? 'manual' : 'auto', modeLabel);
-    const targetLabel = state.kind === 'dir' ? 'Serie TV' : 'File';
-    setHint(ui.fetchStatus, `Rilevato ${targetLabel}: ${summaryText}${warningText}`);
+    renderFetchStatus(payload, data);
   } catch (error) {
     ui.fetchBadge.classList.add('hidden');
     setHint(ui.fetchStatus, `Errore: ${error.message || error}`);
