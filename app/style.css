@@ -280,9 +280,14 @@ body:not(.light) .theme-toggle .icon-moon {
   align-self: center;
 }
 
-.checkbox.align-input {
-  align-self: start;
-  margin-top: 18px;
+.checkbox-field > label:first-child {
+  visibility: hidden;
+  height: 11px;
+}
+
+.checkbox-field .checkbox {
+  align-self: flex-start;
+  margin-top: 1px;
 }
 
 .field {

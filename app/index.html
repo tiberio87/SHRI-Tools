@@ -84,10 +84,13 @@
               <label for="yearInput">Anno</label>
               <input id="yearInput" type="text" placeholder="2024" />
             </div>
-            <label class="checkbox">
-              <input id="includeYear" type="checkbox" checked />
-              Includi anno
-            </label>
+            <div class="field checkbox-field">
+              <label>&nbsp;</label>
+              <label class="checkbox">
+                <input id="includeYear" type="checkbox" checked />
+                Includi anno
+              </label>
+            </div>
           </div>
           <div id="seasonEpisodeGroup" class="row">
             <div class="field">
@@ -177,7 +180,10 @@
               <label for="editionInput">Edizione</label>
               <input id="editionInput" type="text" placeholder="IMAX / Extended" />
             </div>
-            <label class="checkbox manual-field align-input"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
+            <div class="field manual-field checkbox-field">
+              <label>&nbsp;</label>
+              <label class="checkbox"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
+            </div>
             <div class="field manual-field">
               <label for="repackSelect">Repack</label>
               <div class="dropdown" id="repackDropdown">
