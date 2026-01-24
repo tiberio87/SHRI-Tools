@@ -512,6 +512,7 @@ function resetSource() {
 
   ui.selectedPath.textContent = 'Nessun percorso selezionato.';
   setHint(ui.scanHint, '');
+  ui.resetSourceBtn.classList.add('hidden');
   resetAllInputs();
 }
 
@@ -2068,6 +2069,7 @@ async function loadPath(targetPath) {
   }
 
   ui.selectedPath.textContent = targetPath;
+  ui.resetSourceBtn.classList.remove('hidden');
   setHint(ui.scanHint, scan.mainVideo ? `File analizzato: ${scan.mainVideo}` : 'Nessun file analizzato.');
 
   if (scan.mediaInfo?.error) {
