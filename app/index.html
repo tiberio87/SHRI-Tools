@@ -47,79 +47,6 @@
 
         <section class="section">
           <div class="section-header">
-            <h2>Metadata</h2>
-            <div class="section-actions">
-              <label class="checkbox inline">
-                <input id="autoDetectToggle" type="checkbox" checked />Auto-detect
-              </label>
-              <button id="autoDetectBtn" class="secondary">Rileva</button>
-            </div>
-          </div>
-          <div class="row">
-            <div class="field">
-              <label for="imdbInput">IMDb ID (fallback)</label>
-              <input id="imdbInput" type="text" placeholder="tt1234567" />
-            </div>
-            <div class="field">
-              <label for="tvdbInput">TVDB ID (fallback)</label>
-              <input id="tvdbInput" type="text" placeholder="12345" />
-            </div>
-            <div class="field">
-              <label for="typeSelect">Tipo</label>
-              <select id="typeSelect">
-                <option value="movie">Film</option>
-                <option value="tv-season">Serie TV (Stagione)</option>
-                <option value="tv-episode">Serie TV (Episodio)</option>
-                <option value="anime-season">Anime (Stagione)</option>
-                <option value="anime-episode">Anime (Episodio)</option>
-              </select>
-            </div>
-          </div>
-          <div class="row">
-            <div class="field">
-              <label for="titleInput">Titolo</label>
-              <input id="titleInput" type="text" placeholder="Titolo ufficiale" />
-            </div>
-            <div class="field">
-              <label for="yearInput">Anno</label>
-              <input id="yearInput" type="text" placeholder="2024" />
-            </div>
-            <div class="field checkbox-field">
-              <label>&nbsp;</label>
-              <label class="checkbox">
-                <input id="includeYear" type="checkbox" checked />
-                Includi anno
-              </label>
-            </div>
-          </div>
-          <div id="seasonEpisodeGroup" class="row">
-            <div class="field">
-              <label for="seasonInput">Stagione</label>
-              <input id="seasonInput" type="number" min="1" placeholder="1" />
-            </div>
-            <div class="field">
-              <label for="episodeInput">Episodio</label>
-              <input id="episodeInput" type="number" min="1" placeholder="1" />
-            </div>
-          </div>
-          <div id="episodeTitleGroup" class="row">
-            <div class="field">
-              <label for="episodeTitleInput">Titolo episodio</label>
-              <input id="episodeTitleInput" type="text" placeholder="Titolo episodio" />
-            </div>
-            <div class="field manual-field">
-              <label for="partInput">Parte</label>
-              <input id="partInput" type="text" placeholder="Part 1" />
-            </div>
-          </div>
-          <div class="fetch-line">
-            <div id="fetchBadge" class="badge hidden"></div>
-            <div id="fetchStatus" class="hint"></div>
-          </div>
-        </section>
-
-        <section class="section">
-          <div class="section-header">
             <h2>MediaInfo &amp; Dettagli</h2>
             <div class="section-actions">
               <div id="mediaInfoBadge" class="status status-slot hidden">MediaInfo</div>
@@ -229,6 +156,79 @@
               <input id="tagInput" type="text" placeholder="iSlaNd" list="tagOptions" />
               <datalist id="tagOptions"></datalist>
             </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header">
+            <h2>Metadata</h2>
+            <div class="section-actions">
+              <label class="checkbox inline">
+                <input id="autoDetectToggle" type="checkbox" checked />Auto-detect
+              </label>
+              <button id="autoDetectBtn" class="secondary">Rileva</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="imdbInput">IMDb ID (fallback)</label>
+              <input id="imdbInput" type="text" placeholder="tt1234567" />
+            </div>
+            <div class="field">
+              <label for="tvdbInput">TVDB ID (fallback)</label>
+              <input id="tvdbInput" type="text" placeholder="12345" />
+            </div>
+            <div class="field">
+              <label for="typeSelect">Tipo</label>
+              <select id="typeSelect">
+                <option value="movie">Film</option>
+                <option value="tv-season">Serie TV (Stagione)</option>
+                <option value="tv-episode">Serie TV (Episodio)</option>
+                <option value="anime-season">Anime (Stagione)</option>
+                <option value="anime-episode">Anime (Episodio)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="titleInput">Titolo</label>
+              <input id="titleInput" type="text" placeholder="Titolo ufficiale" />
+            </div>
+            <div class="field">
+              <label for="yearInput">Anno</label>
+              <input id="yearInput" type="text" placeholder="2024" />
+            </div>
+            <div class="field checkbox-field">
+              <label>&nbsp;</label>
+              <label class="checkbox">
+                <input id="includeYear" type="checkbox" checked />
+                Includi anno
+              </label>
+            </div>
+          </div>
+          <div id="seasonEpisodeGroup" class="row">
+            <div class="field">
+              <label for="seasonInput">Stagione</label>
+              <input id="seasonInput" type="number" min="1" placeholder="1" />
+            </div>
+            <div class="field">
+              <label for="episodeInput">Episodio</label>
+              <input id="episodeInput" type="number" min="1" placeholder="1" />
+            </div>
+          </div>
+          <div id="episodeTitleGroup" class="row">
+            <div class="field">
+              <label for="episodeTitleInput">Titolo episodio</label>
+              <input id="episodeTitleInput" type="text" placeholder="Titolo episodio" />
+            </div>
+            <div class="field manual-field">
+              <label for="partInput">Parte</label>
+              <input id="partInput" type="text" placeholder="Part 1" />
+            </div>
+          </div>
+          <div class="fetch-line">
+            <div id="fetchBadge" class="badge hidden"></div>
+            <div id="fetchStatus" class="hint"></div>
           </div>
         </section>
       </div>
