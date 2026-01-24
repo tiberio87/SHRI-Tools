@@ -399,7 +399,11 @@ function renderFetchStatus(payload, data) {
     parts.push({ label: 'Lingua originale', value: normalizeLangTag(data.originalLanguage) });
   }
   if (data.tvdbSeriesId) {
-    parts.push({ label: 'TVDB ID', value: data.tvdbSeriesId, link: `https://thetvdb.com/series/${data.tvdbSeriesId}` });
+    const slug = data.tvdbSeriesSlug;
+    const link = slug
+      ? `https://thetvdb.com/series/${slug}`
+      : `https://thetvdb.com/?tab=series&id=${data.tvdbSeriesId}`;
+    parts.push({ label: 'TVDB ID', value: data.tvdbSeriesId, link });
   }
   if (data.tvdbAttempted) {
     const count = Array.isArray(data.episodes) ? data.episodes.length : 0;

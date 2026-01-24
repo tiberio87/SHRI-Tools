@@ -581,6 +581,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     warnings: [],
     tvdbAttempted: false,
     tvdbSeriesId: '',
+    tvdbSeriesSlug: '',
     tmdbFallback: false
   };
 
@@ -677,22 +678,28 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       const token = await tvdbLogin(tvdbKey);
       let seriesId = tvdbId;
       let seriesName = '';
+      let seriesSlug = '';
 
       if (!seriesId) {
         const series = await tvdbSearchSeries(titleGuess || result.title, token, preferredLanguage);
         if (series) {
           seriesId = String(series.tvdb_id || series.id || '');
           seriesName = series.name || series.seriesName || '';
+          seriesSlug = series.slug || series.slugName || '';
         }
       } else {
         const series = await tvdbFetchSeries(seriesId, token, preferredLanguage);
         if (series) {
           seriesName = series.name || series.seriesName || '';
+          seriesSlug = series.slug || series.slugName || '';
         }
       }
 
       if (seriesId) {
         result.tvdbSeriesId = seriesId;
+      }
+      if (seriesSlug) {
+        result.tvdbSeriesSlug = seriesSlug;
       }
       if (seriesName && !result.title) {
         result.title = seriesName;
