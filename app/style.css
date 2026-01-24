@@ -276,6 +276,16 @@ body:not(.light) .theme-toggle .icon-moon {
   align-items: center;
 }
 
+.release-row {
+  grid-template-columns: minmax(170px, 1fr) 110px repeat(5, minmax(160px, 1fr));
+}
+
+@media (max-width: 1200px) {
+  .release-row {
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  }
+}
+
 .row .checkbox {
   align-self: center;
 }
