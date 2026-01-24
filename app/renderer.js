@@ -884,6 +884,9 @@ function setupDropdown(dropdown, trigger, input, menu) {
     if (!target) {
       return;
     }
+    if (target.dataset.disabled === 'true' || target.classList.contains('disabled')) {
+      return;
+    }
     const value = target.dataset.value || '';
     const label = target.textContent || '';
     setDropdownValue(input, trigger, value, label);
@@ -981,7 +984,13 @@ function updateTagOptions(settings) {
   blank.type = 'button';
   blank.className = 'dropdown-item';
   blank.dataset.value = '';
-  blank.textContent = unique.length ? 'Seleziona tag gruppo' : 'Aggiungili nelle Impostazioni';
+  if (!unique.length) {
+    blank.dataset.disabled = 'true';
+    blank.classList.add('disabled');
+    blank.textContent = 'Aggiungili nelle Impostazioni';
+  } else {
+    blank.textContent = 'Seleziona tag gruppo';
+  }
   ui.tagDropdownMenu.appendChild(blank);
 
   for (const tag of unique) {
