@@ -724,7 +724,10 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       }
 
       if (seriesId) {
-        const episodes = await tvdbFetchEpisodes(seriesId, token, preferredLanguage);
+        let episodes = await tvdbFetchEpisodes(seriesId, token, preferredLanguage);
+        if (preferredLanguage && episodes.length === 0) {
+          episodes = await tvdbFetchEpisodes(seriesId, token, '');
+        }
         result.episodes = episodes;
       }
     }
@@ -735,8 +738,12 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
   if (result.tvdbAttempted && result.episodes.length === 0) {
     if (tmdbKey && tmdbTvId && seasonHint) {
       try {
-        const seasonData = await fetchTmdbTvSeason(tmdbTvId, seasonHint, tmdbKey, preferredLanguage);
-        const seasonEpisodes = Array.isArray(seasonData?.episodes) ? seasonData.episodes : [];
+        const firstSeasonData = await fetchTmdbTvSeason(tmdbTvId, seasonHint, tmdbKey, preferredLanguage);
+        let seasonEpisodes = Array.isArray(firstSeasonData?.episodes) ? firstSeasonData.episodes : [];
+        if (!seasonEpisodes.length && preferredLanguage && preferredLanguage !== 'en-US') {
+          const fallbackSeasonData = await fetchTmdbTvSeason(tmdbTvId, seasonHint, tmdbKey, 'en-US');
+          seasonEpisodes = Array.isArray(fallbackSeasonData?.episodes) ? fallbackSeasonData.episodes : [];
+        }
         result.episodes = seasonEpisodes.map((ep) => ({
           season: seasonHint,
           episode: ep.episode_number,
