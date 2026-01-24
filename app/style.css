@@ -277,7 +277,15 @@ body:not(.light) .theme-toggle .icon-moon {
 }
 
 .release-row {
-  grid-template-columns: minmax(170px, 1fr) 110px repeat(5, minmax(160px, 1fr));
+  grid-template-columns: minmax(170px, 1fr) max-content repeat(5, minmax(160px, 1fr));
+}
+
+.release-row .checkbox-field {
+  justify-self: start;
+}
+
+.release-row .checkbox {
+  white-space: nowrap;
 }
 
 @media (max-width: 1200px) {
