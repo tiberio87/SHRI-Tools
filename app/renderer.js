@@ -527,6 +527,41 @@ function setSecretVisibility(input, button, visible) {
   button.setAttribute('aria-pressed', visible ? 'true' : 'false');
 }
 
+function setKeyVerifyState(button, state, message) {
+  button.classList.remove('success', 'error', 'loading');
+  if (state) {
+    button.classList.add(state);
+  }
+  if (message) {
+    button.title = message;
+  } else {
+    button.removeAttribute('title');
+  }
+}
+
+async function verifyApiKey(button) {
+  const service = button.dataset.service;
+  const inputId = button.dataset.input;
+  const input = document.getElementById(inputId);
+  const apiKey = input ? input.value.trim() : '';
+
+  if (!apiKey) {
+    setKeyVerifyState(button, 'error', 'Inserisci una chiave.');
+    return;
+  }
+
+  setKeyVerifyState(button, 'loading', 'Verifica in corso...');
+  button.disabled = true;
+  const result = await window.api.verifyApiKey({ service, apiKey });
+  button.disabled = false;
+
+  if (result?.ok) {
+    setKeyVerifyState(button, 'success', 'Chiave valida.');
+  } else {
+    setKeyVerifyState(button, 'error', result?.error || 'Chiave non valida.');
+  }
+}
+
 function openRulesModal() {
   renderRulesContent();
   ui.rulesModal.classList.remove('hidden');
@@ -1908,6 +1943,25 @@ document.querySelectorAll('.icon-button[data-target]').forEach((button) => {
   button.addEventListener('click', () => {
     const visible = input.type === 'password';
     setSecretVisibility(input, button, visible);
+  });
+});
+
+document.querySelectorAll('.key-verify').forEach((button) => {
+  button.addEventListener('click', () => {
+    verifyApiKey(button);
+  });
+});
+
+['omdbKeyInput', 'tmdbKeyInput', 'tvdbKeyInput'].forEach((id) => {
+  const input = document.getElementById(id);
+  if (!input) {
+    return;
+  }
+  input.addEventListener('input', () => {
+    const button = document.querySelector(`.key-verify[data-input="${id}"]`);
+    if (button) {
+      setKeyVerifyState(button, '', '');
+    }
   });
 });
 

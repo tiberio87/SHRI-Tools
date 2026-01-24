@@ -276,6 +276,10 @@ body:not(.light) .theme-toggle .icon-moon {
   align-items: center;
 }
 
+.row .checkbox {
+  align-self: center;
+}
+
 .field {
   display: flex;
   flex-direction: column;
@@ -377,7 +381,7 @@ textarea:focus {
 
 .input-with-icon {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   align-items: center;
   gap: 6px;
 }
@@ -406,6 +410,23 @@ textarea:focus {
 .icon-button.active {
   color: var(--accent);
   border-color: rgba(240, 180, 94, 0.6);
+}
+
+.icon-button.key-verify.success {
+  color: #48c98e;
+  border-color: rgba(72, 201, 142, 0.55);
+  background: rgba(72, 201, 142, 0.12);
+}
+
+.icon-button.key-verify.error {
+  color: #f45b5b;
+  border-color: rgba(244, 91, 91, 0.6);
+  background: rgba(244, 91, 91, 0.12);
+}
+
+.icon-button.key-verify.loading {
+  opacity: 0.7;
+  cursor: progress;
 }
 
 textarea {

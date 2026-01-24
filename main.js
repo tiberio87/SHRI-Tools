@@ -211,6 +211,11 @@ async function fetchTmdbTvSeason(tvId, season, apiKey, language) {
   return fetchJson(url);
 }
 
+async function fetchTmdbConfig(apiKey) {
+  const url = `https://api.themoviedb.org/3/configuration?api_key=${encodeURIComponent(apiKey)}`;
+  return fetchJson(url);
+}
+
 function extractYear(value) {
   if (!value) {
     return '';
@@ -526,6 +531,28 @@ ipcMain.handle('apply-rename', async (_event, payload) => {
     warnings: plan.warnings,
     results
   };
+});
+
+ipcMain.handle('verify-api-key', async (_event, payload) => {
+  const service = payload?.service || '';
+  const apiKey = payload?.apiKey || '';
+  if (!service || !apiKey) {
+    return { ok: false, error: 'Chiave mancante.' };
+  }
+  try {
+    if (service === 'omdb') {
+      await fetchOmdbByImdb('tt0111161', apiKey);
+    } else if (service === 'tmdb') {
+      await fetchTmdbConfig(apiKey);
+    } else if (service === 'tvdb') {
+      await tvdbLogin(apiKey);
+    } else {
+      return { ok: false, error: 'Servizio non supportato.' };
+    }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
 });
 
 ipcMain.handle('fetch-metadata', async (_event, payload) => {

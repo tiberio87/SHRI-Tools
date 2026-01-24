@@ -14,8 +14,8 @@
   <div class="app">
     <header class="app-header">
       <div class="title-block">
-        <h1>ShareIsland Renamer</h1>
-        <p>Rinomina cartelle e file secondo le regole del tracker.</p>
+        <h1>SHRI - Tools</h1>
+        <p>Rinomina file e cartelle rispettando gli standard.</p>
       </div>
       <div class="header-actions">
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
@@ -300,6 +300,11 @@
           <label for="omdbKeyInput">OMDb API Key</label>
           <div class="input-with-icon">
             <input id="omdbKeyInput" type="password" placeholder="Chiave OMDb" />
+            <button class="icon-button key-verify" type="button" data-service="omdb" data-input="omdbKeyInput" aria-label="Verifica chiave OMDb">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 12l4 4 10-10"></path>
+              </svg>
+            </button>
             <button class="icon-button" type="button" data-target="omdbKeyInput" aria-label="Mostra chiave OMDb">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
@@ -312,6 +317,11 @@
           <label for="tmdbKeyInput">TMDb API Key</label>
           <div class="input-with-icon">
             <input id="tmdbKeyInput" type="password" placeholder="Chiave TMDb" />
+            <button class="icon-button key-verify" type="button" data-service="tmdb" data-input="tmdbKeyInput" aria-label="Verifica chiave TMDb">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 12l4 4 10-10"></path>
+              </svg>
+            </button>
             <button class="icon-button" type="button" data-target="tmdbKeyInput" aria-label="Mostra chiave TMDb">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
@@ -324,6 +334,11 @@
           <label for="tvdbKeyInput">TVDB API Key</label>
           <div class="input-with-icon">
             <input id="tvdbKeyInput" type="password" placeholder="Chiave TVDB" />
+            <button class="icon-button key-verify" type="button" data-service="tvdb" data-input="tvdbKeyInput" aria-label="Verifica chiave TVDB">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 12l4 4 10-10"></path>
+              </svg>
+            </button>
             <button class="icon-button" type="button" data-target="tvdbKeyInput" aria-label="Mostra chiave TVDB">
               <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
                 <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
