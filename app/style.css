@@ -8,6 +8,12 @@
   --muted: #8b93a6;
   --accent: #f0b45e;
   --accent-strong: #f08c3e;
+  --folder-accent: #7bb7ff;
+  --folder-accent-strong: #4f86e6;
+  --folder-bg: rgba(123, 183, 255, 0.18);
+  --folder-bg-strong: rgba(79, 134, 230, 0.22);
+  --folder-border: rgba(123, 183, 255, 0.45);
+  --folder-glow: rgba(79, 134, 230, 0.25);
   --shadow: rgba(4, 6, 12, 0.35);
   --input-bg: #121620;
   --input-border: #2e374a;
@@ -48,6 +54,12 @@ body.light {
   --muted: #5f677a;
   --accent: #c2711b;
   --accent-strong: #a85a10;
+  --folder-accent: #1f4d9f;
+  --folder-accent-strong: #1a4186;
+  --folder-bg: rgba(47, 111, 222, 0.12);
+  --folder-bg-strong: rgba(31, 77, 159, 0.12);
+  --folder-border: rgba(31, 77, 159, 0.35);
+  --folder-glow: rgba(31, 77, 159, 0.2);
   --shadow: rgba(20, 23, 31, 0.08);
   --input-bg: #f7f6f2;
   --input-border: #cfd4df;
@@ -466,6 +478,13 @@ button.secondary {
   background: var(--surface-inline);
   color: var(--text);
   border: 1px solid var(--surface-inline-border);
+}
+
+button.secondary.folder {
+  background: linear-gradient(135deg, var(--folder-bg) 0%, var(--folder-bg-strong) 100%);
+  color: var(--folder-accent);
+  border: 1px solid var(--folder-border);
+  box-shadow: 0 8px 16px var(--folder-glow);
 }
 
 button:hover {
