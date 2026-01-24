@@ -409,7 +409,7 @@ function resetMetadataInputs() {
   resetDropdown(ui.tagInput, ui.tagInputBtn, 'Seleziona tag gruppo');
 }
 
-function resetAllInputs() {
+function resetAllInputs(options = {}) {
   resetMetadataInputs();
 
   if (ui.typeSelect) {
@@ -503,7 +503,9 @@ function resetAllInputs() {
 
   updateAutoDetectControls();
   updateVisibility();
-  refreshPreview();
+  if (!options.skipPreview) {
+    refreshPreview();
+  }
 }
 
 function resetSource() {
@@ -2154,7 +2156,7 @@ async function loadPath(targetPath) {
     return;
   }
 
-  resetMetadataInputs();
+  resetAllInputs({ skipPreview: true });
 
   state.targetPath = targetPath;
   state.kind = scan.kind;
