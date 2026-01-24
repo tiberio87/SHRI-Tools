@@ -542,6 +542,17 @@ button:disabled {
   word-break: break-all;
 }
 
+.scan-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.scan-row .hint {
+  flex: 1;
+}
+
 .hint {
   font-size: 11px;
   color: var(--muted);

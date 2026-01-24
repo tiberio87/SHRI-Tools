@@ -18,6 +18,7 @@ const ui = {
   clearDebugBtn: document.getElementById('clearDebugBtn'),
   selectFileBtn: document.getElementById('selectFileBtn'),
   selectFolderBtn: document.getElementById('selectFolderBtn'),
+  resetSourceBtn: document.getElementById('resetSourceBtn'),
   selectedPath: document.getElementById('selectedPath'),
   scanHint: document.getElementById('scanHint'),
   imdbInput: document.getElementById('imdbInput'),
@@ -365,6 +366,15 @@ function setFetchBadge(mode, label) {
   ui.fetchBadge.textContent = label;
 }
 
+function resetDropdown(input, trigger, label) {
+  if (!input || !trigger) {
+    return;
+  }
+  input.value = '';
+  input.dataset.manual = 'false';
+  trigger.textContent = label;
+}
+
 function resetMetadataInputs() {
   [
     ui.imdbInput,
@@ -391,6 +401,118 @@ function resetMetadataInputs() {
     ui.fetchBadge.classList.add('hidden');
   }
   setHint(ui.fetchStatus, '');
+}
+
+function resetAllInputs() {
+  resetMetadataInputs();
+
+  if (ui.typeSelect) {
+    ui.typeSelect.value = 'movie';
+    ui.typeSelect.dataset.manual = 'false';
+  }
+  if (ui.formatSelect) {
+    ui.formatSelect.value = 'WEB-DL';
+    ui.formatSelect.dataset.manual = 'false';
+    applyFormatSuggestion('');
+  }
+
+  if (ui.includeYear) {
+    ui.includeYear.checked = true;
+  }
+  [
+    ui.resolutionInput,
+    ui.videoCodecInput,
+    ui.originalLanguageInput,
+    ui.languageTagInput,
+    ui.audioCodecInput,
+    ui.audioChannelsInput,
+    ui.audioMetaInput,
+    ui.editionInput,
+    ui.regionInput,
+    ui.tagInput
+  ].forEach((input) => {
+    if (!input) {
+      return;
+    }
+    input.value = '';
+    input.dataset.manual = 'false';
+  });
+
+  [
+    ui.uhdCheckbox,
+    ui.hdrCheckbox,
+    ui.hdr10plusCheckbox,
+    ui.dvCheckbox,
+    ui.threeDCheckbox,
+    ui.hybridCheckbox
+  ].forEach((checkbox) => {
+    if (checkbox) {
+      checkbox.checked = false;
+    }
+  });
+
+  resetDropdown(ui.serviceInput, ui.serviceInputBtn, 'Seleziona servizio');
+  resetDropdown(ui.repackSelect, ui.repackSelectBtn, 'Nessuno');
+  resetDropdown(ui.sourceInput, ui.sourceInputBtn, 'Seleziona sorgente');
+
+  if (ui.audioLangHint) {
+    ui.audioLangHint.textContent = 'Lingue audio rilevate: -';
+  }
+
+  if (ui.renameFileCheckbox) {
+    ui.renameFileCheckbox.checked = true;
+  }
+  if (ui.renameFolderCheckbox) {
+    ui.renameFolderCheckbox.checked = false;
+    ui.renameFolderCheckbox.disabled = true;
+  }
+
+  if (ui.renameHint) {
+    setHint(ui.renameHint, '');
+  }
+  if (ui.renamePlanList) {
+    ui.renamePlanList.innerHTML = '';
+  }
+  if (ui.warningList) {
+    ui.warningList.innerHTML = '';
+  }
+  if (ui.folderNamePreview) {
+    ui.folderNamePreview.textContent = '-';
+  }
+  if (ui.baseNamePreview) {
+    ui.baseNamePreview.textContent = '-';
+  }
+  if (ui.fileNamePreview) {
+    ui.fileNamePreview.textContent = '-';
+  }
+
+  if (ui.mediaInfoBadge) {
+    setMediaInfoBadgeVisible(false);
+  }
+  if (ui.renameBadge) {
+    ui.renameBadge.classList.add('hidden');
+    ui.renameBadge.textContent = '';
+  }
+
+  updateAutoDetectControls();
+  updateVisibility();
+  refreshPreview();
+}
+
+function resetSource() {
+  state.targetPath = null;
+  state.kind = null;
+  state.videoFiles = [];
+  state.mainVideo = null;
+  state.mediaInfo = null;
+  state.mainExtension = '';
+  state.audioLangs = [];
+  state.episodeMap = {};
+  state.autoDetectRunning = false;
+
+  ui.selectedPath.textContent = 'Nessun percorso selezionato.';
+  setHint(ui.scanHint, '');
+  resetAllInputs();
 }
 
 function mapTypeLabel(value) {
@@ -2001,6 +2123,10 @@ ui.selectFolderBtn.addEventListener('click', async () => {
   if (folderPath) {
     await loadPath(folderPath);
   }
+});
+
+ui.resetSourceBtn.addEventListener('click', () => {
+  resetSource();
 });
 
 ui.autoDetectBtn.addEventListener('click', async () => {
