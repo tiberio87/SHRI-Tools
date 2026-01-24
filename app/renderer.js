@@ -683,6 +683,7 @@ function applySettingsToUI(settings) {
   }
   loadServiceDefaults().then(() => updateServiceOptions(settings));
   updateTagOptions(settings);
+  schedulePreview();
 }
 
 function getSettings() {
