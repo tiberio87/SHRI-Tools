@@ -260,6 +260,7 @@ const AUDIO_CODEC_SCORE = {
 
 const STOP_WORDS = new Set([
   '2160P', '1080P', '720P', '576P', '480P',
+  '4K', '8K',
   'WEB', 'WEBDL', 'WEB-DL', 'WEBRIP', 'WEBRIP',
   'BLURAY', 'BLU-RAY', 'REMUX', 'UHD', 'HDR', 'HDR10', 'HDR10+', 'DV', 'DOVI',
   'X264', 'X265', 'H264', 'H265', 'HEVC', 'AVC', 'AV1',
@@ -398,7 +399,7 @@ function renderFetchStatus(payload, data) {
     parts.push({ label: 'Lingua originale', value: normalizeLangTag(data.originalLanguage) });
   }
   if (data.tvdbSeriesId) {
-    parts.push({ label: 'TVDB ID', value: data.tvdbSeriesId });
+    parts.push({ label: 'TVDB ID', value: data.tvdbSeriesId, link: `https://thetvdb.com/series/${data.tvdbSeriesId}` });
   }
   if (data.tvdbAttempted) {
     const count = Array.isArray(data.episodes) ? data.episodes.length : 0;
@@ -424,12 +425,26 @@ function renderFetchStatus(payload, data) {
     label.textContent = `${part.label}: `;
     ui.fetchStatus.appendChild(label);
 
-    const value = document.createElement('span');
-    value.textContent = part.value;
-    if (part.highlight) {
-      value.classList.add('fetch-title');
+    let valueNode;
+    if (part.link) {
+      const link = document.createElement('a');
+      link.href = '#';
+      link.className = 'fetch-link';
+      link.textContent = part.value;
+      link.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.api.openExternal(part.link);
+      });
+      valueNode = link;
+    } else {
+      const value = document.createElement('span');
+      value.textContent = part.value;
+      if (part.highlight) {
+        value.classList.add('fetch-title');
+      }
+      valueNode = value;
     }
-    ui.fetchStatus.appendChild(value);
+    ui.fetchStatus.appendChild(valueNode);
   });
 
   if (data.warnings && data.warnings.length) {
@@ -1192,7 +1207,11 @@ function guessTitleFromName(rawName) {
     cutIndex = yearMatch.index;
   }
   const titleChunk = cleaned.slice(0, cutIndex).trim();
-  const tokens = titleChunk.split(' ').filter((token) => token && !STOP_WORDS.has(token.toUpperCase()));
+  const tokens = titleChunk
+    .split(' ')
+    .filter((token) => token && !STOP_WORDS.has(token.toUpperCase()))
+    .filter((token) => !/^[\-\u2013\u2014]+$/.test(token))
+    .filter((token) => !/^[()\[\]{}]+$/.test(token));
   return tokens.join(' ').trim();
 }
 
@@ -1716,13 +1735,15 @@ async function fetchMetadataAuto(guess) {
   setHint(ui.fetchStatus, 'Ricerca in corso...');
 
   try {
+    const typeHint = guess.typeHint || ui.typeSelect.value;
+    const isTvType = typeHint.startsWith('tv') || typeHint.startsWith('anime');
     const payload = {
       imdbId: ui.imdbInput.value.trim(),
-      tvdbId: ui.tvdbInput.value.trim(),
+      tvdbId: isTvType ? ui.tvdbInput.value.trim() : '',
       title: guess.title || ui.titleInput.value.trim(),
       year: guess.year || ui.yearInput.value.trim(),
-      season: guess.season || ui.seasonInput.value.trim(),
-      typeHint: guess.typeHint || ui.typeSelect.value,
+      season: isTvType ? (guess.season || ui.seasonInput.value.trim()) : '',
+      typeHint,
       omdbKey: settings.omdbKey,
       tmdbKey: settings.tmdbKey,
       tvdbKey: settings.tvdbKey,

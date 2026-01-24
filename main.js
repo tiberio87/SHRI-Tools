@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -549,6 +549,22 @@ ipcMain.handle('verify-api-key', async (_event, payload) => {
     } else {
       return { ok: false, error: 'Servizio non supportato.' };
     }
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('open-external', async (_event, url) => {
+  if (typeof url !== 'string') {
+    return { ok: false, error: 'URL non valido.' };
+  }
+  const trimmed = url.trim();
+  if (!/^https?:\/\//i.test(trimmed)) {
+    return { ok: false, error: 'Schema non supportato.' };
+  }
+  try {
+    await shell.openExternal(trimmed);
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };

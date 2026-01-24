@@ -9,5 +9,6 @@ contextBridge.exposeInMainWorld('api', {
   previewRename: (payload) => ipcRenderer.invoke('preview-rename', payload),
   applyRename: (payload) => ipcRenderer.invoke('apply-rename', payload),
   fetchMetadata: (payload) => ipcRenderer.invoke('fetch-metadata', payload),
-  verifyApiKey: (payload) => ipcRenderer.invoke('verify-api-key', payload)
+  verifyApiKey: (payload) => ipcRenderer.invoke('verify-api-key', payload),
+  openExternal: (url) => ipcRenderer.invoke('open-external', url)
 });

@@ -551,6 +551,12 @@ button:disabled {
   font-size: 12px;
 }
 
+.fetch-link {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .fetch-line {
   display: flex;
   align-items: center;
