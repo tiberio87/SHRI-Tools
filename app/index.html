@@ -201,7 +201,18 @@
             </div>
             <div class="field manual-field" id="sourceGroup">
               <label for="sourceInput">Sorgente</label>
-              <input id="sourceInput" type="text" placeholder="BluRay / UHD BluRay / WEB" />
+              <div class="dropdown" id="sourceDropdown">
+                <button id="sourceInputBtn" class="dropdown-trigger" type="button">Seleziona sorgente</button>
+                <div class="dropdown-menu" id="sourceDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="">Seleziona sorgente</button>
+                  <button class="dropdown-item" type="button" data-value="BluRay">BluRay</button>
+                  <button class="dropdown-item" type="button" data-value="UHD BluRay">UHD BluRay</button>
+                  <button class="dropdown-item" type="button" data-value="DVD">DVD</button>
+                  <button class="dropdown-item" type="button" data-value="HDTV">HDTV</button>
+                  <button class="dropdown-item" type="button" data-value="WEB">WEB</button>
+                </div>
+                <input id="sourceInput" type="hidden" value="" />
+              </div>
             </div>
             <div class="field manual-field" id="regionWrapper">
               <label for="regionInput">Regione</label>

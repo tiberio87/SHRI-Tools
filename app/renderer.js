@@ -53,6 +53,9 @@ const ui = {
   hybridCheckbox: document.getElementById('hybridCheckbox'),
   repackSelect: document.getElementById('repackSelect'),
   serviceInput: document.getElementById('serviceInput'),
+  sourceInputBtn: document.getElementById('sourceInputBtn'),
+  sourceDropdown: document.getElementById('sourceDropdown'),
+  sourceDropdownMenu: document.getElementById('sourceDropdownMenu'),
   sourceInput: document.getElementById('sourceInput'),
   regionInput: document.getElementById('regionInput'),
   regionWrapper: document.getElementById('regionWrapper'),
@@ -1935,6 +1938,7 @@ setupDropdown(
   ui.repackSelect,
   ui.repackDropdown.querySelector('.dropdown-menu')
 );
+setupDropdown(ui.sourceDropdown, ui.sourceInputBtn, ui.sourceInput, ui.sourceDropdownMenu);
 
 document.addEventListener('click', (event) => {
   if (!event.target.closest('.dropdown')) {
