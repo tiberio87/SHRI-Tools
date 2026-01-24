@@ -913,6 +913,73 @@ function getAudioTracks(mediaInfo) {
   return tracks.filter((track) => track['@type'] === 'Audio');
 }
 
+function getGeneralTrack(mediaInfo) {
+  const tracks = mediaInfo?.media?.track || [];
+  return tracks.find((track) => track['@type'] === 'General');
+}
+
+function hasEncodingSignature(track) {
+  if (!track) {
+    return false;
+  }
+  const keys = [
+    'Encoded_Library',
+    'Encoded_Library_Name',
+    'Encoded_Library_Settings',
+    'Encoding_Settings',
+    'Writing_library',
+    'Writing_Application',
+    'Encoded_Library/String',
+    'Encoded_Library_Name/String',
+    'Encoded_Library_Settings/String',
+    'Encoding_Settings/String',
+    'Writing library',
+    'Writing application'
+  ];
+  return keys.some((key) => String(track[key] || '').trim());
+}
+
+function suggestFormatFromMediaInfo(mediaInfo) {
+  if (!mediaInfo || mediaInfo.error) {
+    return '';
+  }
+  const videoTrack = getVideoTrack(mediaInfo);
+  const generalTrack = getGeneralTrack(mediaInfo);
+  const hasEncode = hasEncodingSignature(videoTrack) || hasEncodingSignature(generalTrack);
+  return hasEncode ? 'Encode' : 'WEB-DL';
+}
+
+function applyFormatSuggestion(suggested) {
+  const select = ui.formatSelect;
+  if (!select) {
+    return;
+  }
+  if (!select.dataset.labelsSaved) {
+    [...select.options].forEach((option) => {
+      option.dataset.label = option.textContent;
+    });
+    select.dataset.labelsSaved = 'true';
+  }
+
+  const manual = select.dataset.manual === 'true';
+  [...select.options].forEach((option) => {
+    if (option.dataset.label) {
+      option.textContent = option.dataset.label;
+    }
+  });
+
+  if (manual || !suggested) {
+    return;
+  }
+
+  select.value = suggested;
+  select.dataset.manual = 'false';
+  const option = [...select.options].find((opt) => opt.value === suggested);
+  if (option && option.dataset.label) {
+    option.textContent = `${option.dataset.label} (suggerito)`;
+  }
+}
+
 function getResolution(videoTrack) {
   const width = parseInt(videoTrack?.Width || 0, 10);
   const height = parseInt(videoTrack?.Height || 0, 10);
@@ -1192,6 +1259,9 @@ function fillFromMediaInfo() {
       ui.uhdCheckbox.checked = true;
     }
   }
+
+  const formatSuggestion = suggestFormatFromMediaInfo(state.mediaInfo);
+  applyFormatSuggestion(formatSuggestion);
 
   if (audioTracks.length) {
     const cleanAudio = audioTracks.filter((track) => {
