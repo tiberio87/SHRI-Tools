@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
@@ -361,6 +361,7 @@ function createWindow() {
     height: 960,
     minWidth: 1280,
     minHeight: 840,
+    autoHideMenuBar: true,
     backgroundColor: '#111319',
     webPreferences: {
       contextIsolation: true,
@@ -368,6 +369,7 @@ function createWindow() {
     }
   });
 
+  Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, 'app', 'index.html'));
 }
 
