@@ -365,6 +365,34 @@ function setFetchBadge(mode, label) {
   ui.fetchBadge.textContent = label;
 }
 
+function resetMetadataInputs() {
+  [
+    ui.imdbInput,
+    ui.tvdbInput,
+    ui.titleInput,
+    ui.yearInput,
+    ui.seasonInput,
+    ui.episodeInput,
+    ui.episodeTitleInput,
+    ui.partInput
+  ].forEach((input) => {
+    if (!input) {
+      return;
+    }
+    input.value = '';
+    input.dataset.manual = 'false';
+  });
+
+  if (ui.typeSelect) {
+    ui.typeSelect.dataset.manual = 'false';
+  }
+
+  if (ui.fetchBadge) {
+    ui.fetchBadge.classList.add('hidden');
+  }
+  setHint(ui.fetchStatus, '');
+}
+
 function mapTypeLabel(value) {
   const normalized = String(value || '').toLowerCase();
   if (!normalized) {
@@ -1888,6 +1916,8 @@ async function loadPath(targetPath) {
   if (!scan) {
     return;
   }
+
+  resetMetadataInputs();
 
   state.targetPath = targetPath;
   state.kind = scan.kind;
