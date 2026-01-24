@@ -579,6 +579,9 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     originalLanguage: '',
     episodes: [],
     warnings: [],
+    imdbId: '',
+    tmdbId: '',
+    tmdbType: '',
     tvdbAttempted: false,
     tvdbSeriesId: '',
     tvdbSeriesSlug: '',
@@ -608,11 +611,13 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       result.title = omdbData.Title || result.title;
       result.year = String(omdbData.Year || result.year).slice(0, 4);
       result.type = omdbData.Type || result.type;
+      result.imdbId = omdbData.imdbID || result.imdbId;
     } else if (titleGuess && omdbKey) {
       const omdbData = await fetchOmdbByTitle(titleGuess, yearGuess, omdbKey);
       result.title = omdbData.Title || result.title;
       result.year = String(omdbData.Year || result.year).slice(0, 4);
       result.type = omdbData.Type || result.type;
+      result.imdbId = omdbData.imdbID || result.imdbId;
     }
   } catch (error) {
     result.warnings.push(String(error));
@@ -623,6 +628,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       const tmdbFind = await fetchTmdbByImdb(imdbId, tmdbKey);
       const movie = tmdbFind?.movie_results?.[0];
       const tv = tmdbFind?.tv_results?.[0];
+      const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
       if (tv?.id) {
         tmdbTvId = String(tv.id);
       }
@@ -636,6 +642,16 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       }
       if (!result.year) {
         result.year = extractYear(movie?.release_date || tv?.first_air_date);
+      }
+      if (movie?.id && !isTvHint) {
+        result.tmdbId = String(movie.id);
+        result.tmdbType = 'movie';
+      } else if (tv?.id) {
+        result.tmdbId = String(tv.id);
+        result.tmdbType = 'tv';
+      } else if (movie?.id) {
+        result.tmdbId = String(movie.id);
+        result.tmdbType = 'movie';
       }
     } else if (tmdbKey && titleGuess) {
       const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
@@ -656,6 +672,8 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (!result.year) {
           result.year = extractYear(details.release_date || details.first_air_date);
         }
+        result.tmdbId = String(first.id);
+        result.tmdbType = type;
       }
     }
   } catch (error) {
@@ -726,6 +744,10 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         }));
         if (result.episodes.length) {
           result.tmdbFallback = true;
+        }
+        if (!result.tmdbId) {
+          result.tmdbId = tmdbTvId;
+          result.tmdbType = 'tv';
         }
       } catch (error) {
         result.warnings.push(`TMDb fallback errore: ${error}`);
