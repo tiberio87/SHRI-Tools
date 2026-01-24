@@ -562,6 +562,10 @@ button:disabled {
   font-size: 12px;
 }
 
+.settings-checkbox {
+  margin-top: 6px;
+}
+
 .fetch-link {
   color: var(--accent);
   text-decoration: underline;

@@ -81,6 +81,7 @@ const ui = {
   preferredLanguageSelect: document.getElementById('preferredLanguageSelect'),
   serviceListInput: document.getElementById('serviceListInput'),
   tagListInput: document.getElementById('tagListInput'),
+  autoTagDetectToggle: document.getElementById('autoTagDetectToggle'),
   serviceInputBtn: document.getElementById('serviceInputBtn'),
   serviceDropdown: document.getElementById('serviceDropdown'),
   serviceDropdownMenu: document.getElementById('serviceDropdownMenu'),
@@ -640,7 +641,8 @@ function loadSettings() {
       tvdbKey: '',
       preferredLanguage: 'it-IT',
       serviceList: '',
-      tagList: ''
+      tagList: '',
+      autoTagDetect: true
     };
     if (!raw) {
       return defaults;
@@ -654,7 +656,8 @@ function loadSettings() {
       tvdbKey: '',
       preferredLanguage: 'it-IT',
       serviceList: '',
-      tagList: ''
+      tagList: '',
+      autoTagDetect: true
     };
   }
 }
@@ -673,6 +676,9 @@ function applySettingsToUI(settings) {
   ui.preferredLanguageSelect.value = preferredLanguage;
   ui.serviceListInput.value = settings.serviceList || '';
   ui.tagListInput.value = settings.tagList || '';
+  if (ui.autoTagDetectToggle) {
+    ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
+  }
   loadServiceDefaults().then(() => updateServiceOptions(settings));
   updateTagOptions(settings);
 }
@@ -684,7 +690,8 @@ function getSettings() {
     tvdbKey: ui.tvdbKeyInput.value.trim(),
     preferredLanguage: ui.preferredLanguageSelect.value,
     serviceList: ui.serviceListInput.value.trim(),
-    tagList: ui.tagListInput.value.trim()
+    tagList: ui.tagListInput.value.trim(),
+    autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked)
   };
 }
 
@@ -965,6 +972,7 @@ function updateTagOptions(settings) {
   const tags = parseSimpleList(settings?.tagList || '');
   const unique = [...new Set(tags)];
   const suggestion = state.tagSuggestion || '';
+  const autoDetect = settings?.autoTagDetect !== false;
   ui.tagDropdownMenu.innerHTML = '';
 
   const blank = document.createElement('button');
@@ -983,22 +991,37 @@ function updateTagOptions(settings) {
     ui.tagDropdownMenu.appendChild(item);
   }
 
-  if (unique.length) {
-    const current = ui.tagInput.value;
-    if (current && unique.includes(current)) {
-      ui.tagInputBtn.textContent = current;
-    } else {
-      ui.tagInput.value = '';
-      ui.tagInputBtn.textContent = suggestion ? `Suggerito: ${suggestion}` : 'Seleziona tag gruppo';
-    }
-  } else {
-    ui.tagInput.value = '';
-    if (suggestion) {
-      ui.tagInputBtn.textContent = `Suggerito: ${suggestion}`;
-    } else {
-      ui.tagInputBtn.textContent = 'Aggiungili nelle Impostazioni';
-    }
+  const manual = ui.tagInput.dataset.manual === 'true';
+  const current = ui.tagInput.value;
+  const currentInList = current && unique.includes(current);
+
+  if (autoDetect && suggestion && !manual) {
+    ui.tagInput.value = suggestion;
+    ui.tagInput.dataset.manual = 'false';
+    ui.tagInputBtn.textContent = `Rilevato: ${suggestion}`;
+    return;
   }
+
+  if (!autoDetect && !currentInList) {
+    ui.tagInput.value = '';
+    ui.tagInput.dataset.manual = 'false';
+  }
+
+  if (currentInList) {
+    ui.tagInputBtn.textContent = current;
+    return;
+  }
+
+  if (!unique.length) {
+    ui.tagInputBtn.textContent = suggestion && autoDetect
+      ? `Rilevato: ${suggestion}`
+      : 'Aggiungili nelle Impostazioni';
+    return;
+  }
+
+  ui.tagInputBtn.textContent = suggestion && autoDetect
+    ? `Rilevato: ${suggestion}`
+    : 'Seleziona tag gruppo';
 }
 
 function pad2(value) {
