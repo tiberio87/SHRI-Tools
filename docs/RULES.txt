@@ -1,0 +1,205 @@
+2) Regole della Lingua
+Le seguenti regole sulla lingua si applicano a ogni contenuto caricato sul tracker, indipendentemente dal fatto che sia stato realizzato da Gruppi P2P, Crew Interne o dagli utenti stessi.
+Qualora una release non rispetti pienamente i requisiti linguistici richiesti, l'upload è comunque consentito per garantire la disponibilità del contenuto. Tuttavia, il torrent potrebbe essere oggetto di trumping.
+2.1 L'audio primario deve essere in lingua italiana.
+2.2 L'audio secondario deve essere presente e nella lingua originale.
+2.3 L'upload di contenuti che presentano tracce audio oltre all'italiano e alla lingua originale, sono comunque consentiti, ma potrebbero essere oggetto di trumping. Fa eccezione il formato Full Disc.
+2.4 In mancanza dell'audio secondario o nel caso che fosse nella lingua originale, l'upload sarà ritenuto comunque valido, a condizione che l'audio primario sia in italiano. Il torrent verrà marcato come trumpabile.
+2.5 È possibile caricare contenuti con audio esclusivamente in lingua straniera solo nel caso in cui non esista una versione ufficiale che contenga la traccia audio in lingua italiana. In questo caso la presenza dei sottotitoli italiani ufficiali è obbligatoria.
+2.5.1 Contenuti come concerti, documentari, film muti, opere, spettacoli di danza e simili sono consentiti per l'upload a prescindere dalla presenza dei sottotitoli in italiano.
+2.6 È proibito in generale effettuare l'upload di contenuti per i quali la lingua italiana non è prevista in nessuna versione ufficiale, nemmeno sottoforma di sottotitoli.
+3) Contenuti consentiti
+3.1 Film e Serie TV (a condizione che esista su TMDB o IMDB, altrimenti contattare lo Staff prima dell'upload)
+3.2 Opere di Animazione (Anime, Cartoon).
+3.3 Contenuti descritti al punto 2.5.1, come concerti, opera, spettacoli sportivi ecc.
+4) Contenuti vietati
+4.1 Contenuti accessibili gratuitamente (es. video YouTube)
+4.2 Qualsiasi contenuto pornografico o dichiarato ufficialmente "Per Adulti"
+4.3 Box-Set o TV Pack. È ammesso solo un film o episodio per torrent, con una sola eccezione per i Season Pack.
+4.3.1 Raccolte di film, cofanetti, trilogie e altri contenuti simili devono essere caricati singolarmente (1 film per torrent).
+4.3.2 È consentito caricare solo un episodio TV per torrent, con l'unica eccezione dei Season Pack che possono contenere tutti gli episodi di una singola stagione conclusa.
+4.5 File addizionali (NFOs, samples, screenshots, sottotitoli, ecc.) con alcune eccezioni per gli Anime.
+4.6 Film e Serie TV compressi in archivi di qualsiasi tipo come zip, tar.gz, 7z, rar, ace, ecc.
+4.7 Re-encodes / Transcode o contenuti up-scalati.
+4.8 Files estranei, non necessari e non richiesti all'interno del torrent.
+4.9 Contenuti oggettivamente di scarsa qualità.
+4.10 Contenuti incompleti, con difetti audio e video o problemi che ne impediscono la corretta riproduzione.
+4.11 Contenuti up-scalati (es. da 720p a 1080p).
+4.12 Film e serie TV in formato Full Disc alterati nel contenuto e nelle forma. L'upload deve essere la riproduzione fedele 1:1 dell'originale. Alterazioni di qualsiasi tipo sono proibite.
+4.13 Materiale esplicitamente dichiarato esclusivo di altri tracker. Questa violazione è ritenuta grave e potrebbe causare il Ban dell'account ShareIsland, oltre che di altri tracker.
+5) Risoluzioni consentite
+5.1 Sono ammessi contenuti con risoluzione SD, HD e UHD.
+5.2 L'upload di contenuti SD è consentito esclusivamente in formato Full Disc (DVD). Per gli altri formati, l'upload è consentito solo nei casi in cui:
+5.2.2 Nel tracker non è presente una versione con risoluzione HD o UHD.
+5.2.3 Non esistono versioni ufficiali con risoluzione HD o UHD nei circuiti di distribuzione retail o streaming.
+6) Formati
+6.1 Full Disc
+Sono copie 1:1 di un DVD o Blu-ray Disc (HD o UHD), complete e inalterate.
+
+6.1.1 Per i DVD, è richiesto l'uso del contenitore VOB_IFO (cartelle VIDEO_TS).
+6.1.2 Per i Blu-ray, è richiesto l'uso del contenitore M2TS (cartelle BDMV).
+6.1.2.1 Fanno eccezione i dischi con contenuti in 3D, i quali devono essere caricati sottoforma di immagini ISO.
+6.1.3 Tutti i Full Disc devono essere intatti, non alterati e completi. Nessun re-encoding o re-authoring è permesso.
+6.1.5 Tutte le protezioni e le restrizioni basate sulla regione, devono essere rimosse.
+6.5.2 È obbligatorio allegare il log BDInfo (da incollare nel campo BDInfo (Quick Summary) della pagina di Upload.
+6.2 Remux
+
+Qualità audio e video lossless, identica al Full Disc, ma distribuito sottoforma di un singolo file MKV
+
+6.2.1 È richiesto l'utilizzo del contenitore MKV.
+6.2.2 La traccia video non deve essere compressa in alcun modo. Le uniche manipolazioni permesse riguardano l'HDR.
+6.2.3 I Remux devono sempre contenere le tracce audio della miglior qualità offerta dal Full Disc utilizzato come sorgente.
+6.2.4 L'audio PCM 1.0 & 2.0 deve essere convertito in FLAC.
+6.2.5.1 L'audio a 24-bit non deve essere convertito a 16-bit a meno che non si tratti di audio "padded" (verificabile con eac3to).
+6.2.6.2 L'audio PCM con più di 2 canali, deve essere convertito nel formato DTS-HD MA, FLAC o True-HD.
+6.2.7 Per ogni traccia audio in formato True-HD presente nella sorgente e consentita dalle Regole della Lingua, deve essere inclusa separatamente la relativa traccia audio di compatibilità.
+6.2.8 Tutti i sottotitoli presenti nella sorgente utilizzata, devono essere inclusi e nominati correttamente (Regolari, SDH, Forced)
+6.2.2 È obbligatorio allegare il log MediaInfo (da incollare nel campo MediaInfo Parser della pagina di Upload).
+6.3 WEB-DL
+
+Contenuto estratto direttamente da un servizio di streaming senza effettuare compressioni audio/video.
+
+6.3.1 È richiesto l'utilizzo del contenitore MKV.
+6.3.2 La traccia video non deve essere compressa in alcun modo. Le uniche manipolazioni permesse riguardano l'HDR.
+6.3.3 È obbligatorio allegare il log MediaInfo (da incollare nel campo MediaInfo Parser della pagina di Upload).
+6.4 Encode
+
+Versioni ottimizzate per peso e qualità. Nonostante sia possibile creare un encode di qualità partendo da una versione WEB-DL, il risultato migliore si ottiene sempre partendo da sorgenti Remux o Full Disc.
+
+6.4.1 È richiesto l'utilizzo del contenitore MKV, mentre gli unici encoder permessi sono x264, x265 e AV1.
+6.4.2 È assolutamente proibito effettuare ri-codifiche (in gergo "transcode"), ossia creare un encode partendo da un sorgente che è già un encode.
+6.4.3 Codec, risoluzioni e contenitori errati possono essere tollerati in rare circostanze e a discrezione dello Staff se il film in questione non può essere trovato nella sua forma non alterata. Se invece il film è disponibile nel formato adeguato, nessun encode dovrebbe mai essere realizzato e caricato usando le impostazioni sbagliate.
+6.4.4 Le bande nere presenti nel video originale devono essere rimosse tramite Crop.
+6.4.5 È obbligatorio allegare il log MediaInfo (da incollare nel campo MediaInfo Parser della pagina di Upload).
+6.4.5.1 La sezione Encoding settings del log MediaInfo deve essere presente e non deve essere alterata.
+6.4.6 È obbligatorio allegare 3+ screenshot in formato PNG dell'encode (guida)
+6.4.6.1 È gradita ma non obbligatoria la presenza di screenshot di comparazione caricati su slow.pics e dei log di encoding.
+6.4.7 Un'ottima abitudine che aiuta utenti e Staff ed è sempre consigliata è quella di inserire il nome delle sorgenti utilizzate per realizzare l'encode. Nel caso di verifiche, comparazioni e valutazioni varie, sapere da quale sorgente proviene un encode è di fondamentale importanza.
+7) Serie TV e Season Pack
+7.1 Dopo che una stagione è completamente terminata, c'è un periodo di 24 ore dove i singoli episodi possono ancora essere caricati. Al termine di questo periodo, tutti i caricamenti relativi a quella stagione devono essere contenuti in una raccolta che prende il nome di Season Pack.
+7.1.1 I singoli episodi devono essere trumpati dopo aver caricato il Season Pack. Fare riferimento alle regole 3.6 e 5 della sezione Trump.
+7.2 Non sono consentite più stagioni all'interno di in un solo torrent a meno che non si tratti di un DVD o Blu-ray caricato in formato Full Disc.
+8) Denominazione
+Prestare la massima attenzione alla nomenclatura è fondamentale: sebbene il nome del file debba essere accurato, il titolo inserito sul sito è prioritario. Quest'ultimo garantisce l'uniformità agli standard del tracker e deve includere tutti i dettagli tecnici necessari che spesso non possono essere contenuti nel semplice nome del file.
+
+8.1 I titoli corretti da utilizzare sono quelli riportati su TMDB e IMDB per i Film e su TVDB per le Serie TV.
+8.2 Il nome del file deve includere il titolo, l'anno, la risoluzione, la sorgente, il codec video e se disponibile, il Tag dell'autore o del gruppo che ha realizzato la release.
+In aggiunta è fortemente consigliato includere anche le lingue audio (massimo due, usando abbreviazioni), il Tag del codec audio e i canali audio.
+8.3 Il nome della release sul sito deve seguire le regole di Convenzione dei Titoli.
+8.4 Per le release realizzate da gruppi o crew esterne che non seguono lo standard, vige l'obbligo di preservare l'integrità del materiale originale: il nome dei file e delle cartelle non deve essere mai alterato.
+8.4.1 È tuttavia compito e dovere dell'utente, in fase di caricamento, inserire nel campo Titolo della pagina di Upload, il nome corretto e conforme allo standard, per esempio aggiungendo eventuali tag mancanti.
+9) Convenzioni dei Titoli
+9.1 Film
+
+WEB-DL
+Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
+Transformers One 2024 ITA IMAX REPACK 2160p UHD NF WEB-DL DD+ 5.1 Atmos DV HDR H.265-iSlaNd
+WEBRip
+Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
+El Camino A Breaking Bad Movie 2019 ITA REPACK 2160p UHD NF WEBRip DD+ 5.1 Atmos x264-BlackBit
+Encode
+Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag
+Oppenheimer 2023 ITA IMAX 2160p UHD BluRay DTS-HD MA 5.1 DV HDR x265-iSlaNd
+Remux
+Titolo Anno 3D LINGUA Edizione Hybrid REPACK Risoluzione UHD Src REMUX HDR VCodec ACodec Canali Meta-Tag
+Avatar 2009 3D ITA Extended 2160p UHD BluRay REMUX DV HDR HEVC DTS-HD MA 7.1 Atmos-FraMeSToR
+Full Disc
+Titolo Anno 3D Edizione REPACK Risoluzione Regione UHD Src HDR VCodec ACodec Canali Meta-Tag
+Avatar 2009 3D IMAX 2160p EUR UHD Blu-ray HDR DV HEVC TrueHD 7.1 Atmos-B0MBARDiERS
+
+9.2 Stagioni di Serie TV
+Se l'anno di uscita dello spettacolo è incluso nel titolo presente su TVDB, allora deve essere incluso anche nel nome della release.
+
+WEB-DL
+Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02 ITA REPACK 2160p UHD AMZN WEB-DL DD+ 5.1 Atmos DV HDR H.265-Kitsune
+WEBRip
+Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02 ITA 2160p UHD AMZN WEBRip DD+ 5.1 x264-Kitsune
+Encode
+Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag
+Halo 2022 S01 ITA 2160p UHD BluRay TrueHD 7.1 Atmos DV HDR x265-Stelks
+REMUX
+Titolo Anno S## 3D LINGUA Edizione Hybrid REPACK Risoluzione UHD Src REMUX HDR VCodec ACodec Canali Meta-Tag
+House of the Dragon S01 ITA 2160p UHD BluRay REMUX HDR DV HEVC TrueHD 7.1 Atmos-TekMUX
+Full Disc
+Titolo Anno S## 3D Edizione REPACK Risoluzione Regione UHD Src HDR VCodec ACodec Canali Meta-Tag
+Game of Thrones S07 2160p USA UHD Blu-ray DV HDR10+ HEVC TrueHD 7.1 Atmos-FraMeSToR
+
+9.3 Episodi di Serie TV:
+Se l'anno di uscita dello spettacolo è incluso nel titolo su TVDB, deve essere inserito.
+
+WEB-DL
+Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02E01 A Lesson for Your Next Life ITA 2160p UHD AMZN WEB-DL DD+ 5.1 Atmos HDR H.265-Kitsune
+WEBRip
+Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02E01 A Lesson for Your Next Life ITA 2160p UHD AMZN WEBRip DD+ 5.1 x264-Kitsune
+Encode
+Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag
+Halo 2022 S01E01 Contact ITA 2160p UHD BluRay TrueHD 7.1 Atmos DV HDR x265-Stelks
+REMUX
+Titolo Anno S##E## Tit_Ep Parte 3D LINGUA Edizione Hybrid REPACK Risoluzione UHD Src REMUX HDR VCodec ACodec Canali Meta-Tag
+House of the Dragon S01E01 The Heirs of the Dragon ITA 2160p UHD BluRay REMUX HDR DV HEVC TrueHD 7.1 Atmos-TekMUX
+
+9.4 Anime:
+Valgono le stesse regole di denominazione delle Serie TV (Stagione o Episodi).
+
+
+9.5 Spiegazione del Titolo:
+9.5.1 Titolo: il titolo del Film, Episodio o Serie TV presente sui rispettivi siti TMDB, IMDB e TVDB.
+9.5.2 Nazione (IT, UK, US ecc.): usato solo per disambiguare tra contenuti con lo stesso nome.
+9.5.3 Anno: l'anno di uscita del film presente su TMDB o IMDB. Mentre per i contenuti TV, l'anno va incluso solo se è presente anche nel titolo su TVDB.
+9.5.4 S##: numero della stagione, se applicabile.
+9.5.5 E##: numero dell'episodio, se applicabile.
+9.5.5.3 3D: Tag per contenuti tridimensionali (solo Remux e Full Disc).
+98.5.6 LINGUA: I Tag della lingua vanno scritti in maiuscolo e in presenza di più lingue, vanno separate da un trattino (" - ").
+A seguire sono riportate le varie casistiche e il Tag da utilizzare:
+9.5.6.1 La release include solo l'audio italiano: In presenza di una sola traccia audio in lingua italiana → ITA.
+9.5.6.2 La release include solo l'audio in lingua originale, diversa dall'italiano (i sottotitoli in italiano sono obbligatori): In presenza di una sola traccia audio, per esempio in francese → FRA.
+9.5.6.3 La release include l'audio in lingua italiana e in lingua originale: In presenza di una traccia audio in lingua italiana e una in lingua originale, per esempio in tedesco → ITA - GER.
+9.5.6.4 La release include l'audio in tre lingue diverse: In presenza di tre tracce audio in lingue diverse → ITA - MULTI.
+Fare riferimento alle Regole della Lingua per avere la certezza che il contenuto che state caricando rispetti i requisiti sulla lingua. In caso di dubbi, chiedere allo Staff o nel forum.
+
+9.5.7 Edizione: include versioni (Director's Cut, Extended, Unrated, IMAX, Open Matte, ecc.) ed edizioni speciali (Anniversary, Limited e Special Edition, Restored, Remastered, 4K Remaster ecc.).
+9.5.8 Hybrid: incluso solo quando la traccia video e la traccia audio provengono da sorgenti diverse o quando in una traccia video non-Dolby Vision, viene iniettato il set di metadati prelevati da una traccia video Dolby Vision.
+9.5.9 REPACK: incluso solo quando viene rilasciata nuovamente la stessa release ma con eventuali errori e difetti corretti ed eliminati. Un Repack trumpa la release precedente (regola Trump 3.2.1). Lo stesso vale per PROPER o RERIP. Nel caso, applicare il Tag corretto.
+9.5.10 Risoluzione: risoluzione video (480i, 480p, 576i, 576p, 720p, 1080p, 1080i, 2160p).
+9.5.11 UHD: Tag per contenuti a risoluzione 2160p (4K Ultra HD). Facoltativo in presenza del Tag Risoluzione 2160p.
+9.5.12 Regione: vale solo per il formato Full Disc e indica il paese di rilascio del disco (USA, EUR, IT, JP, ecc.).
+9.5.13 Servizio: vale solo per i contenuti WEB ed è semplicemente l'abbreviazione del servizio di streaming (es. NF per Netflix, AMZN per Amazon, DSNP per Disney+, iT per Itunes, ecc.).
+9.5.14 Src: web (WEB-DL, WEBRip) oppure disco fisico (NTSC DVD, PAL DVD, DVDRip, HD DVD, BluRay, UHD BluRay). Per il disco completo, la dicitura deve essere più specifica (e.g. NTSC DVD5, NTSC DVD9, PAL DVD5, HD DVD, Blu-ray, UHD Blu-ray). Nota bene! Si usi "BluRay" (senza trattino) per Remux ed Encode, ma "Blu-ray" (con trattino) per Full Disc;
+9.5.15 HDR: se omesso, si assume che si tratti di contenuto SDR. Altrimenti, uno o più di questi Tag va incluso: HDR, HDR10+, DV, DoVi.
+9.5.16 VCodec: codec video (MPEG-2, VC-1, AVC, HEVC, x264, H.264, x265, H.265, AV1);
+9.5.17 ACodec: codec audio della traccia audio in italiano di migliore qualità [AAC, DD (anche AC3), DD-EX, DD+ (anche E-AC3), TrueHD, DTS, DTS-ES, DTS-HD MA, DTS-HD HRA, DTS:X, FLAC, OPUS];
+9.5.18 Canali: Canali audio della traccia audio in italiano di migliore qualità (1.0, 2.0, 2.1, 3.0, 3.1, 4.0, 4.1, 5.0, 5.1, 6.1, 7.1);
+9.5.19 Meta: Metadati aggiuntivi della traccia audio. Se omesso, si assume che non esistano. Altrimenti, uno tra questi Tag va incluso: Atmos, Auro3D.
+9.5.20 Tag: Tag della Crew Interna, del Gruppo P2P o del singolo utente che ha realizzato il contenuto. Per le release personali è consentito utilizzare il proprio Tag personale.
+10) Regole di Slot e Trumping
+Su ShareIsland adottiamo un sistema di Trumping (sostituzione) per garantire contenuti della massima qualità possibile.
+Parallelamente, il nostro sistema di Slot assicura un’ampia varietà di versioni, lasciando agli utenti la piena libertà di scegliere (e condividere) la versione che meglio risponde alle proprie esigenze.
+10.1 Slot (Coesistenza)
+Slot
+10.2 Trumping (Sostituzione)
+Trump
+11) Requisiti della Descrizione
+11.1 Generale:
+11.1.1 Le descrizioni devono essere in italiano.
+11.1.2 Non inserire link ad altri tracker.
+11.1.3 Non includere informazioni estranee o descrizioni che non sono richieste dalle regole, come la sinossi, i poster, i voti o altre informazioni già disponibili automaticamente nella scheda del film/episodio.
+11.1.4 È obbligatorio includere 3 o più Screenshots. Per effettuare uno Screenshots conforme, fai riferimento alla nostra guida.
+11.1.5 È obbligatorio includere il log MediaInfo o BDInfo nell'apposito campo. Per i dettagli sui vari casi, proseguire al punto successivo.
+
+11.2 Regole specifiche dei formati
+11.2.1 Full Disc (DVD): È obbligatorio includere il MediaInfo - nel campo MediaInfo - del file .IFO (generalmente, ma non sempre, quello di dimensioni maggiori) è quello che contiene le informazioni importanti come la durata, la lingua dell'audio e i sottotitoli - ma non il bitrate. Pertanto, il MediaInfo del file .VOB di dimensioni maggiori, dovrebbe anch'esso essere incluso nella descrizione, separatamente, all'interno di uno spoiler nella descrizione, in modo da fornire informazioni anche sul bitrate.
+Puoi includere immagini di prove fisiche (proof) riguardo il possesso del contenuto originale e informazioni sul materiale extra incluso.
+11.2.2 Full Disc (Blu-ray): È obbligatorio includere nel campo Quick Summary la scansione completa di BDInfo, piuttosto che il log completo nella descrizione. Non nella sezione MediaInfo!
+Puoi includere immagini di prove fisiche (proof) riguardo il possesso del contenuto originale e informazioni sul materiale extra incluso.
+11.2.3 REMUX: È obbligatorio includere il MediaInfo completo nell'apposito campo.
+Per i files multipli, come gli episodi TV di un Season Pack, includere il MediaInfo del primo episodio.
+lI log eac3to è altamente raccomandato ma non obbligatorio, mentre è sempre altamente consigliato citare il nome della release sorgente, Full Disc o Remux che sia.
+11.2.4 WEB: È obbligatorio includere il MediaInfo completo nell'apposito campo.
+Per i files multipli, come gli episodi TV di un Season Pack, includere il MediaInfo del primo episodio.
+11.2.5 ENCODE: È obbligatorio includere il MediaInfo completo nell'apposito campo, assicurandosi che la sezione Encoding settings sia presente e visibile
+Per i files multipli, come gli episodi TV di un Season Pack, includere il MediaInfo del primo episodio.
+I log x264/x265 e le note sui filtri utilizzati sono altamente raccomandati ma non obbligatori, mentre è sempre altamente consigliato citare il nome della release sorgente, Full Disc o Remux che sia.
