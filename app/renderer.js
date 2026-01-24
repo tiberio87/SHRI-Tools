@@ -2278,6 +2278,18 @@ ui.languageTagInput.addEventListener('input', () => {
   ui.languageTagInput.dataset.manual = 'true';
 });
 
+ui.tagInput.addEventListener('input', (event) => {
+  const inputType = event?.inputType || '';
+  if (inputType !== 'insertReplacementText') {
+    return;
+  }
+  const options = Array.from(ui.tagOptions?.options || []);
+  const match = options.some((option) => option.value === ui.tagInput.value);
+  if (match) {
+    ui.tagInput.blur();
+  }
+});
+
 ui.originalLanguageInput.addEventListener('input', () => {
   if (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false') {
     ui.languageTagInput.value = buildLanguageTag(state.audioLangs, ui.originalLanguageInput.value);
