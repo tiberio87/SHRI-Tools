@@ -280,6 +280,11 @@ body:not(.light) .theme-toggle .icon-moon {
   align-self: center;
 }
 
+.checkbox.align-input {
+  align-self: start;
+  margin-top: 18px;
+}
+
 .field {
   display: flex;
   flex-direction: column;
