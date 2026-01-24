@@ -1,0 +1,8 @@
+*
+!.gitignore
+!app/
+!app/**
+!main.js
+!preload.js
+!package.json
+!package-lock.json

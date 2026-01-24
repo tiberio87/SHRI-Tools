@@ -1,0 +1,11 @@
+[
+  {"code": "AMZN", "label": "Amazon Prime Video"},
+  {"code": "NF", "label": "Netflix"},
+  {"code": "DSNP", "label": "Disney+"},
+  {"code": "ATVP", "label": "Apple TV+"},
+  {"code": "NOW", "label": "NOW / NOW TV (Sky)"},
+  {"code": "DAZN", "label": "DAZN"},
+  {"code": "DSCP", "label": "Discovery+"},
+  {"code": "CR", "label": "Crunchyroll"},
+  {"code": "iT", "label": "iTunes"}
+]

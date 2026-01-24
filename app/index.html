@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.themoviedb.org https://www.omdbapi.com https://api4.thetvdb.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ShareIsland Renamer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="title-block">
+        <h1>ShareIsland Renamer</h1>
+        <p>Rinomina cartelle e file secondo le regole del tracker.</p>
+      </div>
+      <div class="header-actions">
+        <label class="checkbox inline">
+          <input id="autoDetectToggle" type="checkbox" checked />Auto-detect
+        </label>
+        <button id="openSettingsBtn" class="secondary">Impostazioni</button>
+        <div id="status" class="status">Pronto</div>
+        <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
+          <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path>
+          </svg>
+          <svg class="icon-moon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+            <path d="M20 14.5A7.5 7.5 0 1 1 9.5 4a6.5 6.5 0 1 0 10.5 10.5z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="content-grid">
+      <div class="left-stack">
+        <section class="section">
+          <div class="section-header">
+            <h2>Sorgente</h2>
+            <div class="section-actions">
+              <button id="selectFileBtn" class="primary">Seleziona file</button>
+              <button id="selectFolderBtn" class="secondary">Seleziona cartella</button>
+            </div>
+          </div>
+          <div id="selectedPath" class="path">Nessun percorso selezionato.</div>
+          <div id="scanHint" class="hint"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-header">
+            <h2>Metadata</h2>
+            <div class="section-actions">
+              <button id="autoDetectBtn" class="secondary">Rileva</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="imdbInput">IMDb ID (fallback)</label>
+              <input id="imdbInput" type="text" placeholder="tt1234567" />
+            </div>
+            <div class="field">
+              <label for="tvdbInput">TVDB ID (fallback)</label>
+              <input id="tvdbInput" type="text" placeholder="12345" />
+            </div>
+            <div class="field">
+              <label for="typeSelect">Tipo</label>
+              <select id="typeSelect">
+                <option value="movie">Film</option>
+                <option value="tv-season">Serie TV (Stagione)</option>
+                <option value="tv-episode">Serie TV (Episodio)</option>
+                <option value="anime-season">Anime (Stagione)</option>
+                <option value="anime-episode">Anime (Episodio)</option>
+              </select>
+            </div>
+          </div>
+          <div class="fetch-line">
+            <div id="fetchBadge" class="badge hidden"></div>
+            <div id="fetchStatus" class="hint"></div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="titleInput">Titolo</label>
+              <input id="titleInput" type="text" placeholder="Titolo ufficiale" />
+            </div>
+            <div class="field">
+              <label for="yearInput">Anno</label>
+              <input id="yearInput" type="text" placeholder="2024" />
+            </div>
+            <label class="checkbox">
+              <input id="includeYear" type="checkbox" checked />
+              Includi anno
+            </label>
+          </div>
+          <div id="seasonEpisodeGroup" class="row">
+            <div class="field">
+              <label for="seasonInput">Stagione</label>
+              <input id="seasonInput" type="number" min="1" placeholder="1" />
+            </div>
+            <div class="field">
+              <label for="episodeInput">Episodio</label>
+              <input id="episodeInput" type="number" min="1" placeholder="1" />
+            </div>
+          </div>
+          <div id="episodeTitleGroup" class="row">
+            <div class="field">
+              <label for="episodeTitleInput">Titolo episodio</label>
+              <input id="episodeTitleInput" type="text" placeholder="Titolo episodio" />
+            </div>
+            <div class="field manual-field">
+              <label for="partInput">Parte</label>
+              <input id="partInput" type="text" placeholder="Part 1" />
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-header">
+            <h2>Lingua, Audio, Video & Release</h2>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="formatSelect">Formato</label>
+              <select id="formatSelect">
+                <option value="WEB-DL">WEB-DL</option>
+                <option value="WEBRip">WEBRip</option>
+                <option value="Encode">Encode</option>
+                <option value="Remux">Remux</option>
+                <option value="Full Disc">Full Disc</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="resolutionInput">Risoluzione</label>
+              <input id="resolutionInput" type="text" placeholder="2160p" />
+            </div>
+            <div class="field">
+              <label for="videoCodecInput">Codec video</label>
+              <input id="videoCodecInput" type="text" placeholder="H.265 / x265 / HEVC" />
+            </div>
+          </div>
+          <div class="row">
+            <label class="checkbox"><input id="uhdCheckbox" type="checkbox" />UHD</label>
+            <label class="checkbox"><input id="hdrCheckbox" type="checkbox" />HDR</label>
+            <label class="checkbox"><input id="hdr10plusCheckbox" type="checkbox" />HDR10+</label>
+            <label class="checkbox"><input id="dvCheckbox" type="checkbox" />DV</label>
+            <label class="checkbox" id="threeDWrapper"><input id="threeDCheckbox" type="checkbox" />3D</label>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="originalLanguageInput">Lingua originale</label>
+              <input id="originalLanguageInput" type="text" placeholder="ENG / ITA / FRA" />
+            </div>
+            <div class="field">
+              <label for="languageTagInput">Tag lingua</label>
+              <input id="languageTagInput" type="text" placeholder="ITA - ENG" />
+            </div>
+            <div class="field">
+              <label for="audioCodecInput">Codec audio</label>
+              <input id="audioCodecInput" type="text" placeholder="DD+ / TrueHD" />
+            </div>
+            <div class="field">
+              <label for="audioChannelsInput">Canali</label>
+              <input id="audioChannelsInput" type="text" placeholder="5.1" />
+            </div>
+            <div class="field">
+              <label for="audioMetaInput">Meta</label>
+              <input id="audioMetaInput" type="text" placeholder="Atmos / Auro3D" />
+            </div>
+          </div>
+          <div id="audioLangHint" class="hint">Lingue audio rilevate: -</div>
+          <div class="row">
+            <div class="field manual-field">
+              <label for="editionInput">Edizione</label>
+              <input id="editionInput" type="text" placeholder="IMAX / Extended" />
+            </div>
+            <label class="checkbox manual-field"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
+            <div class="field manual-field">
+              <label for="repackSelect">Repack</label>
+              <div class="dropdown" id="repackDropdown">
+                <button id="repackSelectBtn" class="dropdown-trigger" type="button">Nessuno</button>
+                <div class="dropdown-menu">
+                  <button class="dropdown-item" type="button" data-value="">Nessuno</button>
+                  <button class="dropdown-item" type="button" data-value="REPACK">REPACK</button>
+                  <button class="dropdown-item" type="button" data-value="PROPER">PROPER</button>
+                  <button class="dropdown-item" type="button" data-value="RERIP">RERIP</button>
+                </div>
+                <input id="repackSelect" type="hidden" value="" />
+              </div>
+            </div>
+            <div class="field manual-field" id="serviceGroup">
+              <label for="serviceInput">Servizio</label>
+              <div class="dropdown" id="serviceDropdown">
+                <button id="serviceInputBtn" class="dropdown-trigger" type="button">Seleziona servizio</button>
+                <div class="dropdown-menu" id="serviceDropdownMenu"></div>
+                <input id="serviceInput" type="hidden" value="" />
+              </div>
+            </div>
+            <div class="field manual-field" id="sourceGroup">
+              <label for="sourceInput">Sorgente</label>
+              <input id="sourceInput" type="text" placeholder="BluRay / UHD BluRay / WEB" />
+            </div>
+            <div class="field manual-field" id="regionWrapper">
+              <label for="regionInput">Regione</label>
+              <input id="regionInput" type="text" placeholder="EUR / USA / IT" />
+            </div>
+            <div class="field manual-field">
+              <label for="tagInput">Tag gruppo</label>
+              <input id="tagInput" type="text" placeholder="iSlaNd" list="tagOptions" />
+              <datalist id="tagOptions"></datalist>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <aside class="right-stack">
+        <section class="section">
+          <div class="section-header">
+            <h2>Rinomina</h2>
+          </div>
+          <div class="row">
+            <label class="checkbox"><input id="renameFileCheckbox" type="checkbox" checked />Rinomina file</label>
+            <label class="checkbox"><input id="renameFolderCheckbox" type="checkbox" checked />Rinomina cartella</label>
+          </div>
+          <button id="applyRenameBtn" class="primary">Applica rinomina</button>
+          <div id="renameHint" class="hint"></div>
+        </section>
+
+        <section class="section">
+          <h2>Anteprima</h2>
+          <div class="preview-block">
+            <div class="label">Nome cartella</div>
+            <div id="folderNamePreview" class="preview">-</div>
+          </div>
+          <div class="preview-block">
+            <div class="label">Nome base file</div>
+            <div id="baseNamePreview" class="preview">-</div>
+          </div>
+          <div class="preview-block">
+            <div class="label">Esempio file</div>
+            <div id="fileNamePreview" class="preview">-</div>
+          </div>
+        </section>
+
+        <section class="section plan-section">
+          <h2>Piano di rinomina</h2>
+          <div id="renamePlanList" class="plan-list"></div>
+          <div id="warningList" class="warning-list"></div>
+        </section>
+      </aside>
+    </div>
+  </div>
+
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Impostazioni</h2>
+        <button id="closeSettingsBtn" class="secondary">Chiudi</button>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="serviceListInput">Servizi personalizzati</label>
+          <textarea id="serviceListInput" rows="3" placeholder="Es. Amazon=AMZN"></textarea>
+        </div>
+        <div class="field">
+          <label for="tagListInput">Tag gruppo salvati</label>
+          <textarea id="tagListInput" rows="3" placeholder="Es. iSlaNd"></textarea>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="omdbKeyInput">OMDb API Key</label>
+          <div class="input-with-icon">
+            <input id="omdbKeyInput" type="password" placeholder="Chiave OMDb" />
+            <button class="icon-button" type="button" data-target="omdbKeyInput" aria-label="Mostra chiave OMDb">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="tmdbKeyInput">TMDb API Key</label>
+          <div class="input-with-icon">
+            <input id="tmdbKeyInput" type="password" placeholder="Chiave TMDb" />
+            <button class="icon-button" type="button" data-target="tmdbKeyInput" aria-label="Mostra chiave TMDb">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="tvdbKeyInput">TVDB API Key</label>
+          <div class="input-with-icon">
+            <input id="tvdbKeyInput" type="password" placeholder="Chiave TVDB" />
+            <button class="icon-button" type="button" data-target="tvdbKeyInput" aria-label="Mostra chiave TVDB">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="settings-footer">
+        <div class="settings-footer-left">
+          <button id="saveSettingsBtn" class="primary small">Salva impostazioni</button>
+          <div id="settingsHint" class="hint"></div>
+        </div>
+        <div class="settings-footer-right">
+          <button id="openRulesBtn" class="secondary small">Apri rules</button>
+          <button id="openDebugBtn" class="secondary small">Apri log</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="mediaInfoModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>MediaInfo</h2>
+        <button id="closeMediaInfoBtn" class="secondary">Chiudi</button>
+      </div>
+      <div id="mediaInfoPath" class="hint"></div>
+      <pre id="mediaInfoText" class="text-output">-</pre>
+    </div>
+  </div>
+
+  <div id="debugModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Log debug</h2>
+        <div class="modal-actions">
+          <button id="clearDebugBtn" class="secondary">Pulisci</button>
+          <button id="closeDebugBtn" class="secondary">Chiudi</button>
+        </div>
+      </div>
+      <pre id="debugLogText" class="text-output">Nessun log.</pre>
+    </div>
+  </div>
+
+  <div id="rulesModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Regole di rinomina</h2>
+        <button id="closeRulesBtn" class="secondary">Chiudi</button>
+      </div>
+      <div id="rulesContent" class="rules-content"></div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+{
+  "name": "shri-renamer",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "dependencies": {
+    "mediainfo.js": "^0.3.7"
+  },
+  "devDependencies": {
+    "electron": "^40.0.0"
+  }
+}
