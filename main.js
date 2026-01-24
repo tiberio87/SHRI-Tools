@@ -211,6 +211,13 @@ async function fetchTmdbTvSeason(tvId, season, apiKey, language) {
   return fetchJson(url);
 }
 
+function extractYear(value) {
+  if (!value) {
+    return '';
+  }
+  return String(value).slice(0, 4);
+}
+
 async function tvdbLogin(apiKey) {
   const data = await fetchJson('https://api4.thetvdb.com/v4/login', {
     method: 'POST',
@@ -580,6 +587,12 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       } else if (tv?.original_language) {
         result.originalLanguage = tv.original_language;
       }
+      if (!result.title) {
+        result.title = movie?.title || tv?.name || result.title;
+      }
+      if (!result.year) {
+        result.year = extractYear(movie?.release_date || tv?.first_air_date);
+      }
     } else if (tmdbKey && titleGuess) {
       const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
       const type = isTvHint ? 'tv' : 'movie';
@@ -595,6 +608,9 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         }
         if (!result.title) {
           result.title = details.title || details.name || result.title;
+        }
+        if (!result.year) {
+          result.year = extractYear(details.release_date || details.first_air_date);
         }
       }
     }
