@@ -184,18 +184,30 @@ async function fetchTmdbByImdb(imdbId, apiKey) {
   return fetchJson(url);
 }
 
-async function fetchTmdbSearch(query, type, apiKey) {
-  const url = `https://api.themoviedb.org/3/search/${type}?api_key=${encodeURIComponent(apiKey)}&query=${encodeURIComponent(query)}`;
+async function fetchTmdbSearch(query, type, apiKey, language) {
+  const params = new URLSearchParams({ api_key: apiKey, query });
+  if (language) {
+    params.set('language', language);
+  }
+  const url = `https://api.themoviedb.org/3/search/${type}?${params.toString()}`;
   return fetchJson(url);
 }
 
-async function fetchTmdbDetails(type, id, apiKey) {
-  const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${encodeURIComponent(apiKey)}`;
+async function fetchTmdbDetails(type, id, apiKey, language) {
+  const params = new URLSearchParams({ api_key: apiKey });
+  if (language) {
+    params.set('language', language);
+  }
+  const url = `https://api.themoviedb.org/3/${type}/${id}?${params.toString()}`;
   return fetchJson(url);
 }
 
-async function fetchTmdbTvSeason(tvId, season, apiKey) {
-  const url = `https://api.themoviedb.org/3/tv/${tvId}/season/${season}?api_key=${encodeURIComponent(apiKey)}`;
+async function fetchTmdbTvSeason(tvId, season, apiKey, language) {
+  const params = new URLSearchParams({ api_key: apiKey });
+  if (language) {
+    params.set('language', language);
+  }
+  const url = `https://api.themoviedb.org/3/tv/${tvId}/season/${season}?${params.toString()}`;
   return fetchJson(url);
 }
 
@@ -212,31 +224,33 @@ async function tvdbLogin(apiKey) {
   return token;
 }
 
-async function tvdbRequest(pathname, token) {
-  return fetchJson(`https://api4.thetvdb.com/v4${pathname}`, {
-    headers: { Authorization: `Bearer ${token}` }
-  });
+async function tvdbRequest(pathname, token, language) {
+  const headers = { Authorization: `Bearer ${token}` };
+  if (language) {
+    headers['Accept-Language'] = language;
+  }
+  return fetchJson(`https://api4.thetvdb.com/v4${pathname}`, { headers });
 }
 
-async function tvdbSearchSeries(query, token) {
-  const data = await tvdbRequest(`/search?query=${encodeURIComponent(query)}&type=series`, token);
+async function tvdbSearchSeries(query, token, language) {
+  const data = await tvdbRequest(`/search?query=${encodeURIComponent(query)}&type=series`, token, language);
   const list = Array.isArray(data?.data) ? data.data : [];
   return list[0] || null;
 }
 
-async function tvdbFetchSeries(seriesId, token) {
-  const data = await tvdbRequest(`/series/${seriesId}`, token);
+async function tvdbFetchSeries(seriesId, token, language) {
+  const data = await tvdbRequest(`/series/${seriesId}`, token, language);
   return data?.data || null;
 }
 
-async function tvdbFetchEpisodes(seriesId, token) {
+async function tvdbFetchEpisodes(seriesId, token, language) {
   const episodes = [];
   let page = 0;
   let hasNext = true;
   let safety = 0;
 
   while (hasNext && safety < 50) {
-    const data = await tvdbRequest(`/series/${seriesId}/episodes/default?page=${page}`, token);
+    const data = await tvdbRequest(`/series/${seriesId}/episodes/default?page=${page}`, token, language);
     const pageEpisodes = Array.isArray(data?.data) ? data.data : [];
     episodes.push(...pageEpisodes);
     const next = data?.links?.next;
@@ -534,6 +548,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
   const omdbKey = payload.omdbKey || '';
   const tmdbKey = payload.tmdbKey || '';
   const tvdbKey = payload.tvdbKey || '';
+  const preferredLanguage = payload.preferredLanguage || '';
   let tmdbTvId = '';
 
   try {
@@ -568,13 +583,13 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     } else if (tmdbKey && titleGuess) {
       const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
       const type = isTvHint ? 'tv' : 'movie';
-      const search = await fetchTmdbSearch(titleGuess, type, tmdbKey);
+      const search = await fetchTmdbSearch(titleGuess, type, tmdbKey, preferredLanguage);
       const first = search?.results?.[0];
       if (first?.id) {
         if (type === 'tv') {
           tmdbTvId = String(first.id);
         }
-        const details = await fetchTmdbDetails(type, first.id, tmdbKey);
+        const details = await fetchTmdbDetails(type, first.id, tmdbKey, preferredLanguage);
         if (details?.original_language) {
           result.originalLanguage = details.original_language;
         }
@@ -605,13 +620,13 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       let seriesName = '';
 
       if (!seriesId) {
-        const series = await tvdbSearchSeries(titleGuess || result.title, token);
+        const series = await tvdbSearchSeries(titleGuess || result.title, token, preferredLanguage);
         if (series) {
           seriesId = String(series.tvdb_id || series.id || '');
           seriesName = series.name || series.seriesName || '';
         }
       } else {
-        const series = await tvdbFetchSeries(seriesId, token);
+        const series = await tvdbFetchSeries(seriesId, token, preferredLanguage);
         if (series) {
           seriesName = series.name || series.seriesName || '';
         }
@@ -625,7 +640,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       }
 
       if (seriesId) {
-        const episodes = await tvdbFetchEpisodes(seriesId, token);
+        const episodes = await tvdbFetchEpisodes(seriesId, token, preferredLanguage);
         result.episodes = episodes;
       }
     }
@@ -636,7 +651,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
   if (result.tvdbAttempted && result.episodes.length === 0) {
     if (tmdbKey && tmdbTvId && seasonHint) {
       try {
-        const seasonData = await fetchTmdbTvSeason(tmdbTvId, seasonHint, tmdbKey);
+        const seasonData = await fetchTmdbTvSeason(tmdbTvId, seasonHint, tmdbKey, preferredLanguage);
         const seasonEpisodes = Array.isArray(seasonData?.episodes) ? seasonData.episodes : [];
         result.episodes = seasonEpisodes.map((ep) => ({
           season: seasonHint,

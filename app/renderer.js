@@ -71,6 +71,7 @@ const ui = {
   omdbKeyInput: document.getElementById('omdbKeyInput'),
   tmdbKeyInput: document.getElementById('tmdbKeyInput'),
   tvdbKeyInput: document.getElementById('tvdbKeyInput'),
+  preferredLanguageSelect: document.getElementById('preferredLanguageSelect'),
   serviceListInput: document.getElementById('serviceListInput'),
   tagListInput: document.getElementById('tagListInput'),
   tagOptions: document.getElementById('tagOptions'),
@@ -440,6 +441,7 @@ function loadSettings() {
       omdbKey: '',
       tmdbKey: '',
       tvdbKey: '',
+      preferredLanguage: 'it-IT',
       serviceList: '',
       tagList: ''
     };
@@ -453,6 +455,7 @@ function loadSettings() {
       omdbKey: '',
       tmdbKey: '',
       tvdbKey: '',
+      preferredLanguage: 'it-IT',
       serviceList: '',
       tagList: ''
     };
@@ -464,9 +467,13 @@ function saveSettings(settings) {
 }
 
 function applySettingsToUI(settings) {
+  const preferredLanguage = Object.prototype.hasOwnProperty.call(settings, 'preferredLanguage')
+    ? settings.preferredLanguage
+    : 'it-IT';
   ui.omdbKeyInput.value = settings.omdbKey || '';
   ui.tmdbKeyInput.value = settings.tmdbKey || '';
   ui.tvdbKeyInput.value = settings.tvdbKey || '';
+  ui.preferredLanguageSelect.value = preferredLanguage;
   ui.serviceListInput.value = settings.serviceList || '';
   ui.tagListInput.value = settings.tagList || '';
   loadServiceDefaults().then(() => updateServiceOptions(settings));
@@ -478,6 +485,7 @@ function getSettings() {
     omdbKey: ui.omdbKeyInput.value.trim(),
     tmdbKey: ui.tmdbKeyInput.value.trim(),
     tvdbKey: ui.tvdbKeyInput.value.trim(),
+    preferredLanguage: ui.preferredLanguageSelect.value,
     serviceList: ui.serviceListInput.value.trim(),
     tagList: ui.tagListInput.value.trim()
   };
@@ -1609,7 +1617,10 @@ async function fetchMetadataAuto(guess) {
       typeHint: guess.typeHint || ui.typeSelect.value,
       omdbKey: settings.omdbKey,
       tmdbKey: settings.tmdbKey,
-      tvdbKey: settings.tvdbKey
+      tvdbKey: settings.tvdbKey,
+      preferredLanguage: Object.prototype.hasOwnProperty.call(settings, 'preferredLanguage')
+        ? settings.preferredLanguage
+        : 'it-IT'
     };
 
     const data = await window.api.fetchMetadata(payload);
