@@ -18,9 +18,6 @@
         <p>Rinomina cartelle e file secondo le regole del tracker.</p>
       </div>
       <div class="header-actions">
-        <label class="checkbox inline">
-          <input id="autoDetectToggle" type="checkbox" checked />Auto-detect
-        </label>
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
         <div id="status" class="status">Pronto</div>
         <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
@@ -42,7 +39,7 @@
             <h2>Sorgente</h2>
             <div class="section-actions">
               <button id="selectFileBtn" class="primary">Seleziona file</button>
-              <button id="selectFolderBtn" class="secondary folder">Seleziona cartella</button>
+              <button id="selectFolderBtn" class="primary">Seleziona cartella</button>
             </div>
           </div>
           <div id="selectedPath" class="path">Nessun percorso selezionato.</div>
@@ -53,6 +50,9 @@
           <div class="section-header">
             <h2>Metadata</h2>
             <div class="section-actions">
+              <label class="checkbox inline">
+                <input id="autoDetectToggle" type="checkbox" checked />Auto-detect
+              </label>
               <button id="autoDetectBtn" class="secondary">Rileva</button>
             </div>
           </div>

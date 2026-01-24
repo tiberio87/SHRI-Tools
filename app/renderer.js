@@ -1646,6 +1646,22 @@ async function autoDetectFromPath() {
   await fetchMetadataAuto(guess);
 }
 
+function updateAutoDetectControls() {
+  const isAuto = ui.autoDetectToggle.checked;
+  ui.autoDetectBtn.disabled = isAuto;
+}
+
+async function manualDetectFromInputs() {
+  const guess = {
+    title: ui.titleInput.value.trim(),
+    year: ui.yearInput.value.trim(),
+    season: ui.seasonInput.value.trim(),
+    episode: ui.episodeInput.value.trim(),
+    typeHint: ui.typeSelect.value
+  };
+  await fetchMetadataAuto(guess);
+}
+
 async function loadPath(targetPath) {
   const scan = await window.api.scanPath(targetPath);
   if (!scan) {
@@ -1732,10 +1748,11 @@ ui.selectFolderBtn.addEventListener('click', async () => {
 });
 
 ui.autoDetectBtn.addEventListener('click', async () => {
-  await autoDetectFromPath();
+  await manualDetectFromInputs();
 });
 
 ui.autoDetectToggle.addEventListener('change', async () => {
+  updateAutoDetectControls();
   if (ui.autoDetectToggle.checked) {
     await autoDetectFromPath();
   }
@@ -1918,6 +1935,7 @@ ui.originalLanguageInput.addEventListener('input', () => {
 const initialSettings = loadSettings();
 applySettingsToUI(initialSettings);
 applyTheme(loadTheme());
+updateAutoDetectControls();
 updateVisibility();
 refreshPreview();
 
