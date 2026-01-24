@@ -156,8 +156,11 @@
             </div>
             <div class="field manual-field">
               <label for="tagInput">Tag gruppo</label>
-              <input id="tagInput" type="text" placeholder="iSlaNd" list="tagOptions" />
-              <datalist id="tagOptions"></datalist>
+              <div class="dropdown" id="tagDropdown">
+                <button id="tagInputBtn" class="dropdown-trigger" type="button">Seleziona tag gruppo</button>
+                <div class="dropdown-menu" id="tagDropdownMenu"></div>
+                <input id="tagInput" type="hidden" value="" />
+              </div>
             </div>
           </div>
         </section>
@@ -286,11 +289,11 @@
       </div>
       <div class="row">
         <div class="field">
-          <label for="serviceListInput">Servizi personalizzati</label>
+          <label for="serviceListInput">Servizi personalizzati (uno per riga, es. Amazon=AMZN)</label>
           <textarea id="serviceListInput" rows="3" placeholder="Es. Amazon=AMZN"></textarea>
         </div>
         <div class="field">
-          <label for="tagListInput">Tag gruppo salvati</label>
+          <label for="tagListInput">Tag gruppo salvati (uno per riga)</label>
           <textarea id="tagListInput" rows="3" placeholder="Es. iSlaNd"></textarea>
         </div>
       </div>

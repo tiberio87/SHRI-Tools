@@ -63,6 +63,9 @@ const ui = {
   serviceGroup: document.getElementById('serviceGroup'),
   sourceGroup: document.getElementById('sourceGroup'),
   tagInput: document.getElementById('tagInput'),
+  tagInputBtn: document.getElementById('tagInputBtn'),
+  tagDropdown: document.getElementById('tagDropdown'),
+  tagDropdownMenu: document.getElementById('tagDropdownMenu'),
   renameFileCheckbox: document.getElementById('renameFileCheckbox'),
   renameFolderCheckbox: document.getElementById('renameFolderCheckbox'),
   applyRenameBtn: document.getElementById('applyRenameBtn'),
@@ -78,7 +81,6 @@ const ui = {
   preferredLanguageSelect: document.getElementById('preferredLanguageSelect'),
   serviceListInput: document.getElementById('serviceListInput'),
   tagListInput: document.getElementById('tagListInput'),
-  tagOptions: document.getElementById('tagOptions'),
   serviceInputBtn: document.getElementById('serviceInputBtn'),
   serviceDropdown: document.getElementById('serviceDropdown'),
   serviceDropdownMenu: document.getElementById('serviceDropdownMenu'),
@@ -454,6 +456,7 @@ function resetAllInputs() {
   resetDropdown(ui.serviceInput, ui.serviceInputBtn, 'Seleziona servizio');
   resetDropdown(ui.repackSelect, ui.repackSelectBtn, 'Nessuno');
   resetDropdown(ui.sourceInput, ui.sourceInputBtn, 'Seleziona sorgente');
+  resetDropdown(ui.tagInput, ui.tagInputBtn, 'Seleziona tag gruppo');
 
   if (ui.audioLangHint) {
     ui.audioLangHint.textContent = 'Lingue audio rilevate: -';
@@ -951,16 +954,40 @@ function updateServiceOptions(settings) {
 }
 
 function updateTagOptions(settings) {
-  if (!ui.tagOptions) {
+  if (!ui.tagDropdownMenu || !ui.tagInputBtn || !ui.tagInput) {
     return;
   }
   const tags = parseSimpleList(settings?.tagList || '');
   const unique = [...new Set(tags)];
-  ui.tagOptions.innerHTML = '';
+  ui.tagDropdownMenu.innerHTML = '';
+
+  const blank = document.createElement('button');
+  blank.type = 'button';
+  blank.className = 'dropdown-item';
+  blank.dataset.value = '';
+  blank.textContent = unique.length ? 'Seleziona tag gruppo' : 'Aggiungili nelle Impostazioni';
+  ui.tagDropdownMenu.appendChild(blank);
+
   for (const tag of unique) {
-    const option = document.createElement('option');
-    option.value = tag;
-    ui.tagOptions.appendChild(option);
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'dropdown-item';
+    item.dataset.value = tag;
+    item.textContent = tag;
+    ui.tagDropdownMenu.appendChild(item);
+  }
+
+  if (unique.length) {
+    const current = ui.tagInput.value;
+    if (current && unique.includes(current)) {
+      ui.tagInputBtn.textContent = current;
+    } else {
+      ui.tagInput.value = '';
+      ui.tagInputBtn.textContent = 'Seleziona tag gruppo';
+    }
+  } else {
+    ui.tagInput.value = '';
+    ui.tagInputBtn.textContent = 'Aggiungili nelle Impostazioni';
   }
 }
 
@@ -2262,6 +2289,7 @@ setupDropdown(
   ui.repackDropdown.querySelector('.dropdown-menu')
 );
 setupDropdown(ui.sourceDropdown, ui.sourceInputBtn, ui.sourceInput, ui.sourceDropdownMenu);
+setupDropdown(ui.tagDropdown, ui.tagInputBtn, ui.tagInput, ui.tagDropdownMenu);
 
 document.addEventListener('click', (event) => {
   if (!event.target.closest('.dropdown')) {
@@ -2278,18 +2306,6 @@ ui.saveSettingsBtn.addEventListener('click', () => {
 
 ui.languageTagInput.addEventListener('input', () => {
   ui.languageTagInput.dataset.manual = 'true';
-});
-
-ui.tagInput.addEventListener('input', (event) => {
-  const inputType = event?.inputType || '';
-  if (inputType !== 'insertReplacementText') {
-    return;
-  }
-  const options = Array.from(ui.tagOptions?.options || []);
-  const match = options.some((option) => option.value === ui.tagInput.value);
-  if (match) {
-    ui.tagInput.blur();
-  }
 });
 
 ui.originalLanguageInput.addEventListener('input', () => {
