@@ -415,17 +415,7 @@ function renderFetchStatus(payload, data) {
   const typeLabel = mapTypeLabel(data.type || payload.typeHint || ui.typeSelect.value);
 
   if (title) {
-    let titleLink = '';
-    if (data.tmdbId && data.tmdbType) {
-      titleLink = `https://www.themoviedb.org/${data.tmdbType}/${data.tmdbId}`;
-    } else if (data.imdbId) {
-      titleLink = `https://www.imdb.com/title/${data.imdbId}/`;
-    } else if (data.tvdbSeriesSlug) {
-      titleLink = `https://thetvdb.com/series/${data.tvdbSeriesSlug}`;
-    } else if (data.tvdbSeriesId) {
-      titleLink = `https://thetvdb.com/?tab=series&id=${data.tvdbSeriesId}`;
-    }
-    parts.push({ label: 'Titolo', value: title, highlight: true, link: titleLink });
+    parts.push({ label: 'Titolo', value: title, highlight: true });
   }
   if (year) {
     parts.push({ label: 'Anno', value: year });
@@ -442,6 +432,22 @@ function renderFetchStatus(payload, data) {
       ? `https://thetvdb.com/series/${slug}`
       : `https://thetvdb.com/?tab=series&id=${data.tvdbSeriesId}`;
     parts.push({ label: 'TVDB ID', value: data.tvdbSeriesId, link });
+  }
+
+  if (data.imdbId) {
+    parts.push({
+      label: 'IMDb',
+      value: data.imdbId,
+      link: `https://www.imdb.com/title/${data.imdbId}/`
+    });
+  }
+
+  if (data.tmdbId && data.tmdbType) {
+    parts.push({
+      label: 'TMDb',
+      value: data.tmdbId,
+      link: `https://www.themoviedb.org/${data.tmdbType}/${data.tmdbId}`
+    });
   }
   if (data.tvdbAttempted) {
     const count = Array.isArray(data.episodes) ? data.episodes.length : 0;
