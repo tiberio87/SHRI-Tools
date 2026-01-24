@@ -103,6 +103,7 @@ const state = {
   mainExtension: '',
   audioLangs: [],
   episodeMap: {},
+  tagSuggestion: '',
   autoDetectRunning: false
 };
 
@@ -403,6 +404,8 @@ function resetMetadataInputs() {
     ui.fetchBadge.classList.add('hidden');
   }
   setHint(ui.fetchStatus, '');
+
+  resetDropdown(ui.tagInput, ui.tagInputBtn, 'Seleziona tag gruppo');
 }
 
 function resetAllInputs() {
@@ -511,12 +514,14 @@ function resetSource() {
   state.mainExtension = '';
   state.audioLangs = [];
   state.episodeMap = {};
+  state.tagSuggestion = '';
   state.autoDetectRunning = false;
 
   ui.selectedPath.textContent = 'Nessun percorso selezionato.';
   setHint(ui.scanHint, '');
   ui.resetSourceBtn.classList.add('hidden');
   resetAllInputs();
+  updateTagOptions(loadSettings());
 }
 
 function mapTypeLabel(value) {
@@ -959,6 +964,7 @@ function updateTagOptions(settings) {
   }
   const tags = parseSimpleList(settings?.tagList || '');
   const unique = [...new Set(tags)];
+  const suggestion = state.tagSuggestion || '';
   ui.tagDropdownMenu.innerHTML = '';
 
   const blank = document.createElement('button');
@@ -983,11 +989,15 @@ function updateTagOptions(settings) {
       ui.tagInputBtn.textContent = current;
     } else {
       ui.tagInput.value = '';
-      ui.tagInputBtn.textContent = 'Seleziona tag gruppo';
+      ui.tagInputBtn.textContent = suggestion ? `Suggerito: ${suggestion}` : 'Seleziona tag gruppo';
     }
   } else {
     ui.tagInput.value = '';
-    ui.tagInputBtn.textContent = 'Aggiungili nelle Impostazioni';
+    if (suggestion) {
+      ui.tagInputBtn.textContent = `Suggerito: ${suggestion}`;
+    } else {
+      ui.tagInputBtn.textContent = 'Aggiungili nelle Impostazioni';
+    }
   }
 }
 
@@ -1340,6 +1350,54 @@ function getParentPath(filePath) {
 
 function stripExtension(name) {
   return name.replace(/\.[^/.]+$/, '');
+}
+
+function isNoiseTag(token) {
+  if (!token) {
+    return true;
+  }
+  const upper = token.toUpperCase();
+  const compact = upper.replace(/[._-]/g, '');
+  if (STOP_WORDS.has(upper) || STOP_WORDS.has(compact)) {
+    return true;
+  }
+  if (/^\d{3,4}P$/.test(upper) || /^(19|20)\d{2}$/.test(upper)) {
+    return true;
+  }
+  if (/^(ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR)([-_.](ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR))+$/i.test(upper)) {
+    return true;
+  }
+  return false;
+}
+
+function extractGroupTagFromName(filePath) {
+  if (!filePath) {
+    return '';
+  }
+  const base = stripExtension(getPathBaseName(filePath)).trim();
+  if (!base) {
+    return '';
+  }
+
+  let candidate = '';
+  const bracketMatch = base.match(/[\[\(\{]([A-Za-z0-9][A-Za-z0-9._-]{1,})[\]\)\}]\s*$/);
+  if (bracketMatch) {
+    candidate = bracketMatch[1];
+  } else {
+    const dashMatch = base.match(/[-–—]\s*([A-Za-z0-9][A-Za-z0-9._-]{1,})\s*$/);
+    if (dashMatch) {
+      candidate = dashMatch[1];
+    }
+  }
+
+  candidate = candidate.replace(/^[.\-]+|[.\-]+$/g, '').trim();
+  if (!candidate || candidate.length < 2 || candidate.length > 20 || /\s/.test(candidate)) {
+    return '';
+  }
+  if (isNoiseTag(candidate)) {
+    return '';
+  }
+  return candidate;
 }
 
 function parseSeasonEpisode(text) {
@@ -2098,6 +2156,9 @@ async function loadPath(targetPath) {
   ui.selectedPath.textContent = targetPath;
   ui.resetSourceBtn.classList.remove('hidden');
   setHint(ui.scanHint, scan.mainVideo ? `File analizzato: ${scan.mainVideo}` : 'Nessun file analizzato.');
+
+  state.tagSuggestion = extractGroupTagFromName(scan.mainVideo || targetPath);
+  updateTagOptions(loadSettings());
 
   if (scan.mediaInfo?.error) {
     setMediaInfoBadgeVisible(false);
