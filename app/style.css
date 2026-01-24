@@ -265,6 +265,7 @@ body:not(.light) .theme-toggle .icon-moon {
 
 .section-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
 }
 

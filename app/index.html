@@ -19,7 +19,6 @@
       </div>
       <div class="header-actions">
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
-        <div id="status" class="status">Pronto</div>
         <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
             <circle cx="12" cy="12" r="4"></circle>
@@ -118,7 +117,10 @@
 
         <section class="section">
           <div class="section-header">
-            <h2>Lingua, Audio, Video & Release</h2>
+            <h2>MediaInfo &amp; Dettagli</h2>
+            <div class="section-actions">
+              <div id="mediaInfoBadge" class="status hidden">MediaInfo</div>
+            </div>
           </div>
           <div class="row">
             <div class="field">
@@ -218,6 +220,9 @@
         <section class="section">
           <div class="section-header">
             <h2>Rinomina</h2>
+            <div class="section-actions">
+              <div id="renameBadge" class="status hidden"></div>
+            </div>
           </div>
           <div class="row">
             <label class="checkbox"><input id="renameFileCheckbox" type="checkbox" checked />Rinomina file</label>

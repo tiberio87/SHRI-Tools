@@ -1,5 +1,6 @@
 const ui = {
-  status: document.getElementById('status'),
+  mediaInfoBadge: document.getElementById('mediaInfoBadge'),
+  renameBadge: document.getElementById('renameBadge'),
   autoDetectToggle: document.getElementById('autoDetectToggle'),
   autoDetectBtn: document.getElementById('autoDetectBtn'),
   themeToggle: document.getElementById('themeToggle'),
@@ -265,8 +266,24 @@ const STOP_WORDS = new Set([
 
 let previewTimer = null;
 
-function setStatus(text) {
-  ui.status.textContent = text;
+function setMediaInfoBadgeVisible(isVisible) {
+  ui.mediaInfoBadge.classList.toggle('hidden', !isVisible);
+  ui.mediaInfoBadge.classList.toggle('clickable', isVisible);
+}
+
+function updateRenameBadge(plan) {
+  if (!ui.renameBadge) {
+    return;
+  }
+  if (!state.targetPath) {
+    ui.renameBadge.classList.add('hidden');
+    ui.renameBadge.textContent = '';
+    return;
+  }
+
+  const totalOps = Array.isArray(plan?.ops) ? plan.ops.length : 0;
+  ui.renameBadge.textContent = `Rinomine: ${totalOps}`;
+  ui.renameBadge.classList.remove('hidden');
 }
 
 function setHint(target, text) {
@@ -1374,6 +1391,7 @@ async function updateRenamePlan() {
   if (!state.targetPath) {
     ui.renamePlanList.innerHTML = '';
     ui.warningList.innerHTML = '';
+    updateRenameBadge(null);
     return;
   }
 
@@ -1385,6 +1403,7 @@ async function updateRenamePlan() {
     folderName: state.kind === 'dir' ? folderName : '',
     fileRenames
   });
+  updateRenameBadge(plan);
 
   ui.renamePlanList.innerHTML = '';
   ui.warningList.innerHTML = '';
@@ -1692,12 +1711,11 @@ async function loadPath(targetPath) {
   setHint(ui.scanHint, scan.mainVideo ? `File analizzato: ${scan.mainVideo}` : 'Nessun file analizzato.');
 
   if (scan.mediaInfo?.error) {
-    setStatus('MediaInfo non disponibile');
+    setMediaInfoBadgeVisible(false);
     setHint(ui.scanHint, `Errore MediaInfo: ${scan.mediaInfo.error}`);
   } else {
-    setStatus('MediaInfo pronto');
+    setMediaInfoBadgeVisible(Boolean(scan.mainVideo));
   }
-  ui.status.classList.toggle('clickable', !!scan.mainVideo && !scan.mediaInfo?.error);
 
   if (scan.kind === 'dir') {
     ui.renameFolderCheckbox.disabled = false;
@@ -1781,11 +1799,9 @@ ui.applyRenameBtn.addEventListener('click', async () => {
   const result = await window.api.applyRename(payload);
   if (result.ok) {
     setHint(ui.renameHint, 'Rinomina completata.');
-    setStatus('Rinomina completata');
   } else {
     const warning = result.warnings.length ? result.warnings.join(' | ') : 'Errore nella rinomina.';
     setHint(ui.renameHint, warning);
-    setStatus('Rinomina incompleta');
   }
   schedulePreview();
 });
@@ -1806,8 +1822,8 @@ if (ui.themeToggle) {
   });
 }
 
-ui.status.addEventListener('click', async () => {
-  if (!ui.status.classList.contains('clickable')) {
+ui.mediaInfoBadge.addEventListener('click', async () => {
+  if (!ui.mediaInfoBadge.classList.contains('clickable')) {
     return;
   }
   await showMediaInfoReport();
