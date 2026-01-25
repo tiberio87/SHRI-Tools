@@ -2,6 +2,36 @@ export const SETTINGS_STORAGE_KEY = 'shri-renamer-settings';
 export const THEME_STORAGE_KEY = 'shri-renamer-theme';
 export const ANNOUNCE_BASE = 'https://shareisland.org/announce/';
 
+export const UNIT3D_CATEGORY_ID = {
+  MOVIE: '1',
+  TV: '2'
+};
+
+export const SHRI_TYPE_ID = {
+  DISC: '26',
+  REMUX: '7',
+  WEBDL: '27',
+  WEBRIP: '15',
+  HDTV: '33',
+  ENCODE: '15',
+  DVDRIP: '15',
+  BRRIP: '15'
+};
+
+export const UNIT3D_RESOLUTION_ID = {
+  '8640p': '10',
+  '4320p': '1',
+  '2160p': '2',
+  '1440p': '3',
+  '1080p': '3',
+  '1080i': '4',
+  '720p': '5',
+  '576p': '6',
+  '576i': '7',
+  '480p': '8',
+  '480i': '9'
+};
+
 export const DEFAULT_GROUP_TAGS = [
   'Blackbit',
   'G66',

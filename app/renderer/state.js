@@ -7,10 +7,14 @@ export const state = {
   mainExtension: '',
   audioLangs: [],
   episodeMap: {},
+  metadata: null,
   tagSuggestion: '',
   autoDetectRunning: false,
   lastTagSuggestion: '',
-  lastTagResolveKey: ''
+  lastTagResolveKey: '',
+  lastTorrentPath: '',
+  screenshots: [],
+  screenshotsMeta: null
 };
 
 export const debugState = {

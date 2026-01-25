@@ -6,16 +6,21 @@ import {
   DEFAULT_GROUP_TAGS,
   LANG_MAP,
   RULES_SECTIONS,
-  AUDIO_CODEC_SCORE,
-  STOP_WORDS,
   ANNOUNCE_BASE
 } from './renderer/constants.js';
+import { normalizeLangTag } from './renderer/media-utils.js';
+import { createUploadKit } from './renderer/upload-kit.js';
+import { createMetadataTools } from './renderer/metadata.js';
+import { createRenameTools } from './renderer/rename.js';
+import { getParentPath, getPathBaseName } from './renderer/path-utils.js';
+import { createLogger } from './renderer/logger.js';
+import { createThemeTools } from './renderer/theme.js';
+import { createFeedbackTools } from './renderer/feedback.js';
 
-let toastTimer = null;
-let toastHideTimer = null;
-let confirmResolver = null;
 let previewTimer = null;
 let currentTorrentRequestId = null;
+let settingsSnapshot = '';
+let settingsDirty = false;
 
 const DEFAULT_SERVICES = [];
 let serviceDefaultsLoaded = false;
@@ -23,6 +28,13 @@ const LANGUAGE_CODES = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI'])
   .filter(Boolean)
   .map((value) => String(value).toUpperCase());
 const LANGUAGE_CODES_PATTERN = LANGUAGE_CODES.join('|');
+const { logDebug, updateDebugLogView } = createLogger({ debugState, ui });
+const { applyTheme, loadTheme, saveTheme } = createThemeTools({
+  ui,
+  storageKey: THEME_STORAGE_KEY
+});
+const { showToast, copyToClipboard, openConfirmModal, bindConfirmHandlers } =
+  createFeedbackTools({ ui });
 
 function setMediaInfoBadgeVisible(isVisible) {
   ui.mediaInfoBadge.classList.toggle('hidden', !isVisible);
@@ -91,66 +103,6 @@ function getAnnounceUrlFromSettings(settings) {
     return settings.torrentAnnounceUrl;
   }
   return '';
-}
-
-function applyTheme(theme) {
-  const useLight = theme === 'light';
-  document.body.classList.toggle('light', useLight);
-  updateThemeToggleLabel();
-}
-
-function updateThemeToggleLabel() {
-  if (!ui.themeToggle) {
-    return;
-  }
-  const useLight = document.body.classList.contains('light');
-  ui.themeToggle.setAttribute(
-    'aria-label',
-    useLight ? 'Attiva tema scuro' : 'Attiva tema chiaro'
-  );
-}
-
-function loadTheme() {
-  const saved = localStorage.getItem(THEME_STORAGE_KEY);
-  if (saved === 'light' || saved === 'dark') {
-    return saved;
-  }
-  return 'dark';
-}
-
-function saveTheme(theme) {
-  localStorage.setItem(THEME_STORAGE_KEY, theme);
-}
-
-function safeStringify(value) {
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function updateDebugLogView() {
-  if (!ui.debugLogText) {
-    return;
-  }
-  ui.debugLogText.textContent = debugState.buffer.length
-    ? debugState.buffer.join('\n')
-    : 'Nessun log.';
-}
-
-function logDebug(message, data) {
-  if (!debugState.enabled) {
-    return;
-  }
-  const stamp = new Date().toISOString().slice(11, 19);
-  const details = data !== undefined ? ` ${safeStringify(data)}` : '';
-  const line = `[${stamp}] ${message}${details}`;
-  debugState.buffer.push(line);
-  if (debugState.buffer.length > debugState.maxEntries) {
-    debugState.buffer.shift();
-  }
-  updateDebugLogView();
 }
 
 function setFetchBadge(mode, label) {
@@ -318,8 +270,13 @@ function resetSource() {
   state.mainExtension = '';
   state.audioLangs = [];
   state.episodeMap = {};
+  state.metadata = null;
   state.tagSuggestion = '';
   state.autoDetectRunning = false;
+  state.lastTorrentPath = '';
+  state.screenshots = [];
+  state.screenshotsMeta = null;
+  state.screenshotsMeta = null;
 
   ui.selectedPath.textContent = 'Nessun percorso selezionato.';
   setHint(ui.scanHint, '');
@@ -430,9 +387,30 @@ function renderFetchStatus(payload, data) {
     ui.fetchStatus.appendChild(valueNode);
   });
 
-  if (data.warnings && data.warnings.length) {
-    ui.fetchStatus.appendChild(document.createTextNode(` | ${data.warnings.join(' | ')}`));
+  const visibleWarnings = getAutoMatchWarnings(payload, data);
+  if (visibleWarnings.length) {
+    ui.fetchStatus.appendChild(document.createTextNode(` | ${visibleWarnings.join(' | ')}`));
   }
+}
+
+function getAutoMatchWarnings(payload, data) {
+  const warnings = Array.isArray(data?.warnings) ? data.warnings : [];
+  if (!warnings.length) {
+    return [];
+  }
+  const hasTitle = Boolean(data?.title);
+  const hasIds = Boolean(data?.tmdbId || data?.imdbId || data?.tvdbSeriesId);
+  const typeHint = payload?.typeHint || '';
+  const isTv = typeHint.startsWith('tv') || typeHint.startsWith('anime');
+  const hasEpisodes = Array.isArray(data?.episodes) && data.episodes.length > 0;
+
+  if (!hasTitle && !hasIds) {
+    return warnings;
+  }
+  if (isTv && !hasEpisodes) {
+    return warnings;
+  }
+  return [];
 }
 
 function loadSettings() {
@@ -449,7 +427,15 @@ function loadSettings() {
       torrentPasskey: '',
       torrentAnnounceUrl: '',
       torrentOutputDir: '',
-      torrentPrivate: true
+      torrentPrivate: true,
+      ffmpegPath: '',
+      screenshotsCount: 6,
+      imageHostPrimary: 'imgbb',
+      imageHostFallback: 'ptscreens',
+      imgbbKey: '',
+      ptscreensKey: '',
+      unit3dBaseUrl: 'https://shareisland.org',
+      unit3dApiKey: ''
     };
     if (!raw) {
       return defaults;
@@ -468,13 +454,33 @@ function loadSettings() {
       torrentPasskey: '',
       torrentAnnounceUrl: '',
       torrentOutputDir: '',
-      torrentPrivate: true
+      torrentPrivate: true,
+      ffmpegPath: '',
+      screenshotsCount: 6,
+      imageHostPrimary: 'imgbb',
+      imageHostFallback: 'ptscreens',
+      imgbbKey: '',
+      ptscreensKey: '',
+      unit3dBaseUrl: 'https://shareisland.org',
+      unit3dApiKey: ''
     };
   }
 }
 
 function saveSettings(settings) {
   localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+}
+
+function updateFfmpegHint(settings) {
+  if (!ui.ffmpegHint) {
+    return;
+  }
+  const hasPath = Boolean(settings?.ffmpegPath);
+  if (hasPath) {
+    ui.ffmpegHint.textContent = '';
+    return;
+  }
+  ui.ffmpegHint.innerHTML = `FFmpeg non configurato. Scaricalo da <a href="https://ffmpeg.org/download.html" data-external="https://ffmpeg.org/download.html">ffmpeg.org</a> e inserisci il percorso completo del file eseguibile (es. ffmpeg.exe).`;
 }
 
 function applySettingsToUI(settings) {
@@ -484,9 +490,33 @@ function applySettingsToUI(settings) {
   ui.omdbKeyInput.value = settings.omdbKey || '';
   ui.tmdbKeyInput.value = settings.tmdbKey || '';
   ui.tvdbKeyInput.value = settings.tvdbKey || '';
+  if (ui.imgbbKeyInput) {
+    ui.imgbbKeyInput.value = settings.imgbbKey || '';
+  }
+  if (ui.ptscreensKeyInput) {
+    ui.ptscreensKeyInput.value = settings.ptscreensKey || '';
+  }
   ui.preferredLanguageSelect.value = preferredLanguage;
   ui.serviceListInput.value = settings.serviceList || '';
   ui.tagListInput.value = settings.tagList || '';
+  if (ui.ffmpegPathInput) {
+    ui.ffmpegPathInput.value = settings.ffmpegPath || '';
+  }
+  if (ui.screenshotsCountInput) {
+    ui.screenshotsCountInput.value = settings.screenshotsCount || 6;
+  }
+  if (ui.imageHostPrimarySelect) {
+    ui.imageHostPrimarySelect.value = settings.imageHostPrimary || 'imgbb';
+  }
+  if (ui.imageHostFallbackSelect) {
+    ui.imageHostFallbackSelect.value = settings.imageHostFallback || 'ptscreens';
+  }
+  if (ui.unit3dBaseUrlInput) {
+    ui.unit3dBaseUrlInput.value = settings.unit3dBaseUrl || 'https://shareisland.org';
+  }
+  if (ui.unit3dApiKeyInput) {
+    ui.unit3dApiKeyInput.value = settings.unit3dApiKey || '';
+  }
   if (ui.settingsAnnounceInput) {
     const passkey = settings.torrentPasskey || '';
     const fallback = extractPasskeyFromAnnounce(settings.torrentAnnounceUrl || '');
@@ -501,6 +531,7 @@ function applySettingsToUI(settings) {
   if (ui.autoTagDetectToggle) {
     ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
   }
+  updateFfmpegHint(settings);
   updateTagSuggestion(settings);
   loadServiceDefaults().then(() => updateServiceOptions(settings));
   updateTagOptions(settings);
@@ -518,10 +549,18 @@ function getSettings() {
     omdbKey: ui.omdbKeyInput.value.trim(),
     tmdbKey: ui.tmdbKeyInput.value.trim(),
     tvdbKey: ui.tvdbKeyInput.value.trim(),
+    imgbbKey: ui.imgbbKeyInput?.value.trim() || '',
+    ptscreensKey: ui.ptscreensKeyInput?.value.trim() || '',
     preferredLanguage: ui.preferredLanguageSelect.value,
     serviceList: ui.serviceListInput.value.trim(),
     tagList: ui.tagListInput.value.trim(),
     autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),
+    ffmpegPath: ui.ffmpegPathInput?.value.trim() || '',
+    screenshotsCount: parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6,
+    imageHostPrimary: ui.imageHostPrimarySelect?.value || 'imgbb',
+    imageHostFallback: ui.imageHostFallbackSelect?.value || 'ptscreens',
+    unit3dBaseUrl: ui.unit3dBaseUrlInput?.value.trim() || 'https://shareisland.org',
+    unit3dApiKey: ui.unit3dApiKeyInput?.value.trim() || '',
     torrentPasskey: passkey,
     torrentAnnounceUrl: announceUrl,
     torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
@@ -529,12 +568,40 @@ function getSettings() {
   };
 }
 
+function refreshSettingsSnapshot() {
+  settingsSnapshot = JSON.stringify(getSettings());
+  settingsDirty = false;
+}
+
+function updateSettingsDirtyFlag() {
+  settingsDirty = JSON.stringify(getSettings()) !== settingsSnapshot;
+}
+
+function isSettingsOpen() {
+  return ui.settingsModal && !ui.settingsModal.classList.contains('hidden');
+}
+
 function openSettings() {
+  refreshSettingsSnapshot();
   ui.settingsModal.classList.remove('hidden');
 }
 
 function closeSettings() {
   ui.settingsModal.classList.add('hidden');
+}
+
+async function requestCloseSettings() {
+  if (!settingsDirty) {
+    closeSettings();
+    return;
+  }
+  const proceed = await openConfirmModal('Hai modifiche non salvate. Vuoi chiudere senza salvare?');
+  if (!proceed) {
+    return;
+  }
+  applySettingsToUI(loadSettings());
+  refreshSettingsSnapshot();
+  closeSettings();
 }
 
 function openMediaInfoModal() {
@@ -577,8 +644,11 @@ function setKeyVerifyState(button, state, message) {
 async function verifyApiKey(button) {
   const service = button.dataset.service;
   const inputId = button.dataset.input;
+  const baseId = button.dataset.base;
   const input = document.getElementById(inputId);
   const apiKey = input ? input.value.trim() : '';
+  const baseInput = baseId ? document.getElementById(baseId) : null;
+  const baseUrl = baseInput ? baseInput.value.trim() : '';
 
   if (!apiKey) {
     setKeyVerifyState(button, 'error', 'Inserisci una chiave.');
@@ -587,7 +657,7 @@ async function verifyApiKey(button) {
 
   setKeyVerifyState(button, 'loading', 'Verifica in corso...');
   button.disabled = true;
-  const result = await window.api.verifyApiKey({ service, apiKey });
+  const result = await window.api.verifyApiKey({ service, apiKey, baseUrl });
   button.disabled = false;
 
   if (result?.ok) {
@@ -649,7 +719,7 @@ function openTorrentModal() {
     ui.torrentPrivateToggle.checked = settings.torrentPrivate !== false;
   }
   if (ui.torrentNameInput) {
-    ui.torrentNameInput.value = getTorrentNameSuggestion() || '';
+    ui.torrentNameInput.value = renameTools.getTorrentNameSuggestion() || '';
   }
   if (ui.torrentRootName) {
     const rootName = state.kind === 'dir'
@@ -658,7 +728,7 @@ function openTorrentModal() {
     ui.torrentRootName.textContent = rootName || '-';
   }
 
-  renderTorrentWarnings(buildTorrentWarnings());
+  renderTorrentWarnings(renameTools.buildTorrentWarnings());
   setHint(ui.torrentHint, '');
   resetTorrentProgress();
   ui.torrentModal.classList.remove('hidden');
@@ -1066,7 +1136,7 @@ function updateTagSuggestion(settings) {
     state.tagSuggestion = '';
     return;
   }
-  state.tagSuggestion = extractGroupTagFromName(path, buildKnownGroupTags(settings));
+  state.tagSuggestion = metadataTools.extractGroupTagFromName(path, buildKnownGroupTags(settings));
   if (state.tagSuggestion !== state.lastTagSuggestion) {
     logDebug('tag suggestion', {
       path,
@@ -1075,177 +1145,6 @@ function updateTagSuggestion(settings) {
     });
     state.lastTagSuggestion = state.tagSuggestion;
   }
-}
-
-function pad2(value) {
-  const num = parseInt(value, 10);
-  if (Number.isNaN(num)) {
-    return '';
-  }
-  return String(num).padStart(2, '0');
-}
-
-function sanitizeName(name) {
-  return name
-    .replace(/:/g, '')
-    .replace(/[<>"/\\|?*]/g, '_')
-    .replace(/\s+/g, ' ')
-    .replace(/\.+/g, '.')
-    .replace(/[. ]+$/g, '')
-    .trim();
-}
-
-function normalizeLangTag(raw) {
-  if (!raw) {
-    return '';
-  }
-  const cleaned = String(raw).trim().toLowerCase();
-  const token = cleaned.split(/[\s/,(]+/)[0];
-  const key = token.replace(/[^a-z]/g, '');
-  if (LANG_MAP[key]) {
-    return LANG_MAP[key];
-  }
-  if (token.length === 2 || token.length === 3) {
-    return token.toUpperCase();
-  }
-  return token.toUpperCase().slice(0, 3);
-}
-
-function getTrackLang(track) {
-  return (
-    track.Language ||
-    track['Language/String'] ||
-    track.Language_String ||
-    track['Language_String'] ||
-    track['Language/String3'] ||
-    track.Language_String3 ||
-    ''
-  );
-}
-
-function parseChannels(value) {
-  const match = String(value || '').match(/\d+/);
-  if (!match) {
-    return '';
-  }
-  const channels = parseInt(match[0], 10);
-  const map = {
-    1: '1.0',
-    2: '2.0',
-    3: '3.0',
-    4: '4.0',
-    5: '5.0',
-    6: '5.1',
-    7: '6.1',
-    8: '7.1'
-  };
-  return map[channels] || `${channels}.0`;
-}
-
-function mapAudioCodec(track) {
-  const formatRaw = String(track.Format || '').toUpperCase();
-  const commercialRaw = String(track.Format_Commercial || track.Format_Commercial_IfAny || '').toUpperCase();
-  const combined = `${commercialRaw} ${formatRaw}`;
-
-  if (combined.includes('DTS:X')) {
-    return 'DTS:X';
-  }
-  if (combined.includes('DTS-HD') && combined.includes('MASTER')) {
-    return 'DTS-HD MA';
-  }
-  if (combined.includes('DTS-HD') && combined.includes('HIGH')) {
-    return 'DTS-HD HRA';
-  }
-  if (combined.includes('TRUEHD')) {
-    return 'TrueHD';
-  }
-  if (combined.includes('E-AC-3') || combined.includes('EAC3') || combined.includes('DD+')) {
-    return 'DD+';
-  }
-  if (combined.includes('AC-3') || combined.includes('AC3') || combined.includes('DD')) {
-    return 'DD';
-  }
-  if (combined.includes('FLAC')) {
-    return 'FLAC';
-  }
-  if (combined.includes('AAC')) {
-    return 'AAC';
-  }
-  if (combined.includes('OPUS')) {
-    return 'OPUS';
-  }
-  if (combined.includes('DTS')) {
-    return 'DTS';
-  }
-  return (track.Format || track.Format_Commercial || '').trim();
-}
-
-function detectAudioMeta(track) {
-  const extra = `${track.Format_AdditionalFeatures || ''} ${track.Format_Commercial || ''} ${track.Title || ''}`
-    .toLowerCase();
-  if (extra.includes('atmos') || extra.includes('joc')) {
-    return 'Atmos';
-  }
-  if (extra.includes('auro')) {
-    return 'Auro3D';
-  }
-  return '';
-}
-
-function scoreAudioTrack(track) {
-  const codec = mapAudioCodec(track);
-  const scoreBase = AUDIO_CODEC_SCORE[codec] || 40;
-  const channels = parseChannels(track.Channels || track['Channel(s)'] || '');
-  const channelsValue = parseFloat(channels) || 0;
-  const bitrateMatch = String(track.BitRate || '').match(/\d+/);
-  const bitrateValue = bitrateMatch ? parseInt(bitrateMatch[0], 10) : 0;
-  return scoreBase * 1000 + channelsValue * 10 + bitrateValue / 1000000;
-}
-
-function getVideoTrack(mediaInfo) {
-  const tracks = mediaInfo?.media?.track || [];
-  return tracks.find((track) => track['@type'] === 'Video');
-}
-
-function getAudioTracks(mediaInfo) {
-  const tracks = mediaInfo?.media?.track || [];
-  return tracks.filter((track) => track['@type'] === 'Audio');
-}
-
-function getGeneralTrack(mediaInfo) {
-  const tracks = mediaInfo?.media?.track || [];
-  return tracks.find((track) => track['@type'] === 'General');
-}
-
-function hasEncodingSignature(track) {
-  if (!track) {
-    return false;
-  }
-  const keys = [
-    'Encoded_Library',
-    'Encoded_Library_Name',
-    'Encoded_Library_Settings',
-    'Encoding_Settings',
-    'Writing_library',
-    'Writing_Application',
-    'Encoded_Library/String',
-    'Encoded_Library_Name/String',
-    'Encoded_Library_Settings/String',
-    'Encoding_Settings/String',
-    'Writing library',
-    'Writing application'
-  ];
-  return keys.some((key) => String(track[key] || '').trim());
-}
-
-function suggestFormatFromMediaInfo(mediaInfo) {
-  if (!mediaInfo || mediaInfo.error) {
-    return '';
-  }
-  const videoTrack = getVideoTrack(mediaInfo);
-  const generalTrack = getGeneralTrack(mediaInfo);
-  const hasEncode = hasEncodingSignature(videoTrack) || hasEncodingSignature(generalTrack);
-  return hasEncode ? 'Encode' : 'WEB-DL';
 }
 
 function applyFormatSuggestion(suggested) {
@@ -1261,439 +1160,14 @@ function applyFormatSuggestion(suggested) {
   setDropdownAuto(select, trigger, suggested, suggested);
 }
 
-function getResolution(videoTrack) {
-  const width = parseInt(videoTrack?.Width || 0, 10);
-  const height = parseInt(videoTrack?.Height || 0, 10);
-  if (width >= 3800 || height >= 2160) {
-    return '2160p';
-  }
-  if (width >= 1900 || height >= 1080) {
-    return '1080p';
-  }
-  if (width >= 1200 || height >= 720) {
-    return '720p';
-  }
-  if (width >= 700 || height >= 576) {
-    return '576p';
-  }
-  if (width >= 640 || height >= 480) {
-    return '480p';
-  }
-  return '';
-}
-
-function getHdrTokens(videoTrack) {
-  const hdrFields = {
-    HDR_Format: videoTrack?.HDR_Format || '',
-    HDR_Format_String: videoTrack?.HDR_Format_String || '',
-    HDR_Format_Compatibility: videoTrack?.HDR_Format_Compatibility || '',
-    'HDR format': videoTrack?.['HDR format'] || '',
-    'HDR format string': videoTrack?.['HDR format string'] || '',
-    'HDR format compatibility': videoTrack?.['HDR format compatibility'] || ''
-  };
-  const hdrRaw = Object.values(hdrFields)
-    .filter(Boolean)
-    .join(' | ')
-    .toLowerCase();
-  logDebug('HDR fields', hdrFields);
-  logDebug('HDR combined', hdrRaw);
-
-  const tokens = [];
-  const hasDv = hdrRaw.includes('dolby vision');
-  const hasHdr10Plus = hdrRaw.includes('hdr10+') || hdrRaw.includes('hdr10 plus');
-  const hasHdr = hdrRaw.includes('hdr10') || hdrRaw.includes('hdr');
-
-  if (hasDv) {
-    tokens.push('DV');
-  }
-  if (hasHdr10Plus) {
-    tokens.push('HDR10+');
-  } else if (hasHdr) {
-    tokens.push('HDR');
-  }
-  return tokens;
-}
-
-function mapVideoCodec(videoTrack, releaseFormat) {
-  const formatRaw = String(videoTrack?.Format || '').toUpperCase();
-  if (!formatRaw) {
-    return '';
-  }
-
-  if (releaseFormat === 'Encode') {
-    if (formatRaw.includes('HEVC') || formatRaw.includes('H.265')) {
-      return 'x265';
-    }
-    if (formatRaw.includes('AVC') || formatRaw.includes('H.264')) {
-      return 'x264';
-    }
-    if (formatRaw.includes('AV1')) {
-      return 'AV1';
-    }
-  }
-
-  if (releaseFormat === 'WEB-DL' || releaseFormat === 'WEBRip') {
-    if (formatRaw.includes('HEVC') || formatRaw.includes('H.265')) {
-      return 'H.265';
-    }
-    if (formatRaw.includes('AVC') || formatRaw.includes('H.264')) {
-      return 'H.264';
-    }
-    if (formatRaw.includes('AV1')) {
-      return 'AV1';
-    }
-  }
-
-  if (formatRaw.includes('HEVC') || formatRaw.includes('H.265')) {
-    return 'HEVC';
-  }
-  if (formatRaw.includes('AVC') || formatRaw.includes('H.264')) {
-    return 'AVC';
-  }
-  if (formatRaw.includes('VC-1')) {
-    return 'VC-1';
-  }
-  if (formatRaw.includes('MPEG')) {
-    return 'MPEG-2';
-  }
-  return videoTrack?.Format || '';
-}
-
-function buildLanguageTag(audioLangs, originalLangTag) {
-  const langs = [...new Set(audioLangs.filter(Boolean))];
-  if (!langs.length) {
-    return '';
-  }
-
-  const separator = ' - ';
-  if (langs.length >= 3) {
-    if (langs.includes('ITA')) {
-      return `ITA${separator}MULTI`;
-    }
-    const original = normalizeLangTag(originalLangTag);
-    if (original && langs.includes(original)) {
-      return `${original}${separator}MULTI`;
-    }
-    return `${langs[0]}${separator}MULTI`;
-  }
-
-  if (langs.length === 1) {
-    return langs[0];
-  }
-
-  const original = normalizeLangTag(originalLangTag);
-  if (original && langs.includes(original)) {
-    if (original === 'ITA') {
-      const other = langs.find((lang) => lang !== original);
-      return other ? `${original}${separator}${other}` : original;
-    }
-    if (langs.includes('ITA')) {
-      return `${original}${separator}ITA`;
-    }
-    const other = langs.find((lang) => lang !== original);
-    return other ? `${original}${separator}${other}` : original;
-  }
-  if (langs.includes('ITA')) {
-    const other = langs.find((lang) => lang !== 'ITA');
-    return other ? `ITA${separator}${other}` : 'ITA';
-  }
-  return langs.join(separator);
-}
-
-function extractYear(raw) {
-  const match = String(raw || '').match(/\b(19|20)\d{2}\b/);
-  return match ? match[0] : '';
-}
-
-function getPathBaseName(filePath) {
-  const parts = String(filePath).split(/[/\\]/);
-  return parts[parts.length - 1] || '';
-}
-
-function getParentPath(filePath) {
-  const value = String(filePath || '');
-  if (!value) {
-    return '';
-  }
-  const separator = value.includes('\\') ? '\\' : '/';
-  const parts = value.split(/[/\\]/);
-  parts.pop();
-  return parts.join(separator);
-}
-
-function normalizePathValue(value) {
-  return String(value || '').replace(/\//g, '\\');
-}
-
-function isSamePath(left, right) {
-  return normalizePathValue(left).toLowerCase() === normalizePathValue(right).toLowerCase();
-}
-
-function applyFolderRenamePath(value, folderFrom, folderTo) {
-  if (!value || !folderFrom || !folderTo) {
-    return value;
-  }
-  const normValue = normalizePathValue(value);
-  const normFrom = normalizePathValue(folderFrom);
-  const normTo = normalizePathValue(folderTo);
-  const valueLower = normValue.toLowerCase();
-  const fromLower = normFrom.toLowerCase();
-
-  if (valueLower === fromLower) {
-    return normTo;
-  }
-
-  const prefix = fromLower.endsWith('\\') ? fromLower : `${fromLower}\\`;
-  if (valueLower.startsWith(prefix)) {
-    return `${normTo}\\${normValue.slice(prefix.length)}`;
-  }
-  return value;
-}
-
-function showToast(message) {
-  if (!ui.toast) {
-    return;
-  }
-
-  if (toastTimer) {
-    clearTimeout(toastTimer);
-  }
-  if (toastHideTimer) {
-    clearTimeout(toastHideTimer);
-  }
-
-  ui.toast.textContent = message;
-  ui.toast.classList.remove('hidden');
-  requestAnimationFrame(() => {
-    ui.toast.classList.add('show');
-  });
-
-  toastTimer = setTimeout(() => {
-    ui.toast.classList.remove('show');
-    toastHideTimer = setTimeout(() => {
-      ui.toast.classList.add('hidden');
-    }, 220);
-  }, 2400);
-}
-
-function closeConfirmModal() {
-  if (!ui.confirmModal) {
-    return;
-  }
-  ui.confirmModal.classList.add('hidden');
-}
-
-function openConfirmModal(message) {
-  if (!ui.confirmModal || !ui.confirmMessage) {
-    return Promise.resolve(false);
-  }
-  ui.confirmMessage.textContent = message;
-  ui.confirmModal.classList.remove('hidden');
-  return new Promise((resolve) => {
-    confirmResolver = resolve;
-  });
-}
-
-function resolveConfirm(value) {
-  if (confirmResolver) {
-    confirmResolver(value);
-    confirmResolver = null;
-  }
-  closeConfirmModal();
-}
-
-function stripExtension(name) {
-  return name.replace(/\.[^/.]+$/, '');
-}
-
-function isNoiseTag(token) {
-  if (!token) {
-    return true;
-  }
-  const upper = token.toUpperCase();
-  const compact = upper.replace(/[._-]/g, '');
-  if (STOP_WORDS.has(upper) || STOP_WORDS.has(compact)) {
-    return true;
-  }
-  if (/^\d{3,4}P$/.test(upper) || /^(19|20)\d{2}$/.test(upper)) {
-    return true;
-  }
-  if (/^(ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR)([-_.](ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR))+$/i.test(upper)) {
-    return true;
-  }
-  return false;
-}
-
-function extractGroupTagFromName(filePath, knownTags = []) {
-  if (!filePath) {
-    return '';
-  }
-  const base = stripExtension(getPathBaseName(filePath)).trim();
-  if (!base) {
-    return '';
-  }
-
-  if (/\s-\s/.test(base)) {
-    return '';
-  }
-
-  const knownMap = new Map();
-  for (const tag of knownTags) {
-    const clean = String(tag || '').trim();
-    if (clean) {
-      knownMap.set(clean.toUpperCase(), clean);
-    }
-  }
-  if (knownMap.size) {
-    const tokens = base.split(/[._\s-]+/).filter(Boolean);
-    const last = tokens[tokens.length - 1] || '';
-    const known = knownMap.get(last.toUpperCase());
-    if (known && !isNoiseTag(last)) {
-      logDebug('tag detect', { mode: 'known', base, last, known });
-      return known;
-    }
-  }
-
-  let candidate = '';
-  const bracketMatch = base.match(/[\[\(\{]([A-Za-z0-9][A-Za-z0-9._-]{1,})[\]\)\}]\s*$/);
-  if (bracketMatch) {
-    candidate = bracketMatch[1];
-  } else {
-    const tailMatch = base.match(/[-–—]\s*([A-Za-z0-9]{2,20})\s*$/);
-    if (tailMatch) {
-      candidate = tailMatch[1];
-    }
-  }
-
-  candidate = candidate.replace(/^[.\-]+|[.\-]+$/g, '').trim();
-  logDebug('tag detect', {
-    mode: 'suffix',
-    base,
-    rawCandidate: candidate
-  });
-  if (!candidate || candidate.length < 2 || candidate.length > 20 || /\s/.test(candidate)) {
-    return '';
-  }
-  if (candidate.length <= 2 && !knownMap.has(candidate.toUpperCase())) {
-    return '';
-  }
-  if (isNoiseTag(candidate)) {
-    return '';
-  }
-  return candidate;
-}
-
-function parseSeasonEpisode(text) {
-  const match = text.match(/S(\d{1,2})E(\d{1,2})/i) || text.match(/(\d{1,2})x(\d{1,2})/i);
-  if (match) {
-    return { season: match[1], episode: match[2], index: match.index };
-  }
-  return { season: '', episode: '', index: -1 };
-}
-
-function parseSeasonOnly(text) {
-  const match = text.match(/\bS(\d{1,2})\b/i);
-  if (match) {
-    return { season: match[1], index: match.index };
-  }
-  const matchSeason = text.match(/\bSeason\s+(\d{1,2})\b/i);
-  if (matchSeason) {
-    return { season: matchSeason[1], index: matchSeason.index };
-  }
-  return { season: '', index: -1 };
-}
-
-function parseEpisodeTitleFromName(rawName) {
-  const cleaned = stripExtension(rawName)
-    .replace(/[_\.]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const match =
-    cleaned.match(/S\d{1,2}E\d{1,2}/i) ||
-    cleaned.match(/\d{1,2}x\d{1,2}/i);
-  if (!match) {
-    return '';
-  }
-
-  const matchIndex = cleaned.indexOf(match[0]);
-  const after = cleaned.slice(matchIndex + match[0].length).trim();
-  if (!after) {
-    return '';
-  }
-
-  const tokens = after.split(' ').filter((token) => token && !STOP_WORDS.has(token.toUpperCase()));
-  const filtered = tokens
-    .filter((token) => !/^\d{3,4}p$/i.test(token) && !/^\d{4}$/.test(token))
-    .filter((token) => !/^(S?\d{1,2}E\d{1,2}|S?\d{1,2}x\d{1,2}|\d{1,2}x\d{1,2})$/i.test(token));
-  return filtered.join(' ').trim();
-}
-
-function guessTitleFromName(rawName) {
-  let cleaned = stripExtension(rawName);
-  cleaned = cleaned.replace(/\[[^\]]+\]|\([^\)]+\)|\{[^}]+\}/g, ' ');
-  cleaned = cleaned.replace(/[_\.]/g, ' ');
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  const seasonEpisode = parseSeasonEpisode(cleaned);
-  let cutIndex = cleaned.length;
-  if (seasonEpisode.index !== -1) {
-    cutIndex = seasonEpisode.index;
-  } else {
-    const seasonOnly = parseSeasonOnly(cleaned);
-    if (seasonOnly.index !== -1) {
-      cutIndex = seasonOnly.index;
-    }
-  }
-  const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
-  if (yearMatch && yearMatch.index < cutIndex) {
-    cutIndex = yearMatch.index;
-  }
-  const titleChunk = cleaned.slice(0, cutIndex).trim();
-  const tokens = titleChunk
-    .split(' ')
-    .filter((token) => token && !STOP_WORDS.has(token.toUpperCase()))
-    .filter((token) => !/^[\-\u2013\u2014]+$/.test(token))
-    .filter((token) => !/^[()\[\]{}]+$/.test(token));
-  return tokens.join(' ').trim();
-}
-
-function guessMetadataFromName(filePath) {
-  const base = getPathBaseName(filePath);
-  const cleaned = stripExtension(base);
-  const seasonEpisode = parseSeasonEpisode(cleaned);
-  const seasonOnly = seasonEpisode.episode ? { season: '', index: -1 } : parseSeasonOnly(cleaned);
-  const year = extractYear(cleaned);
-  let title = guessTitleFromName(cleaned);
-  if (!title) {
-    const parentPath = getParentPath(filePath);
-    const parentName = parentPath ? getPathBaseName(parentPath) : '';
-    const parentTitle = parentName ? guessTitleFromName(parentName) : '';
-    if (parentTitle) {
-      title = parentTitle;
-    } else if (parentPath) {
-      const grandParent = getParentPath(parentPath);
-      const grandName = grandParent ? getPathBaseName(grandParent) : '';
-      const grandTitle = grandName ? guessTitleFromName(grandName) : '';
-      if (grandTitle) {
-        title = grandTitle;
-      }
-    }
-  }
-  const episodeTitle = parseEpisodeTitleFromName(cleaned);
-  return {
-    title,
-    year,
-    season: seasonEpisode.season || seasonOnly.season,
-    episode: seasonEpisode.episode,
-    episodeTitle
-  };
-}
-
-function episodeKey(season, episode) {
-  if (!season || !episode) {
-    return '';
-  }
-  return `S${pad2(season)}E${pad2(episode)}`;
-}
+const metadataTools = createMetadataTools({
+  state,
+  ui,
+  logDebug,
+  setDropdownAuto,
+  setInputAuto,
+  applyFormatSuggestion
+});
 
 function setIfAuto(input, value) {
   if (!value) {
@@ -1703,95 +1177,6 @@ function setIfAuto(input, value) {
     input.value = value;
     input.dataset.manual = 'false';
     input.dataset.auto = 'false';
-  }
-}
-
-function fillFromMediaInfo() {
-  if (!state.mediaInfo || state.mediaInfo.error) {
-    return;
-  }
-
-  const videoTrack = getVideoTrack(state.mediaInfo);
-  const audioTracks = getAudioTracks(state.mediaInfo);
-  logDebug('MediaInfo tracks', {
-    video: Boolean(videoTrack),
-    audioCount: audioTracks.length
-  });
-
-  if (videoTrack) {
-    const resolution = getResolution(videoTrack);
-    if (ui.resolutionSelectBtn) {
-      setDropdownAuto(ui.resolutionInput, ui.resolutionSelectBtn, resolution, resolution);
-    } else {
-      setInputAuto(ui.resolutionInput, resolution);
-    }
-
-    const hdrTokens = getHdrTokens(videoTrack);
-    ui.dvCheckbox.checked = hdrTokens.includes('DV');
-    ui.hdr10plusCheckbox.checked = hdrTokens.includes('HDR10+');
-    ui.hdrCheckbox.checked = hdrTokens.includes('HDR') && !hdrTokens.includes('HDR10+');
-
-    const format = ui.formatSelect.value;
-    const videoCodec = mapVideoCodec(videoTrack, format);
-    if (ui.videoCodecSelectBtn) {
-      setDropdownAuto(ui.videoCodecInput, ui.videoCodecSelectBtn, videoCodec, videoCodec);
-    } else {
-      setInputAuto(ui.videoCodecInput, videoCodec);
-    }
-
-    if (resolution === '2160p') {
-      ui.uhdCheckbox.checked = true;
-    }
-  }
-
-  applyFormatSuggestion('');
-
-  if (audioTracks.length) {
-    const cleanAudio = audioTracks.filter((track) => {
-      const title = String(track.Title || '').toLowerCase();
-      return !title.includes('commentary');
-    });
-
-    const audioLangs = cleanAudio
-      .map((track) => normalizeLangTag(getTrackLang(track)))
-      .filter(Boolean);
-    const uniqueLangs = [...new Set(audioLangs)];
-    state.audioLangs = uniqueLangs;
-    ui.audioLangHint.textContent = uniqueLangs.length
-      ? `Lingue audio rilevate: ${uniqueLangs.join(', ')}`
-      : 'Lingue audio rilevate: -';
-
-    const preferredTracks = cleanAudio.filter((track) => normalizeLangTag(getTrackLang(track)) === 'ITA');
-    const selectionPool = preferredTracks.length ? preferredTracks : cleanAudio;
-    const best = selectionPool.reduce((bestTrack, track) => {
-      if (!bestTrack) {
-        return track;
-      }
-      return scoreAudioTrack(track) > scoreAudioTrack(bestTrack) ? track : bestTrack;
-    }, null);
-
-    if (best) {
-      const mappedAudio = mapAudioCodec(best);
-      const channels = parseChannels(best.Channels || best['Channel(s)'] || '');
-      if (ui.audioCodecSelectBtn) {
-        setDropdownAuto(ui.audioCodecInput, ui.audioCodecSelectBtn, mappedAudio, mappedAudio);
-      } else {
-        setInputAuto(ui.audioCodecInput, mappedAudio);
-      }
-      if (ui.audioChannelsSelectBtn) {
-        setDropdownAuto(ui.audioChannelsInput, ui.audioChannelsSelectBtn, channels, channels);
-      } else {
-        setInputAuto(ui.audioChannelsInput, channels);
-      }
-      setInputAuto(ui.audioMetaInput, detectAudioMeta(best));
-    }
-
-    if (!ui.languageTagInput.dataset.manual || !ui.languageTagInput.value) {
-      const computedLang = buildLanguageTag(uniqueLangs, ui.originalLanguageInput.value);
-      if (computedLang) {
-        setInputAuto(ui.languageTagInput, computedLang);
-      }
-    }
   }
 }
 
@@ -1882,343 +1267,15 @@ function getResolvedTag() {
   return resolved;
 }
 
-function computeBaseName(form, overrides = {}) {
-  const data = { separatorStyle: 'spaces', ...form, ...overrides };
-  const tokens = [];
-  const type = data.type;
-  const format = data.format;
-  const isEpisode = type === 'tv-episode' || type === 'anime-episode';
-  const isSeason = type === 'tv-season' || type === 'anime-season';
-
-  if (data.title) {
-    tokens.push(data.title);
-  }
-
-  if (data.includeYear && data.year) {
-    tokens.push(data.year);
-  }
-
-  if (isEpisode) {
-    if (data.season && data.episode) {
-      tokens.push(`S${pad2(data.season)}E${pad2(data.episode)}`);
-    } else {
-      if (data.season) {
-        tokens.push(`S${pad2(data.season)}`);
-      }
-      if (data.episode) {
-        tokens.push(`E${pad2(data.episode)}`);
-      }
-    }
-    if (data.episodeTitle) {
-      tokens.push(data.episodeTitle);
-    }
-    if (data.part) {
-      tokens.push(data.part);
-    }
-  } else if (isSeason && data.season) {
-    tokens.push(`S${pad2(data.season)}`);
-  }
-
-  if (format === 'Remux' || format === 'Full Disc') {
-    if (data.is3d) {
-      tokens.push('3D');
-    }
-  }
-
-  if (format !== 'Full Disc' && data.languageTag) {
-    tokens.push(data.languageTag);
-  }
-
-  if (data.edition) {
-    tokens.push(data.edition);
-  }
-  if (data.hybrid) {
-    tokens.push('Hybrid');
-  }
-  if (data.repack) {
-    tokens.push(data.repack);
-  }
-  if (data.resolution) {
-    tokens.push(data.resolution);
-  }
-  if (format === 'Full Disc' && data.region) {
-    tokens.push(data.region);
-  }
-  if (data.uhd) {
-    tokens.push('UHD');
-  }
-
-  const hdrTokens = data.hdrTokens || [];
-
-  if (format === 'WEB-DL' || format === 'WEBRip') {
-    if (data.service) {
-      tokens.push(data.service);
-    }
-    tokens.push(format);
-    if (data.audioCodec) {
-      tokens.push(data.audioCodec);
-    }
-    if (data.audioChannels) {
-      tokens.push(data.audioChannels);
-    }
-    if (data.audioMeta) {
-      tokens.push(data.audioMeta);
-    }
-    tokens.push(...hdrTokens);
-    if (data.videoCodec) {
-      tokens.push(data.videoCodec);
-    }
-  } else if (format === 'Encode') {
-    if (data.source) {
-      tokens.push(data.source);
-    }
-    if (data.audioCodec) {
-      tokens.push(data.audioCodec);
-    }
-    if (data.audioChannels) {
-      tokens.push(data.audioChannels);
-    }
-    if (data.audioMeta) {
-      tokens.push(data.audioMeta);
-    }
-    tokens.push(...hdrTokens);
-    if (data.videoCodec) {
-      tokens.push(data.videoCodec);
-    }
-  } else if (format === 'Remux') {
-    if (data.source) {
-      tokens.push(data.source);
-    }
-    tokens.push('REMUX');
-    tokens.push(...hdrTokens);
-    if (data.videoCodec) {
-      tokens.push(data.videoCodec);
-    }
-    if (data.audioCodec) {
-      tokens.push(data.audioCodec);
-    }
-    if (data.audioChannels) {
-      tokens.push(data.audioChannels);
-    }
-    if (data.audioMeta) {
-      tokens.push(data.audioMeta);
-    }
-  } else if (format === 'Full Disc') {
-    if (data.source) {
-      tokens.push(data.source);
-    }
-    tokens.push(...hdrTokens);
-    if (data.videoCodec) {
-      tokens.push(data.videoCodec);
-    }
-    if (data.audioCodec) {
-      tokens.push(data.audioCodec);
-    }
-    if (data.audioChannels) {
-      tokens.push(data.audioChannels);
-    }
-    if (data.audioMeta) {
-      tokens.push(data.audioMeta);
-    }
-  }
-
-  const tag = data.tag ? data.tag.replace(/^[\-\s]+/, '') : '';
-  if (tag && tokens.length) {
-    tokens[tokens.length - 1] = `${tokens[tokens.length - 1]}-${tag}`;
-  }
-
-  const joiner = data.separatorStyle === 'dots' ? '.' : ' ';
-  const tokensToJoin = tokens
-    .filter(Boolean)
-    .map((token) => (data.separatorStyle === 'dots' ? token.replace(/\s*-\s*/g, '-') : token));
-  let name = tokensToJoin.join(joiner);
-  if (data.separatorStyle === 'dots') {
-    name = name.replace(/\s+/g, '.').replace(/\.+/g, '.');
-  } else {
-    name = name.replace(/\s+/g, ' ').trim();
-  }
-
-  return sanitizeName(name);
-}
-
-function getTorrentNameSuggestion() {
-  const { folderName, baseName } = buildRenameTargets();
-  const formatLanguageSeparators = (value) => {
-    if (!value || !LANGUAGE_CODES_PATTERN) {
-      return value;
-    }
-    const pattern = new RegExp(`\\b(${LANGUAGE_CODES_PATTERN})-(${LANGUAGE_CODES_PATTERN})\\b`, 'g');
-    return value.replace(pattern, '$1.-.$2');
-  };
-  if (state.kind === 'dir') {
-    return formatLanguageSeparators(folderName || getPathBaseName(state.targetPath));
-  }
-  if (baseName) {
-    return formatLanguageSeparators(baseName);
-  }
-  const targetFile = state.mainVideo || state.targetPath;
-  return formatLanguageSeparators(stripExtension(getPathBaseName(targetFile)));
-}
-
-function buildTorrentWarnings() {
-  const warnings = [];
-  const { folderName, fileRenames } = buildRenameTargets();
-  if (state.kind === 'dir') {
-    const currentFolder = getPathBaseName(state.targetPath);
-    if (folderName && folderName !== currentFolder) {
-      warnings.push(`Cartella non conforme: ${currentFolder} → ${folderName}`);
-    }
-  }
-
-  const mismatches = fileRenames.filter((item) => {
-    if (!item?.path || !item?.baseName) {
-      return false;
-    }
-    const current = stripExtension(getPathBaseName(item.path));
-    return item.baseName !== current;
-  });
-
-  if (mismatches.length) {
-    const sample = mismatches[0];
-    const current = stripExtension(getPathBaseName(sample.path));
-    warnings.push(
-      `${mismatches.length} file non conformi alle rules (es. ${current} → ${sample.baseName}).`
-    );
-  }
-  return warnings;
-}
-
-function getMissingRenameRequirements(form) {
-  const missing = [];
-  const format = form.format;
-  if ((format === 'WEB-DL' || format === 'WEBRip') && !form.service) {
-    missing.push(`Servizio mancante per il formato ${format}.`);
-  }
-  if ((format === 'Encode' || format === 'Remux' || format === 'Full Disc') && !form.source) {
-    missing.push(`Sorgente mancante per il formato ${format}.`);
-  }
-  return missing;
-}
-
-function buildRenameTargets() {
-  if (!state.targetPath) {
-    return { folderName: '', baseName: '', fileRenames: [], warnings: [] };
-  }
-
-  const warnings = [];
-  const form = getFormState();
-  const isDir = state.kind === 'dir';
-  const isSeason = isDir || form.type.includes('season');
-  const seasonType = form.type.includes('anime') ? 'anime-season' : 'tv-season';
-  const episodeType = form.type.includes('anime') ? 'anime-episode' : 'tv-episode';
-
-  const folderName = isDir ? computeBaseName(form, { type: seasonType, separatorStyle: 'dots' }) : '';
-
-  const fileRenames = [];
-
-  if (isDir) {
-    const seasonValue = form.season;
-    for (const filePath of state.videoFiles) {
-      const guess = guessMetadataFromName(filePath);
-      const season = guess.season || seasonValue;
-      const episode = guess.episode;
-      const key = episodeKey(season, episode);
-      const episodeTitle = key && state.episodeMap[key] ? state.episodeMap[key] : guess.episodeTitle;
-      const baseName = computeBaseName(form, {
-        type: episodeType,
-        separatorStyle: 'dots',
-        season,
-        episode,
-        episodeTitle: episodeTitle || form.episodeTitle
-      });
-      if (!episode || !season) {
-        warnings.push(`Stagione/episodio mancante per ${getPathBaseName(filePath)}`);
-      }
-      fileRenames.push({ path: filePath, baseName });
-    }
-  } else {
-    let baseName = computeBaseName(form, { separatorStyle: 'dots' });
-    if (form.type === 'tv-episode' || form.type === 'anime-episode') {
-      const key = episodeKey(form.season, form.episode);
-      const mappedTitle = key && state.episodeMap[key] ? state.episodeMap[key] : '';
-      if (mappedTitle) {
-        baseName = computeBaseName(form, { separatorStyle: 'dots', episodeTitle: mappedTitle });
-      } else if (!form.episodeTitle) {
-        const guess = state.mainVideo ? guessMetadataFromName(state.mainVideo) : null;
-        if (guess?.episodeTitle) {
-          baseName = computeBaseName(form, { separatorStyle: 'dots', episodeTitle: guess.episodeTitle });
-        }
-      }
-    }
-    const targetFile = state.mainVideo || state.targetPath;
-    fileRenames.push({ path: targetFile, baseName });
-  }
-
-  const previewBase = fileRenames[0]?.baseName || '';
-  return { folderName, baseName: previewBase, fileRenames, warnings };
-}
-
-function applyRenameResults(result, payload) {
-  if (!result || !Array.isArray(result.results) || !result.results.length) {
-    return;
-  }
-
-  const okResults = result.results.filter((item) => item && item.ok);
-  if (!okResults.length) {
-    return;
-  }
-
-  const fileMap = new Map();
-  for (const item of okResults) {
-    fileMap.set(normalizePathValue(item.from).toLowerCase(), item.to);
-  }
-
-  const expectedFolderFrom = payload?.renameFolder
-    ? (state.kind === 'dir' ? state.targetPath : getParentPath(state.targetPath))
-    : '';
-  const folderResult = expectedFolderFrom
-    ? okResults.find((item) => isSamePath(item.from, expectedFolderFrom))
-    : null;
-  const folderFrom = folderResult?.from || '';
-  const folderTo = folderResult?.to || '';
-
-  const applyFileRename = (value) => {
-    if (!value) {
-      return value;
-    }
-    const mapped = fileMap.get(normalizePathValue(value).toLowerCase());
-    return mapped || value;
-  };
-
-  const applyAllRenames = (value) => {
-    let updated = applyFileRename(value);
-    if (folderTo && folderFrom) {
-      updated = applyFolderRenamePath(updated, folderFrom, folderTo);
-    }
-    return updated;
-  };
-
-  if (state.kind === 'dir' && folderTo) {
-    state.targetPath = folderTo;
-  } else {
-    state.targetPath = applyAllRenames(state.targetPath);
-  }
-
-  state.mainVideo = applyAllRenames(state.mainVideo);
-  state.videoFiles = state.videoFiles.map((pathValue) => applyAllRenames(pathValue));
-
-  if (state.mainVideo) {
-    const lastDot = state.mainVideo.lastIndexOf('.');
-    state.mainExtension = lastDot !== -1 ? state.mainVideo.slice(lastDot) : '';
-  }
-
-  if (state.targetPath) {
-    ui.selectedPath.textContent = state.targetPath;
-  }
-  if (state.mainVideo) {
-    setHint(ui.scanHint, `File analizzato: ${state.mainVideo}`);
-  }
-}
+const renameTools = createRenameTools({
+  state,
+  ui,
+  getFormState,
+  guessMetadataFromName: metadataTools.guessMetadataFromName,
+  episodeKey: metadataTools.episodeKey,
+  setHint,
+  languageCodesPattern: LANGUAGE_CODES_PATTERN
+});
 
 async function updateRenamePlan() {
   if (!state.targetPath) {
@@ -2228,7 +1285,7 @@ async function updateRenamePlan() {
     return;
   }
 
-  const { folderName, baseName, fileRenames, warnings } = buildRenameTargets();
+  const { folderName, baseName, fileRenames, warnings } = renameTools.buildRenameTargets();
   const plan = await window.api.previewRename({
     targetPath: state.targetPath,
     renameFiles: ui.renameFileCheckbox.checked,
@@ -2383,26 +1440,46 @@ async function fetchMetadataAuto(guess) {
     const data = await window.api.fetchMetadata(payload);
     logDebug('fetchMetadata payload', payload);
     logDebug('fetchMetadata result', data);
-    if (data.title) {
-      setIfAuto(ui.titleInput, data.title);
+    let finalData = data;
+    const hasMatch = Boolean(
+      data?.title || data?.tmdbId || data?.imdbId || data?.tvdbSeriesId
+    );
+    if (!hasMatch && payload.title) {
+      const cleanedTitle = metadataTools.cleanSearchTitle(payload.title);
+      if (cleanedTitle && cleanedTitle !== payload.title) {
+        const retryPayload = { ...payload, title: cleanedTitle };
+        logDebug('fetchMetadata retry (clean title)', retryPayload);
+        const retryData = await window.api.fetchMetadata(retryPayload);
+        logDebug('fetchMetadata retry result', retryData);
+        const retryHasMatch = Boolean(
+          retryData?.title || retryData?.tmdbId || retryData?.imdbId || retryData?.tvdbSeriesId
+        );
+        if (retryHasMatch) {
+          finalData = retryData;
+        }
+      }
     }
-    if (data.year) {
-      setIfAuto(ui.yearInput, data.year);
+    state.metadata = finalData;
+    if (finalData.title) {
+      setIfAuto(ui.titleInput, finalData.title);
     }
-    if (data.originalLanguage) {
-      const normalizedOriginal = normalizeLangTag(data.originalLanguage);
+    if (finalData.year) {
+      setIfAuto(ui.yearInput, finalData.year);
+    }
+    if (finalData.originalLanguage) {
+      const normalizedOriginal = normalizeLangTag(finalData.originalLanguage);
       setInputAuto(ui.originalLanguageInput, normalizedOriginal);
       if (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false') {
-        const recomputed = buildLanguageTag(state.audioLangs, normalizedOriginal);
+        const recomputed = metadataTools.buildLanguageTag(state.audioLangs, normalizedOriginal);
         if (recomputed) {
           setInputAuto(ui.languageTagInput, recomputed);
         }
       }
     }
-    if (Array.isArray(data.episodes)) {
+    if (Array.isArray(finalData.episodes)) {
       const map = {};
-      data.episodes.forEach((ep) => {
-        const key = episodeKey(ep.season, ep.episode);
+      finalData.episodes.forEach((ep) => {
+        const key = metadataTools.episodeKey(ep.season, ep.episode);
         if (key && ep.name) {
           map[key] = ep.name;
         }
@@ -2413,7 +1490,7 @@ async function fetchMetadataAuto(guess) {
     if (state.kind !== 'dir') {
       const season = ui.seasonInput.value;
       const episode = ui.episodeInput.value;
-      const key = episodeKey(season, episode);
+      const key = metadataTools.episodeKey(season, episode);
       if (key && state.episodeMap[key]) {
         setIfAuto(ui.episodeTitleInput, state.episodeMap[key]);
       }
@@ -2422,7 +1499,7 @@ async function fetchMetadataAuto(guess) {
     const usedManualId = Boolean(payload.imdbId || payload.tvdbId);
     const modeLabel = usedManualId ? 'Matching manuale' : 'Auto Matching';
     setFetchBadge(usedManualId ? 'manual' : 'auto', modeLabel);
-    renderFetchStatus(payload, data);
+    renderFetchStatus(payload, finalData);
   } catch (error) {
     ui.fetchBadge.classList.add('hidden');
     setHint(ui.fetchStatus, `Errore: ${error.message || error}`);
@@ -2442,8 +1519,8 @@ async function autoDetectFromPath() {
 
   if (state.kind === 'dir') {
     const folderName = getPathBaseName(state.targetPath);
-    const folderGuess = guessMetadataFromName(folderName);
-    const firstFileGuess = state.videoFiles.length ? guessMetadataFromName(state.videoFiles[0]) : {};
+    const folderGuess = metadataTools.guessMetadataFromName(folderName);
+    const firstFileGuess = state.videoFiles.length ? metadataTools.guessMetadataFromName(state.videoFiles[0]) : {};
 
     guess.title = folderGuess.title || firstFileGuess.title || '';
     guess.year = folderGuess.year || firstFileGuess.year || '';
@@ -2457,7 +1534,7 @@ async function autoDetectFromPath() {
       setIfAuto(ui.seasonInput, guess.season);
     }
   } else if (state.mainVideo) {
-    const fileGuess = guessMetadataFromName(state.mainVideo);
+    const fileGuess = metadataTools.guessMetadataFromName(state.mainVideo);
     guess = {
       ...guess,
       ...fileGuess,
@@ -2517,6 +1594,9 @@ async function loadPath(targetPath) {
   state.videoFiles = scan.videoFiles || [];
   state.mainVideo = scan.mainVideo;
   state.mediaInfo = scan.mediaInfo;
+  state.metadata = null;
+  state.screenshots = [];
+  state.lastTorrentPath = '';
   state.episodeMap = {};
   logDebug('scanPath result', {
     kind: scan.kind,
@@ -2561,7 +1641,7 @@ async function loadPath(targetPath) {
     ui.typeSelect.value = ui.typeSelect.value.includes('anime') ? 'anime-season' : 'tv-season';
   }
 
-  fillFromMediaInfo();
+  metadataTools.fillFromMediaInfo();
   await autoDetectFromPath();
   schedulePreview();
 }
@@ -2580,6 +1660,20 @@ async function showMediaInfoReport() {
     ui.mediaInfoText.textContent = result?.text || 'Nessun output disponibile.';
   }
 }
+
+const uploadKit = createUploadKit({
+  buildMediaInfoShort: metadataTools.buildMediaInfoShort,
+  computeBaseName: renameTools.computeBaseName,
+  copyToClipboard,
+  getFormState,
+  getMissingRenameRequirements: renameTools.getMissingRenameRequirements,
+  getPathBaseName,
+  loadSettings,
+  setHint,
+  showToast,
+  updateFfmpegHint
+});
+uploadKit.initUploadKitEvents();
 
 ui.selectFileBtn.addEventListener('click', async () => {
   const filePath = await window.api.selectFile();
@@ -2623,7 +1717,7 @@ ui.applyRenameBtn.addEventListener('click', async () => {
   }
 
   const form = getFormState();
-  const missing = getMissingRenameRequirements(form);
+  const missing = renameTools.getMissingRenameRequirements(form);
   if (missing.length) {
     const message = `${missing.join('\n')}\n\nVuoi procedere comunque?`;
     const proceed = await openConfirmModal(message);
@@ -2632,7 +1726,7 @@ ui.applyRenameBtn.addEventListener('click', async () => {
     }
   }
 
-  const { folderName, fileRenames } = buildRenameTargets();
+  const { folderName, fileRenames } = renameTools.buildRenameTargets();
   if (!fileRenames.length && !folderName) {
     setHint(ui.renameHint, 'Inserisci i campi minimi per generare il nome.');
     return;
@@ -2651,7 +1745,7 @@ ui.applyRenameBtn.addEventListener('click', async () => {
   if (result.ok) {
     setHint(ui.renameHint, 'Rinomina completata.');
     showToast('Rinomina completata.');
-    applyRenameResults(result, payload);
+    renameTools.applyRenameResults(result, payload);
   } else {
     const warning = result.warnings.length ? result.warnings.join(' | ') : 'Errore nella rinomina.';
     setHint(ui.renameHint, warning);
@@ -2701,6 +1795,7 @@ if (ui.generateTorrentBtn) {
     const result = await window.api.createTorrent(payload);
     logDebug('createTorrent result', result);
     if (result?.ok) {
+      state.lastTorrentPath = result.outputPath || '';
       const updated = {
         ...loadSettings(),
         torrentPasskey: announceResolved.passkey || '',
@@ -2710,6 +1805,9 @@ if (ui.generateTorrentBtn) {
       };
       saveSettings(updated);
       applySettingsToUI(updated);
+      if (isSettingsOpen()) {
+        refreshSettingsSnapshot();
+      }
       const toastMessage = result.warning
         ? `Torrent creato. ${result.warning}`
         : 'Torrent creato.';
@@ -2725,11 +1823,23 @@ if (ui.generateTorrentBtn) {
 }
 
 ui.openSettingsBtn.addEventListener('click', openSettings);
-ui.closeSettingsBtn.addEventListener('click', closeSettings);
+ui.closeSettingsBtn.addEventListener('click', requestCloseSettings);
 ui.settingsModal.addEventListener('click', (event) => {
   if (event.target.classList.contains('modal-backdrop')) {
-    closeSettings();
+    requestCloseSettings();
   }
+});
+ui.settingsModal.addEventListener('input', (event) => {
+  if (!event.target.closest('.settings-body')) {
+    return;
+  }
+  updateSettingsDirtyFlag();
+});
+ui.settingsModal.addEventListener('change', (event) => {
+  if (!event.target.closest('.settings-body')) {
+    return;
+  }
+  updateSettingsDirtyFlag();
 });
 
 if (ui.themeToggle) {
@@ -2779,21 +1889,17 @@ if (ui.browseTorrentOutputSettingsBtn) {
   });
 }
 
-if (ui.confirmCancelBtn) {
-  ui.confirmCancelBtn.addEventListener('click', () => resolveConfirm(false));
-}
-
-if (ui.confirmOkBtn) {
-  ui.confirmOkBtn.addEventListener('click', () => resolveConfirm(true));
-}
-
-if (ui.confirmModal) {
-  ui.confirmModal.addEventListener('click', (event) => {
-    if (event.target.classList.contains('modal-backdrop')) {
-      resolveConfirm(false);
+if (ui.browseFfmpegBtn) {
+  ui.browseFfmpegBtn.addEventListener('click', async () => {
+    const filePath = await window.api.selectAnyFile?.();
+    if (filePath && ui.ffmpegPathInput) {
+      ui.ffmpegPathInput.value = filePath;
+      updateFfmpegHint({ ffmpegPath: filePath });
     }
   });
 }
+
+bindConfirmHandlers();
 
 if (window.api?.onTorrentProgress) {
   window.api.onTorrentProgress((data) => {
@@ -2899,6 +2005,15 @@ setupDropdown(ui.audioChannelsDropdown, ui.audioChannelsSelectBtn, ui.audioChann
 setupDropdown(ui.tagDropdown, ui.tagInputBtn, ui.tagInput, ui.tagDropdownMenu);
 
 document.addEventListener('click', (event) => {
+  const external = event.target.closest('[data-external]');
+  if (external) {
+    event.preventDefault();
+    const url = external.getAttribute('data-external') || external.getAttribute('href') || '';
+    if (url) {
+      window.api.openExternal(url);
+    }
+    return;
+  }
   if (!event.target.closest('.dropdown')) {
     closeAllDropdowns();
   }
@@ -2909,6 +2024,7 @@ ui.saveSettingsBtn.addEventListener('click', () => {
   saveSettings(settings);
   applySettingsToUI(settings);
   setHint(ui.settingsHint, 'Impostazioni salvate.');
+  refreshSettingsSnapshot();
 });
 
 ui.languageTagInput.addEventListener('input', () => {
@@ -2917,10 +2033,16 @@ ui.languageTagInput.addEventListener('input', () => {
 
 ui.originalLanguageInput.addEventListener('input', () => {
   if (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false') {
-    ui.languageTagInput.value = buildLanguageTag(state.audioLangs, ui.originalLanguageInput.value);
+    ui.languageTagInput.value = metadataTools.buildLanguageTag(state.audioLangs, ui.originalLanguageInput.value);
   }
   schedulePreview();
 });
+
+if (ui.ffmpegPathInput) {
+  ui.ffmpegPathInput.addEventListener('input', () => {
+    updateFfmpegHint({ ffmpegPath: ui.ffmpegPathInput.value.trim() });
+  });
+}
 
 [
   ui.typeSelect,
@@ -2968,7 +2090,7 @@ ui.originalLanguageInput.addEventListener('input', () => {
   element.addEventListener('change', () => {
     if (element === ui.formatSelect && state.mediaInfo) {
       resetDropdown(ui.videoCodecInput, ui.videoCodecSelectBtn, 'Seleziona codec');
-      fillFromMediaInfo();
+      metadataTools.fillFromMediaInfo();
     }
     schedulePreview();
   });

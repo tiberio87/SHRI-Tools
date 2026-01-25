@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   selectFile: () => ipcRenderer.invoke('select-file'),
+  selectAnyFile: () => ipcRenderer.invoke('select-any-file'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   scanPath: (targetPath) => ipcRenderer.invoke('scan-path', targetPath),
   getMediaInfoText: (filePath) => ipcRenderer.invoke('mediainfo-text', filePath),
@@ -12,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   verifyApiKey: (payload) => ipcRenderer.invoke('verify-api-key', payload),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   createTorrent: (payload) => ipcRenderer.invoke('create-torrent', payload),
+  generateScreenshots: (payload) => ipcRenderer.invoke('generate-screenshots', payload),
   onTorrentProgress: (handler) => {
     const listener = (_event, data) => handler(data);
     ipcRenderer.on('torrent-progress', listener);

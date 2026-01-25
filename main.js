@@ -1,7 +1,15 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, shell } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell, globalShortcut } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
 const fsSync = require('fs');
+const { spawn } = require('child_process');
+
+function createFormData() {
+  if (!global.FormData) {
+    throw new Error('FormData non disponibile. Aggiorna Electron/Node o abilita una versione che includa fetch.');
+  }
+  return new global.FormData();
+}
 const { mediaInfoFactory } = require('mediainfo.js');
 const { readFile } = require('fs/promises');
 
@@ -20,6 +28,7 @@ const MIN_PIECE_LENGTH = 16 * 1024;
 const MAX_PIECE_LENGTH = 4 * 1024 * 1024;
 const MAX_TORRENT_SIZE = 2 * 1024 * 1024;
 const MAX_PIECES_TARGET = 100000;
+const TINY_GIF_BASE64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
 let mediaInfoInstance = null;
 let mediaInfoTextInstance = null;
@@ -77,6 +86,301 @@ async function analyzeMediaText(filePath) {
   } finally {
     await handle.close();
   }
+}
+
+function getVideoTrack(mediaInfo) {
+  const tracks = mediaInfo?.media?.track || [];
+  return tracks.find((track) => track['@type'] === 'Video');
+}
+
+function parseNumber(value, fallback = 0) {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  const cleaned = String(value).replace(/[^0-9.]/g, '');
+  const parsed = parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseRatio(value, fallback = 0) {
+  if (typeof value === 'number') {
+    return value;
+  }
+  if (!value) {
+    return fallback;
+  }
+  const text = String(value).trim();
+  if (text.includes(':')) {
+    const [left, right] = text.split(':');
+    const num = parseFloat(left);
+    const den = parseFloat(right);
+    if (Number.isFinite(num) && Number.isFinite(den) && den !== 0) {
+      return num / den;
+    }
+  }
+  const cleaned = text.replace(/[^0-9.]/g, '');
+  const parsed = parseFloat(cleaned);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function deriveSar(width, height, par, dar) {
+  if (!width || !height) {
+    return { wSar: 1, hSar: 1 };
+  }
+  if (!par || par === 1) {
+    return { wSar: 1, hSar: 1 };
+  }
+  if (!dar) {
+    dar = width / height;
+  }
+  if (par < 1) {
+    const newHeight = dar * height;
+    const sar = newHeight ? width / newHeight : 1;
+    return { wSar: 1, hSar: sar || 1 };
+  }
+  return { wSar: par, hSar: 1 };
+}
+
+function detectHdr(mediaInfo) {
+  const videoTrack = getVideoTrack(mediaInfo);
+  if (!videoTrack) {
+    return false;
+  }
+  const fields = [
+    videoTrack.HDR_Format,
+    videoTrack.HDR_Format_String,
+    videoTrack.HDR_Format_Compatibility,
+    videoTrack['HDR format'],
+    videoTrack['HDR format string'],
+    videoTrack['HDR format compatibility'],
+    videoTrack.Transfer_characteristics,
+    videoTrack['Transfer characteristics'],
+    videoTrack.ColorPrimaries,
+    videoTrack['Color primaries']
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  return (
+    fields.includes('hdr') ||
+    fields.includes('dolby vision') ||
+    fields.includes('hlg') ||
+    fields.includes('pq')
+  );
+}
+
+async function verifyImgbbKey(apiKey) {
+  const form = createFormData();
+  form.append('image', TINY_GIF_BASE64);
+  const url = `https://api.imgbb.com/1/upload?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(url, { method: 'POST', body: form });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    const message = data?.error?.message || `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+}
+
+async function verifyPtscreensKey(apiKey) {
+  const form = createFormData();
+  form.append('source', TINY_GIF_BASE64);
+  const response = await fetch('https://ptscreens.com/api/1/upload', {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey },
+    body: form
+  });
+  const data = await response.json().catch(() => null);
+  const statusCode = data?.status_code || data?.success?.code || response.status;
+  if (!response.ok || String(statusCode) !== '200') {
+    const message = data?.status_txt || data?.error || `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+}
+
+async function verifyUnit3dKey(apiKey, baseUrl) {
+  const base = (baseUrl || 'https://shareisland.org').replace(/\/+$/, '');
+  const response = await fetch(`${base}/api/user`, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: 'application/json'
+    }
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`HTTP ${response.status}: ${text || 'Errore API'}`);
+  }
+}
+
+function resolveFfprobePath(ffmpegPath) {
+  if (!ffmpegPath) {
+    return '';
+  }
+  const dir = path.dirname(ffmpegPath);
+  const ext = path.extname(ffmpegPath);
+  return path.join(dir, `ffprobe${ext}`);
+}
+
+function runProcess(command, args) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, { windowsHide: true });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (chunk) => {
+      stdout += chunk.toString();
+    });
+    child.stderr.on('data', (chunk) => {
+      stderr += chunk.toString();
+    });
+    child.on('error', reject);
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr });
+      } else {
+        reject(new Error(stderr || `Exit code ${code}`));
+      }
+    });
+  });
+}
+
+async function getVideoDurationSeconds(ffprobePath, videoPath) {
+  const args = [
+    '-v',
+    'error',
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'default=noprint_wrappers=1:nokey=1',
+    videoPath
+  ];
+  const { stdout } = await runProcess(ffprobePath, args);
+  const value = parseFloat(stdout.trim());
+  if (!Number.isFinite(value)) {
+    throw new Error('Durata non rilevata.');
+  }
+  return value;
+}
+
+function buildScreenshotTimes(duration, count) {
+  const safeCount = Math.max(3, Math.min(12, Number(count) || 6));
+  const start = duration * 0.1;
+  const end = duration * 0.9;
+  const step = safeCount > 1 ? (end - start) / (safeCount - 1) : 0;
+  return Array.from({ length: safeCount }, (_, index) => start + step * index);
+}
+
+function buildScreenshotFilters({ scaleWidth, scaleHeight, tonemap }) {
+  const filters = [];
+  if (scaleWidth && scaleHeight) {
+    filters.push(`scale=${scaleWidth}:${scaleHeight}`);
+  }
+  if (tonemap) {
+    filters.push(
+      'zscale=transfer=linear',
+      'tonemap=tonemap=hable:desat=0',
+      'zscale=transfer=bt709'
+    );
+  }
+  filters.push('format=rgb24');
+  return filters.join(',');
+}
+
+async function captureScreenshot(ffmpegPath, videoPath, outputPath, timestamp, options) {
+  const filterChain = buildScreenshotFilters(options);
+  const args = [
+    '-hide_banner',
+    '-y',
+    '-ss',
+    String(timestamp),
+    '-i',
+    videoPath,
+    '-map',
+    '0:v:0',
+    '-an',
+    '-sn',
+    '-frames:v',
+    '1',
+    '-vf',
+    filterChain,
+    '-compression_level',
+    '3',
+    '-pred',
+    'mixed',
+    outputPath
+  ];
+  await runProcess(ffmpegPath, args);
+}
+
+async function uploadToImgbb(filePath, apiKey) {
+  if (!apiKey) {
+    throw new Error('Chiave imgBB mancante.');
+  }
+  const buffer = await fs.readFile(filePath);
+  const base64 = buffer.toString('base64');
+  const form = createFormData();
+  form.append('image', base64);
+  const url = `https://api.imgbb.com/1/upload?key=${encodeURIComponent(apiKey)}`;
+  const response = await fetch(url, { method: 'POST', body: form });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) {
+    const message = data?.error?.message || `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  return {
+    displayUrl: data?.data?.display_url || data?.data?.url,
+    viewerUrl: data?.data?.url_viewer || '',
+    rawUrl: data?.data?.image?.url || data?.data?.url
+  };
+}
+
+async function uploadToPtscreens(filePath, apiKey) {
+  if (!apiKey) {
+    throw new Error('Chiave PTScreens mancante.');
+  }
+  const buffer = await fs.readFile(filePath);
+  const base64 = buffer.toString('base64');
+  const form = createFormData();
+  form.append('source', base64);
+  const response = await fetch('https://ptscreens.com/api/1/upload', {
+    method: 'POST',
+    headers: { 'X-API-Key': apiKey },
+    body: form
+  });
+  const data = await response.json().catch(() => null);
+  const statusCode = data?.status_code || data?.success?.code || response.status;
+  if (!response.ok || String(statusCode) !== '200') {
+    const message = data?.status_txt || data?.error || `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+  const image = data?.image || {};
+  return {
+    displayUrl: image.display_url || image.url_frame || image.url,
+    viewerUrl: image.url_viewer || '',
+    rawUrl: image.url || image.display_url
+  };
+}
+
+async function uploadWithFallback(filePath, primaryHost, fallbackHost, keys) {
+  const hosts = [primaryHost, fallbackHost].filter(Boolean);
+  const errors = [];
+  for (const host of hosts) {
+    try {
+      if (host === 'imgbb') {
+        const result = await uploadToImgbb(filePath, keys.imgbbKey);
+        return { ok: true, host, ...result };
+      }
+      if (host === 'ptscreens') {
+        const result = await uploadToPtscreens(filePath, keys.ptscreensKey);
+        return { ok: true, host, ...result };
+      }
+      errors.push(`Host non supportato: ${host}`);
+    } catch (error) {
+      errors.push(`${host}: ${error.message || error}`);
+    }
+  }
+  return { ok: false, host: primaryHost, error: errors.join(' | ') };
 }
 
 function isVideoFile(name) {
@@ -265,6 +569,12 @@ async function fetchTmdbDetails(type, id, apiKey, language) {
   return fetchJson(url);
 }
 
+async function fetchTmdbImages(type, id, apiKey) {
+  const params = new URLSearchParams({ api_key: apiKey });
+  const url = `https://api.themoviedb.org/3/${type}/${id}/images?${params.toString()}`;
+  return fetchJson(url);
+}
+
 async function fetchTmdbTvSeason(tvId, season, apiKey, language) {
   const params = new URLSearchParams({ api_key: apiKey });
   if (language) {
@@ -284,6 +594,35 @@ function extractYear(value) {
     return '';
   }
   return String(value).slice(0, 4);
+}
+
+function getTmdbLangCode(language) {
+  if (!language) {
+    return '';
+  }
+  return String(language).split('-')[0].toLowerCase();
+}
+
+function pickTmdbLogo(logos, preferredLang, originalLang) {
+  if (!Array.isArray(logos) || !logos.length) {
+    return '';
+  }
+  const preferred = getTmdbLangCode(preferredLang);
+  const original = getTmdbLangCode(originalLang);
+  if (preferred) {
+    const match = logos.find((logo) => logo?.iso_639_1 === preferred);
+    if (match?.file_path) {
+      return match.file_path;
+    }
+  }
+  if (original) {
+    const match = logos.find((logo) => logo?.iso_639_1 === original);
+    if (match?.file_path) {
+      return match.file_path;
+    }
+  }
+  const fallback = logos.find((logo) => logo?.file_path);
+  return fallback?.file_path || '';
 }
 
 async function tvdbLogin(apiKey) {
@@ -464,6 +803,19 @@ function createWindow() {
 
 app.whenReady().then(() => {
   createWindow();
+  const toggleDevTools = () => {
+    const win = BrowserWindow.getFocusedWindow();
+    if (!win) {
+      return;
+    }
+    if (win.webContents.isDevToolsOpened()) {
+      win.webContents.closeDevTools();
+    } else {
+      win.webContents.openDevTools({ mode: 'detach' });
+    }
+  };
+  globalShortcut.register('CommandOrControl+Shift+I', toggleDevTools);
+  globalShortcut.register('F12', toggleDevTools);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
@@ -476,6 +828,10 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  globalShortcut.unregisterAll();
 });
 
 ipcMain.handle('select-file', async () => {
@@ -492,6 +848,118 @@ ipcMain.handle('select-file', async () => {
     return null;
   }
   return result.filePaths[0];
+});
+
+ipcMain.handle('select-any-file', async () => {
+  const result = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [
+      { name: 'Executable', extensions: ['exe'] },
+      { name: 'All files', extensions: ['*'] }
+    ]
+  });
+  if (result.canceled || !result.filePaths.length) {
+    return null;
+  }
+  return result.filePaths[0];
+});
+
+ipcMain.handle('generate-screenshots', async (_event, payload) => {
+  const videoPath = payload?.videoPath || '';
+  const ffmpegPath = payload?.ffmpegPath || '';
+  const count = payload?.count || 6;
+  const primaryHost = payload?.primaryHost || 'imgbb';
+  const fallbackHost = payload?.fallbackHost || 'ptscreens';
+  const imgbbKey = payload?.imgbbKey || '';
+  const ptscreensKey = payload?.ptscreensKey || '';
+
+  if (!videoPath) {
+    return { ok: false, error: 'File video mancante.' };
+  }
+  if (!ffmpegPath) {
+    return { ok: false, error: 'FFmpeg non configurato.' };
+  }
+
+  const ffprobePath = resolveFfprobePath(ffmpegPath);
+  if (!fsSync.existsSync(ffprobePath)) {
+    return { ok: false, error: 'FFprobe non trovato vicino a FFmpeg.' };
+  }
+
+  const outputDir = path.join(app.getPath('temp'), 'shri-tools', 'screenshots', String(Date.now()));
+  await fs.mkdir(outputDir, { recursive: true });
+
+  try {
+    const duration = await getVideoDurationSeconds(ffprobePath, videoPath);
+    const times = buildScreenshotTimes(duration, count);
+    let mediaInfo = null;
+    try {
+      mediaInfo = await analyzeMedia(videoPath);
+    } catch {
+      mediaInfo = null;
+    }
+    const videoTrack = getVideoTrack(mediaInfo);
+    const width = parseNumber(videoTrack?.Width, 1920);
+    const height = parseNumber(videoTrack?.Height, 1080);
+    const par = parseNumber(videoTrack?.PixelAspectRatio, 1);
+    const dar = parseRatio(
+      videoTrack?.DisplayAspectRatio,
+      width && height ? width / height : 16 / 9
+    );
+    const { wSar, hSar } = deriveSar(width, height, par, dar);
+    const scaledWidth = Math.round(width * wSar);
+    const scaledHeight = Math.round(height * hSar);
+    const needsScale = Boolean(scaledWidth && scaledHeight) &&
+      (Math.round(width) !== scaledWidth || Math.round(height) !== scaledHeight);
+    let tonemapEnabled = detectHdr(mediaInfo);
+    let tonemapApplied = false;
+
+    const images = [];
+    let index = 0;
+    for (const time of times) {
+      index += 1;
+      const fileName = `shot_${String(index).padStart(2, '0')}.png`;
+      const filePath = path.join(outputDir, fileName);
+      const options = {
+        scaleWidth: needsScale ? scaledWidth : 0,
+        scaleHeight: needsScale ? scaledHeight : 0,
+        tonemap: tonemapEnabled
+      };
+      try {
+        await captureScreenshot(ffmpegPath, videoPath, filePath, time, options);
+        tonemapApplied = tonemapApplied || tonemapEnabled;
+      } catch (error) {
+        if (tonemapEnabled) {
+          tonemapEnabled = false;
+          await captureScreenshot(ffmpegPath, videoPath, filePath, time, {
+            scaleWidth: needsScale ? scaledWidth : 0,
+            scaleHeight: needsScale ? scaledHeight : 0,
+            tonemap: false
+          });
+        } else {
+          throw error;
+        }
+      }
+
+      const upload = await uploadWithFallback(filePath, primaryHost, fallbackHost, {
+        imgbbKey,
+        ptscreensKey
+      });
+
+      images.push({
+        ok: upload.ok,
+        host: upload.host,
+        filePath,
+        displayUrl: upload.displayUrl || '',
+        viewerUrl: upload.viewerUrl || '',
+        rawUrl: upload.rawUrl || '',
+        error: upload.error || ''
+      });
+    }
+
+    return { ok: true, outputDir, images, tonemapped: tonemapApplied };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
 });
 
 ipcMain.handle('select-folder', async () => {
@@ -698,6 +1166,7 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
 ipcMain.handle('verify-api-key', async (_event, payload) => {
   const service = payload?.service || '';
   const apiKey = payload?.apiKey || '';
+  const baseUrl = payload?.baseUrl || '';
   if (!service || !apiKey) {
     return { ok: false, error: 'Chiave mancante.' };
   }
@@ -708,6 +1177,12 @@ ipcMain.handle('verify-api-key', async (_event, payload) => {
       await fetchTmdbConfig(apiKey);
     } else if (service === 'tvdb') {
       await tvdbLogin(apiKey);
+    } else if (service === 'imgbb') {
+      await verifyImgbbKey(apiKey);
+    } else if (service === 'ptscreens') {
+      await verifyPtscreensKey(apiKey);
+    } else if (service === 'unit3d') {
+      await verifyUnit3dKey(apiKey, baseUrl);
     } else {
       return { ok: false, error: 'Servizio non supportato.' };
     }
@@ -733,6 +1208,43 @@ ipcMain.handle('open-external', async (_event, url) => {
   }
 });
 
+async function enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint) {
+  if (!tmdbKey || !result?.tmdbId) {
+    return;
+  }
+  const hint = typeHint || '';
+  const inferredType = hint.startsWith('tv') || hint.startsWith('anime') ? 'tv' : 'movie';
+  const type = result.tmdbType || inferredType;
+
+  const details = await fetchTmdbDetails(type, result.tmdbId, tmdbKey, preferredLanguage);
+  if (!result.title) {
+    result.title = details?.title || details?.name || result.title;
+  }
+  if (!result.year) {
+    result.year = extractYear(details?.release_date || details?.first_air_date);
+  }
+  if (!result.originalLanguage && details?.original_language) {
+    result.originalLanguage = details.original_language;
+  }
+  if (details?.overview) {
+    result.tmdbOverview = details.overview;
+  } else if (preferredLanguage && preferredLanguage !== 'en-US') {
+    const fallback = await fetchTmdbDetails(type, result.tmdbId, tmdbKey, 'en-US');
+    if (fallback?.overview) {
+      result.tmdbOverview = fallback.overview;
+    }
+  }
+  result.tmdbType = type;
+
+  const images = await fetchTmdbImages(type, result.tmdbId, tmdbKey);
+  const logoPath = pickTmdbLogo(images?.logos, preferredLanguage, result.originalLanguage);
+  if (logoPath) {
+    const normalized = logoPath.startsWith('/') ? logoPath : `/${logoPath}`;
+    result.tmdbLogoPath = normalized;
+    result.tmdbLogoUrl = `https://image.tmdb.org/t/p/w300${normalized}`;
+  }
+}
+
 ipcMain.handle('fetch-metadata', async (_event, payload) => {
   const result = {
     title: '',
@@ -744,6 +1256,9 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     imdbId: '',
     tmdbId: '',
     tmdbType: '',
+    tmdbOverview: '',
+    tmdbLogoPath: '',
+    tmdbLogoUrl: '',
     tvdbAttempted: false,
     tvdbSeriesId: '',
     tvdbSeriesSlug: '',
@@ -928,6 +1443,12 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
 
   if (result.tvdbAttempted && result.episodes.length === 0) {
     result.warnings.push('TVDB: nessun episodio trovato.');
+  }
+
+  try {
+    await enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint);
+  } catch (error) {
+    result.warnings.push(String(error));
   }
 
   return result;

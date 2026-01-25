@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.themoviedb.org https://www.omdbapi.com https://api4.thetvdb.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.themoviedb.org https://www.omdbapi.com https://api4.thetvdb.com; img-src 'self' data: https:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SHRI - Tools</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -309,6 +309,7 @@
           <div class="action-row">
             <button id="applyRenameBtn" class="primary">Applica rinomina</button>
             <button id="openTorrentBtn" class="success torrent-button" type="button">Genera .torrent</button>
+            <button id="openUploadKitBtn" class="secondary" type="button">Upload Kit</button>
           </div>
           <div id="renameHint" class="hint"></div>
         </section>
@@ -339,8 +340,13 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>Impostazioni</h2>
-        <button id="closeSettingsBtn" class="secondary">Chiudi</button>
+        <div class="modal-actions">
+          <button id="saveSettingsBtn" class="primary small">Salva impostazioni</button>
+          <button id="closeSettingsBtn" class="secondary small">Chiudi</button>
+        </div>
       </div>
+      <div class="settings-body">
+      <h3 class="settings-title">Rinomina</h3>
       <div class="row settings-grid">
         <div class="field">
           <label for="serviceListInput">Servizi personalizzati (uno per riga, es. Amazon=AMZN)</label>
@@ -368,6 +374,7 @@
           </select>
         </div>
       </div>
+      <h3 class="settings-title">Torrent</h3>
       <div class="row">
         <div class="field">
           <label for="settingsAnnounceInput">PID announce (SHRI)</label>
@@ -395,6 +402,7 @@
           Torrent privato (default)
         </label>
       </div>
+      <h3 class="settings-title">Metadata API</h3>
       <div class="row">
         <div class="field">
           <label for="omdbKeyInput">OMDb API Key</label>
@@ -448,15 +456,109 @@
           </div>
         </div>
       </div>
+      <h3 class="settings-title">Screenshot & Image Host</h3>
+      <div class="row settings-grid">
+        <div class="field">
+          <label for="ffmpegPathInput">Percorso FFmpeg</label>
+          <div class="input-with-action">
+            <input id="ffmpegPathInput" type="text" placeholder="Seleziona ffmpeg.exe" />
+            <button id="browseFfmpegBtn" class="secondary small" type="button">Sfoglia</button>
+          </div>
+          <div id="ffmpegHint" class="hint"></div>
+        </div>
+        <div class="field">
+          <label for="screenshotsCountInput">Numero screenshot</label>
+          <input id="screenshotsCountInput" type="number" min="3" max="12" step="1" placeholder="6" />
+        </div>
+      </div>
+      <div class="row settings-grid">
+        <div class="field">
+          <label for="imageHostPrimarySelect">Host immagini preferito</label>
+          <select id="imageHostPrimarySelect">
+            <option value="imgbb">imgBB</option>
+            <option value="ptscreens">PTScreens</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="imageHostFallbackSelect">Host fallback</label>
+          <select id="imageHostFallbackSelect">
+            <option value="ptscreens">PTScreens</option>
+            <option value="imgbb">imgBB</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="imgbbKeyInput">imgBB API Key</label>
+          <div class="input-with-icon">
+            <input id="imgbbKeyInput" type="password" placeholder="Chiave imgBB" />
+            <button class="icon-button key-verify" type="button" data-service="imgbb" data-input="imgbbKeyInput" aria-label="Verifica chiave imgBB">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 12l4 4 10-10"></path>
+              </svg>
+            </button>
+            <button class="icon-button" type="button" data-target="imgbbKeyInput" aria-label="Mostra chiave imgBB">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="ptscreensKeyInput">PTScreens API Key</label>
+          <div class="input-with-icon">
+            <input id="ptscreensKeyInput" type="password" placeholder="Chiave PTScreens" />
+            <button class="icon-button key-verify" type="button" data-service="ptscreens" data-input="ptscreensKeyInput" aria-label="Verifica chiave PTScreens">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 12l4 4 10-10"></path>
+              </svg>
+            </button>
+            <button class="icon-button" type="button" data-target="ptscreensKeyInput" aria-label="Mostra chiave PTScreens">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <h3 class="settings-title">Upload API (UNIT3D)</h3>
+      <div class="row settings-grid">
+        <div class="field">
+          <label for="unit3dBaseUrlInput">Base URL</label>
+          <input id="unit3dBaseUrlInput" type="text" placeholder="https://shareisland.org" />
+        </div>
+        <div class="field">
+          <label for="unit3dApiKeyInput">API Key</label>
+          <div class="input-with-icon">
+            <input id="unit3dApiKeyInput" type="password" placeholder="API key UNIT3D" />
+            <button class="icon-button key-verify" type="button" data-service="unit3d" data-input="unit3dApiKeyInput" data-base="unit3dBaseUrlInput" aria-label="Verifica chiave UNIT3D">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M5 12l4 4 10-10"></path>
+              </svg>
+            </button>
+            <button class="icon-button" type="button" data-target="unit3dApiKeyInput" aria-label="Mostra chiave UNIT3D">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
+      </div>
       <div class="settings-footer">
         <div class="settings-footer-left">
-          <button id="saveSettingsBtn" class="primary small">Salva impostazioni</button>
           <div id="settingsHint" class="hint"></div>
         </div>
         <div class="settings-footer-right">
           <button id="openRulesBtn" class="secondary small">Apri rules</button>
           <button id="openDebugBtn" class="secondary small">Apri log</button>
         </div>
+      </div>
       </div>
     </div>
   </div>
@@ -596,7 +698,88 @@
     </div>
   </div>
 
+  <div id="uploadKitModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Upload Kit</h2>
+        <button id="closeUploadKitBtn" class="secondary">Chiudi</button>
+      </div>
+      <div class="upload-kit-grid">
+        <section class="upload-section">
+          <div class="section-header">
+            <h3>Titolo upload</h3>
+            <button id="copyUploadTitleBtn" class="secondary small">Copia</button>
+          </div>
+          <div id="uploadTitleText" class="preview">-</div>
+          <div id="uploadTitleHint" class="hint"></div>
+        </section>
+        <section class="upload-section">
+          <div class="section-header">
+            <h3>ID</h3>
+          </div>
+          <div id="uploadIdsList" class="upload-ids">-</div>
+        </section>
+        <section id="uploadMiSection" class="upload-section full collapsible collapsed">
+          <div class="section-header">
+            <div class="collapse-title">
+              <h3>MediaInfo</h3>
+            </div>
+            <div class="section-actions">
+              <button id="uploadMiShortBtn" class="tab-button" type="button">Short</button>
+              <button id="uploadMiFullBtn" class="tab-button active" type="button">Full</button>
+              <button id="copyUploadMiBtn" class="secondary small" type="button">Copia</button>
+            </div>
+          </div>
+          <div class="collapsible-body">
+            <pre id="uploadMiText" class="text-output text-output-compact">-</pre>
+          </div>
+        </section>
+        <section id="uploadDescSection" class="upload-section full collapsible collapsed">
+          <div class="section-header">
+            <div class="collapse-title">
+              <h3>Descrizione (BBCode)</h3>
+            </div>
+            <button id="previewUploadDescBtn" class="secondary small">Preview</button>
+            <button id="copyUploadDescBtn" class="secondary small">Copia</button>
+          </div>
+          <div class="collapsible-body">
+            <pre id="uploadDescText" class="text-output text-output-compact">-</pre>
+          </div>
+        </section>
+        <section class="upload-section full">
+          <div class="section-header">
+            <h3>Screenshots</h3>
+            <div class="section-actions">
+              <button id="generateScreensBtn" class="primary small" type="button">Genera & Carica</button>
+              <button id="copyScreensBbcodeBtn" class="secondary small" type="button">Copia BBCode</button>
+            </div>
+          </div>
+          <div id="screensHint" class="hint"></div>
+          <div id="screensList" class="screens-list"></div>
+        </section>
+        <section class="upload-section full">
+          <div class="section-header">
+            <h3>Warning</h3>
+          </div>
+          <div id="uploadWarnings" class="warning-list"></div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <div id="bbcodePreviewModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Anteprima BBCode</h2>
+        <button id="closeBbcodePreviewBtn" class="secondary">Chiudi</button>
+      </div>
+      <div id="bbcodePreviewContent" class="bbcode-preview"></div>
+    </div>
+  </div>
 
   <script type="module" src="renderer.js"></script>
 </body>
