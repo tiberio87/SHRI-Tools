@@ -34,6 +34,7 @@
   --code-text: #d2d7e1;
   --plan-old: #d5dbe6;
   --plan-new: #7dd6c1;
+  --success-text: #0b1b18;
   --badge-bg: #121826;
   --badge-border: #2e374a;
   --auto-border: rgba(125, 214, 193, 0.7);
@@ -75,6 +76,7 @@ body.light {
   --code-text: #2b3342;
   --plan-old: #4c5567;
   --plan-new: #1f7d6b;
+  --success-text: #f4fffb;
   --badge-bg: #f2f4f8;
   --badge-border: #d3d8e2;
   --auto-border: rgba(31, 125, 107, 0.6);
@@ -278,6 +280,22 @@ body:not(.light) .theme-toggle .icon-moon {
   align-items: center;
 }
 
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.action-row .primary,
+.action-row .secondary {
+  width: auto;
+}
+
+.action-row .torrent-button {
+  margin-left: auto;
+}
+
 .edition-row {
   grid-template-columns: max-content 1fr;
   align-items: start;
@@ -462,6 +480,13 @@ textarea:focus {
   gap: 6px;
 }
 
+.input-with-action {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 6px;
+}
+
 .icon-button {
   display: inline-flex;
   align-items: center;
@@ -558,6 +583,12 @@ button.primary {
   background: linear-gradient(135deg, var(--accent) 0%, var(--accent-strong) 100%);
   color: #1d130b;
   box-shadow: 0 8px 16px rgba(240, 140, 62, 0.25);
+}
+
+button.success {
+  background: linear-gradient(135deg, var(--plan-new) 0%, #4bbfa8 100%);
+  color: var(--success-text);
+  box-shadow: 0 8px 16px rgba(125, 214, 193, 0.22);
 }
 
 button.secondary {
@@ -816,6 +847,89 @@ button:disabled {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+}
+
+.progress-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.progress-stage {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(125, 214, 193, 0.3);
+  border-top-color: var(--plan-new);
+  animation: spin 0.9s linear infinite;
+}
+
+.progress-check {
+  display: none;
+  width: 16px;
+  height: 16px;
+  color: var(--plan-new);
+}
+
+.progress-check svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.2;
+}
+
+.progress-stage-text {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.progress-stage.hidden {
+  display: none;
+}
+
+.progress-stage.done .spinner {
+  display: none;
+}
+
+.progress-stage.done .progress-check {
+  display: inline-flex;
+}
+
+.progress-bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-inline);
+  border: 1px solid var(--border-strong);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(135deg, var(--plan-new), var(--accent));
+  transition: width 0.2s ease;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: var(--muted);
+  min-width: 42px;
+  text-align: right;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .toast {

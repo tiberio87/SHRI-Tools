@@ -16,8 +16,14 @@ const VIDEO_EXTS = new Set([
   '.iso'
 ]);
 
+const MIN_PIECE_LENGTH = 16 * 1024;
+const MAX_PIECE_LENGTH = 4 * 1024 * 1024;
+const MAX_TORRENT_SIZE = 2 * 1024 * 1024;
+const MAX_PIECES_TARGET = 100000;
+
 let mediaInfoInstance = null;
 let mediaInfoTextInstance = null;
+let createTorrentModule = null;
 
 async function getMediaInfo() {
   if (!mediaInfoInstance) {
@@ -127,6 +133,63 @@ async function collectVideoFiles(rootPath, maxDepth = 3) {
 
   await walk(rootPath, maxDepth);
   return results;
+}
+
+async function getTotalSize(targetPath) {
+  const stats = await fs.stat(targetPath);
+  if (stats.isFile()) {
+    return stats.size;
+  }
+  if (!stats.isDirectory()) {
+    return 0;
+  }
+  let total = 0;
+  const entries = await fs.readdir(targetPath, { withFileTypes: true });
+  for (const entry of entries) {
+    const fullPath = path.join(targetPath, entry.name);
+    if (entry.isDirectory()) {
+      total += await getTotalSize(fullPath);
+    } else if (entry.isFile()) {
+      const fileStats = await fs.stat(fullPath);
+      total += fileStats.size;
+    }
+  }
+  return total;
+}
+
+function calculatePieceLength(totalBytes) {
+  if (!totalBytes) {
+    return MIN_PIECE_LENGTH;
+  }
+  let target = Math.ceil(totalBytes / MAX_PIECES_TARGET);
+  let piece = MIN_PIECE_LENGTH;
+  while (piece < target) {
+    piece *= 2;
+  }
+  if (piece > MAX_PIECE_LENGTH) {
+    piece = MAX_PIECE_LENGTH;
+  }
+  return piece;
+}
+
+async function getCreateTorrent() {
+  if (!createTorrentModule) {
+    createTorrentModule = await import('create-torrent');
+  }
+  return createTorrentModule.default || createTorrentModule;
+}
+
+async function createTorrentBuffer(targetPath, options) {
+  const createTorrent = await getCreateTorrent();
+  return new Promise((resolve, reject) => {
+    createTorrent(targetPath, options, (error, torrent) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      resolve(torrent);
+    });
+  });
 }
 
 async function pickMainVideo(videoFiles) {
@@ -531,6 +594,105 @@ ipcMain.handle('apply-rename', async (_event, payload) => {
     warnings: plan.warnings,
     results
   };
+});
+
+ipcMain.handle('create-torrent', async (_event, payload) => {
+  try {
+    const targetPath = payload?.targetPath || '';
+    const announce = payload?.announce || '';
+    const outputDir = payload?.outputDir || '';
+    const outputName = payload?.outputName || '';
+    const isPrivate = payload?.private !== false;
+    const requestId = payload?.requestId || '';
+    const sendProgress = (progress, stage) => {
+      if (_event?.sender) {
+        const payload = { requestId };
+        if (typeof progress === 'number') {
+          payload.progress = progress;
+        }
+        if (stage) {
+          payload.stage = stage;
+        }
+        _event.sender.send('torrent-progress', payload);
+      }
+    };
+
+    if (!targetPath) {
+      return { ok: false, error: 'Percorso mancante.' };
+    }
+    if (!announce) {
+      return { ok: false, error: 'Announce URL mancante.' };
+    }
+    if (!outputDir) {
+      return { ok: false, error: 'Cartella output mancante.' };
+    }
+    if (!outputName) {
+      return { ok: false, error: 'Nome file .torrent mancante.' };
+    }
+    if (!fsSync.existsSync(targetPath)) {
+      return { ok: false, error: 'Percorso non trovato.' };
+    }
+
+    const safeName = path.basename(outputName);
+    const outputFile = safeName.toLowerCase().endsWith('.torrent')
+      ? safeName
+      : `${safeName}.torrent`;
+    const outputPath = path.join(outputDir, outputFile);
+    if (fsSync.existsSync(outputPath)) {
+      return { ok: false, error: 'File .torrent già esistente.' };
+    }
+
+    await fs.mkdir(outputDir, { recursive: true });
+    let pieceLength = null;
+    let torrent = null;
+    let warning = '';
+
+    for (let attempt = 0; attempt < 6; attempt += 1) {
+      sendProgress(0, 'hashing');
+      const options = {
+        announce: [announce],
+        private: isPrivate,
+        name: path.basename(targetPath),
+        createdBy: 'SHRI-Tools',
+        pad: false,
+        onProgress: (progress) => {
+          const normalized = Math.max(0, Math.min(1, Number(progress) || 0));
+          const clamped = normalized >= 1 ? 0.98 : normalized;
+          sendProgress(clamped, 'hashing');
+        }
+      };
+      if (pieceLength) {
+        options.pieceLength = pieceLength;
+      }
+      torrent = await createTorrentBuffer(targetPath, options);
+      sendProgress(0.99, 'encoding');
+
+      if (!torrent || torrent.length <= MAX_TORRENT_SIZE || pieceLength >= MAX_PIECE_LENGTH) {
+        break;
+      }
+      pieceLength = pieceLength ? Math.min(pieceLength * 2, MAX_PIECE_LENGTH) : MIN_PIECE_LENGTH;
+    }
+
+    if (torrent && torrent.length > MAX_TORRENT_SIZE) {
+      warning = 'Il file .torrent supera 2MB. Aumenta la piece size.';
+    }
+
+    if (!torrent) {
+      return { ok: false, error: 'Impossibile generare il torrent.' };
+    }
+
+    sendProgress(0.99, 'writing');
+    await fs.writeFile(outputPath, torrent);
+    sendProgress(1, 'done');
+    return {
+      ok: true,
+      outputPath,
+      pieceLength,
+      warning
+    };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
 });
 
 ipcMain.handle('verify-api-key', async (_event, payload) => {

@@ -10,5 +10,11 @@ contextBridge.exposeInMainWorld('api', {
   applyRename: (payload) => ipcRenderer.invoke('apply-rename', payload),
   fetchMetadata: (payload) => ipcRenderer.invoke('fetch-metadata', payload),
   verifyApiKey: (payload) => ipcRenderer.invoke('verify-api-key', payload),
-  openExternal: (url) => ipcRenderer.invoke('open-external', url)
+  openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  createTorrent: (payload) => ipcRenderer.invoke('create-torrent', payload),
+  onTorrentProgress: (handler) => {
+    const listener = (_event, data) => handler(data);
+    ipcRenderer.on('torrent-progress', listener);
+    return () => ipcRenderer.removeListener('torrent-progress', listener);
+  }
 });

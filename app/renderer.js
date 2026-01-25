@@ -1,382 +1,28 @@
-const ui = {
-  mediaInfoBadge: document.getElementById('mediaInfoBadge'),
-  renameBadge: document.getElementById('renameBadge'),
-  autoDetectToggle: document.getElementById('autoDetectToggle'),
-  autoDetectBtn: document.getElementById('autoDetectBtn'),
-  themeToggle: document.getElementById('themeToggle'),
-  openSettingsBtn: document.getElementById('openSettingsBtn'),
-  closeSettingsBtn: document.getElementById('closeSettingsBtn'),
-  settingsModal: document.getElementById('settingsModal'),
-  mediaInfoModal: document.getElementById('mediaInfoModal'),
-  mediaInfoText: document.getElementById('mediaInfoText'),
-  mediaInfoPath: document.getElementById('mediaInfoPath'),
-  closeMediaInfoBtn: document.getElementById('closeMediaInfoBtn'),
-  formatRow: document.getElementById('formatRow'),
-  openDebugBtn: document.getElementById('openDebugBtn'),
-  debugModal: document.getElementById('debugModal'),
-  debugLogText: document.getElementById('debugLogText'),
-  closeDebugBtn: document.getElementById('closeDebugBtn'),
-  clearDebugBtn: document.getElementById('clearDebugBtn'),
-  selectFileBtn: document.getElementById('selectFileBtn'),
-  selectFolderBtn: document.getElementById('selectFolderBtn'),
-  resetSourceBtn: document.getElementById('resetSourceBtn'),
-  selectedPath: document.getElementById('selectedPath'),
-  scanHint: document.getElementById('scanHint'),
-  imdbInput: document.getElementById('imdbInput'),
-  tvdbInput: document.getElementById('tvdbInput'),
-  fetchStatus: document.getElementById('fetchStatus'),
-  fetchBadge: document.getElementById('fetchBadge'),
-  typeSelect: document.getElementById('typeSelect'),
-  formatSelect: document.getElementById('formatSelect'),
-  formatSelectBtn: document.getElementById('formatSelectBtn'),
-  formatDropdown: document.getElementById('formatDropdown'),
-  formatDropdownMenu: document.getElementById('formatDropdownMenu'),
-  titleInput: document.getElementById('titleInput'),
-  yearInput: document.getElementById('yearInput'),
-  includeYear: document.getElementById('includeYear'),
-  seasonInput: document.getElementById('seasonInput'),
-  episodeInput: document.getElementById('episodeInput'),
-  episodeTitleInput: document.getElementById('episodeTitleInput'),
-  partInput: document.getElementById('partInput'),
-  seasonEpisodeGroup: document.getElementById('seasonEpisodeGroup'),
-  episodeTitleGroup: document.getElementById('episodeTitleGroup'),
-  originalLanguageInput: document.getElementById('originalLanguageInput'),
-  languageTagInput: document.getElementById('languageTagInput'),
-  audioLangHint: document.getElementById('audioLangHint'),
-  audioCodecInput: document.getElementById('audioCodecInput'),
-  audioCodecSelectBtn: document.getElementById('audioCodecSelectBtn'),
-  audioCodecDropdown: document.getElementById('audioCodecDropdown'),
-  audioCodecDropdownMenu: document.getElementById('audioCodecDropdownMenu'),
-  audioChannelsInput: document.getElementById('audioChannelsInput'),
-  audioChannelsSelectBtn: document.getElementById('audioChannelsSelectBtn'),
-  audioChannelsDropdown: document.getElementById('audioChannelsDropdown'),
-  audioChannelsDropdownMenu: document.getElementById('audioChannelsDropdownMenu'),
-  audioMetaInput: document.getElementById('audioMetaInput'),
-  resolutionInput: document.getElementById('resolutionInput'),
-  resolutionSelectBtn: document.getElementById('resolutionSelectBtn'),
-  resolutionDropdown: document.getElementById('resolutionDropdown'),
-  resolutionDropdownMenu: document.getElementById('resolutionDropdownMenu'),
-  videoCodecInput: document.getElementById('videoCodecInput'),
-  videoCodecSelectBtn: document.getElementById('videoCodecSelectBtn'),
-  videoCodecDropdown: document.getElementById('videoCodecDropdown'),
-  videoCodecDropdownMenu: document.getElementById('videoCodecDropdownMenu'),
-  uhdCheckbox: document.getElementById('uhdCheckbox'),
-  hdrCheckbox: document.getElementById('hdrCheckbox'),
-  hdr10plusCheckbox: document.getElementById('hdr10plusCheckbox'),
-  dvCheckbox: document.getElementById('dvCheckbox'),
-  threeDCheckbox: document.getElementById('threeDCheckbox'),
-  threeDWrapper: document.getElementById('threeDWrapper'),
-  editionInput: document.getElementById('editionInput'),
-  hybridCheckbox: document.getElementById('hybridCheckbox'),
-  repackSelect: document.getElementById('repackSelect'),
-  serviceInput: document.getElementById('serviceInput'),
-  sourceInputBtn: document.getElementById('sourceInputBtn'),
-  sourceDropdown: document.getElementById('sourceDropdown'),
-  sourceDropdownMenu: document.getElementById('sourceDropdownMenu'),
-  sourceInput: document.getElementById('sourceInput'),
-  regionInput: document.getElementById('regionInput'),
-  regionWrapper: document.getElementById('regionWrapper'),
-  serviceGroup: document.getElementById('serviceGroup'),
-  sourceGroup: document.getElementById('sourceGroup'),
-  tagInput: document.getElementById('tagInput'),
-  tagInputBtn: document.getElementById('tagInputBtn'),
-  tagDropdown: document.getElementById('tagDropdown'),
-  tagDropdownMenu: document.getElementById('tagDropdownMenu'),
-  renameFileCheckbox: document.getElementById('renameFileCheckbox'),
-  renameFolderCheckbox: document.getElementById('renameFolderCheckbox'),
-  applyRenameBtn: document.getElementById('applyRenameBtn'),
-  renameHint: document.getElementById('renameHint'),
-  fileNamePreview: document.getElementById('fileNamePreview'),
-  folderNamePreview: document.getElementById('folderNamePreview'),
-  renamePlanList: document.getElementById('renamePlanList'),
-  warningList: document.getElementById('warningList'),
-  omdbKeyInput: document.getElementById('omdbKeyInput'),
-  tmdbKeyInput: document.getElementById('tmdbKeyInput'),
-  tvdbKeyInput: document.getElementById('tvdbKeyInput'),
-  preferredLanguageSelect: document.getElementById('preferredLanguageSelect'),
-  serviceListInput: document.getElementById('serviceListInput'),
-  tagListInput: document.getElementById('tagListInput'),
-  autoTagDetectToggle: document.getElementById('autoTagDetectToggle'),
-  serviceInputBtn: document.getElementById('serviceInputBtn'),
-  serviceDropdown: document.getElementById('serviceDropdown'),
-  serviceDropdownMenu: document.getElementById('serviceDropdownMenu'),
-  repackSelectBtn: document.getElementById('repackSelectBtn'),
-  repackDropdown: document.getElementById('repackDropdown'),
-  openRulesBtn: document.getElementById('openRulesBtn'),
-  rulesModal: document.getElementById('rulesModal'),
-  rulesContent: document.getElementById('rulesContent'),
-  closeRulesBtn: document.getElementById('closeRulesBtn'),
-  openGroupDefaultsBtn: document.getElementById('openGroupDefaultsBtn'),
-  groupDefaultsModal: document.getElementById('groupDefaultsModal'),
-  groupDefaultsList: document.getElementById('groupDefaultsList'),
-  closeGroupDefaultsBtn: document.getElementById('closeGroupDefaultsBtn'),
-  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-  settingsHint: document.getElementById('settingsHint'),
-  confirmModal: document.getElementById('confirmModal'),
-  confirmMessage: document.getElementById('confirmMessage'),
-  confirmCancelBtn: document.getElementById('confirmCancelBtn'),
-  confirmOkBtn: document.getElementById('confirmOkBtn'),
-  toast: document.getElementById('toast')
-};
-
-const state = {
-  targetPath: null,
-  kind: null,
-  videoFiles: [],
-  mainVideo: null,
-  mediaInfo: null,
-  mainExtension: '',
-  audioLangs: [],
-  episodeMap: {},
-  tagSuggestion: '',
-  autoDetectRunning: false,
-  lastTagSuggestion: '',
-  lastTagResolveKey: ''
-};
+import { ui } from './renderer/dom.js';
+import { state, debugState } from './renderer/state.js';
+import {
+  SETTINGS_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  DEFAULT_GROUP_TAGS,
+  LANG_MAP,
+  RULES_SECTIONS,
+  AUDIO_CODEC_SCORE,
+  STOP_WORDS,
+  ANNOUNCE_BASE
+} from './renderer/constants.js';
 
 let toastTimer = null;
 let toastHideTimer = null;
 let confirmResolver = null;
-
-const debugState = {
-  enabled: true,
-  buffer: [],
-  maxEntries: 400
-};
-
-const SETTINGS_STORAGE_KEY = 'shri-renamer-settings';
-const THEME_STORAGE_KEY = 'shri-renamer-theme';
-
-const DEFAULT_GROUP_TAGS = [
-  'Blackbit',
-  'G66',
-  'Ubi',
-  'Prometheus',
-  'NST',
-  'Ned',
-  'GP',
-  'NovaRip',
-  'Odino',
-  'CreW',
-  'YELLO',
-  'SpyRo',
-  'iVy',
-  'NTb',
-  'Morpheus',
-  'MRSK',
-  'T7',
-  'TrollHD',
-  'B66',
-  'P67',
-  'MIKE',
-  'TRiADE',
-  'Vitello',
-  'gattopollo',
-  'SAW',
-  'Jsph69',
-  'Mem',
-  'BORDURE',
-  'GeD',
-  'IlSommo',
-  'Pir8',
-  'successfulcrab',
-  'AMBER',
-  'Me7alh',
-  'Pennywise',
-  'ToVaR',
-  'playWEB',
-  'DSR',
-  'M109',
-  'TVSmash',
-  'bamboozle',
-  'ettv',
-  'memento',
-  'TOXiC',
-  'ETHEL',
-  'AMCON',
-  'cielos',
-  'Darksidemux',
-  'ELiTE',
-  'lucidtv',
-  'METCON',
-  'tbs',
-  'FHC',
-  'FraMeSToR',
-  'EPSiLON',
-  'CiNEPHiLES',
-  'SGF',
-  'EbP',
-  'ZioRip',
-  'TheEmojiCrew',
-  'CYBER',
-  'LFi',
-  'Krikk',
-  'SBuR',
-  'CtrlHD',
-  'iSlaNd',
-  'PRiME',
-  'NAHOM',
-  'TMT'
-];
-
-const LANG_MAP = {
-  it: 'ITA',
-  ita: 'ITA',
-  italian: 'ITA',
-  italiano: 'ITA',
-  en: 'ENG',
-  eng: 'ENG',
-  english: 'ENG',
-  fr: 'FRE',
-  fre: 'FRE',
-  fra: 'FRE',
-  french: 'FRE',
-  de: 'GER',
-  deu: 'GER',
-  ger: 'GER',
-  german: 'GER',
-  es: 'SPA',
-  spa: 'SPA',
-  spanish: 'SPA',
-  pt: 'POR',
-  por: 'POR',
-  portuguese: 'POR',
-  ja: 'JPN',
-  jpn: 'JPN',
-  japanese: 'JPN',
-  ru: 'RUS',
-  rus: 'RUS',
-  russian: 'RUS',
-  zh: 'CHI',
-  zho: 'CHI',
-  chi: 'CHI',
-  chinese: 'CHI',
-  ko: 'KOR',
-  kor: 'KOR',
-  korean: 'KOR',
-  uk: 'UKR',
-  ukr: 'UKR',
-  ukrainian: 'UKR'
-};
+let previewTimer = null;
+let currentTorrentRequestId = null;
 
 const DEFAULT_SERVICES = [];
 let serviceDefaultsLoaded = false;
-
-const RULES_SECTIONS = [
-  {
-    title: 'Regole generali',
-    items: [
-      {
-        label: 'Separatore file/cartelle',
-        pattern: 'Usiamo il punto "." tra i token. Stagione/Episodio: S01E01.'
-      },
-      {
-        label: 'Lingue audio',
-        pattern: 'Tag in maiuscolo, più lingue separate da "-": ITA-ENG / ITA-MULTI.'
-      },
-      {
-        label: 'Tag gruppo',
-        pattern: 'Aggiunto in coda con trattino: ... VCodec-Tag.'
-      }
-    ]
-  },
-  {
-    title: 'Film',
-    items: [
-      {
-        label: 'WEB-DL / WEBRip',
-        pattern:
-          'Titolo Anno LINGUA Edizione Hybrid Repack Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag'
-      },
-      {
-        label: 'Encode',
-        pattern:
-          'Titolo Anno LINGUA Edizione Hybrid Repack Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag'
-      },
-      {
-        label: 'Remux',
-        pattern:
-          'Titolo Anno 3D LINGUA Edizione Hybrid Repack Risoluzione UHD Src REMUX HDR VCodec ACodec Canali Meta-Tag'
-      },
-      {
-        label: 'Full Disc',
-        pattern:
-          'Titolo Anno 3D Edizione Repack Risoluzione Regione UHD Src HDR VCodec ACodec Canali Meta-Tag'
-      }
-    ]
-  },
-  {
-    title: 'Serie TV - Stagioni',
-    items: [
-      {
-        label: 'WEB-DL / WEBRip',
-        pattern:
-          'Titolo Anno S## LINGUA Edizione Hybrid Repack Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag'
-      },
-      {
-        label: 'Encode',
-        pattern:
-          'Titolo Anno S## LINGUA Edizione Hybrid Repack Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag'
-      },
-      {
-        label: 'Remux',
-        pattern:
-          'Titolo Anno S## 3D LINGUA Edizione Hybrid Repack Risoluzione UHD Src REMUX HDR VCodec ACodec Canali Meta-Tag'
-      },
-      {
-        label: 'Full Disc',
-        pattern:
-          'Titolo Anno S## 3D Edizione Repack Risoluzione Regione UHD Src HDR VCodec ACodec Canali Meta-Tag'
-      }
-    ]
-  },
-  {
-    title: 'Serie TV - Episodi',
-    items: [
-      {
-        label: 'WEB-DL / WEBRip',
-        pattern:
-          'Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid Repack Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag'
-      },
-      {
-        label: 'Encode',
-        pattern:
-          'Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid Repack Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag'
-      },
-      {
-        label: 'Remux',
-        pattern:
-          'Titolo Anno S##E## Tit_Ep Parte 3D LINGUA Edizione Hybrid Repack Risoluzione UHD Src REMUX HDR VCodec ACodec Canali Meta-Tag'
-      }
-    ]
-  }
-];
-
-const AUDIO_CODEC_SCORE = {
-  'DTS:X': 90,
-  'TrueHD': 88,
-  'DTS-HD MA': 86,
-  'FLAC': 80,
-  'DTS-HD HRA': 75,
-  'DTS': 70,
-  'DD+': 65,
-  'DD': 60,
-  'AAC': 50,
-  'OPUS': 45
-};
-
-const STOP_WORDS = new Set([
-  '2160P', '1080P', '720P', '576P', '480P',
-  '4K', '8K',
-  'WEB', 'WEBDL', 'WEB-DL', 'WEBRIP', 'WEBRIP',
-  'BLURAY', 'BLU-RAY', 'REMUX', 'UHD', 'HDR', 'HDR10', 'HDR10+', 'DV', 'DOVI',
-  'X264', 'X265', 'H264', 'H265', 'HEVC', 'AVC', 'AV1',
-  'DTS', 'DTS-HD', 'DTSHD', 'TRUEHD', 'AAC', 'DD', 'DDP', 'EAC3', 'AC3', 'FLAC',
-  'ATMOS', 'AURO3D', 'IMAX', 'EXTENDED', 'REPACK', 'PROPER', 'RERIP',
-  'MULTI', 'ITA', 'ENG', 'FRE', 'GER', 'SPA', 'JPN', 'RUS'
-]);
-
-let previewTimer = null;
+const LANGUAGE_CODES = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
+  .filter(Boolean)
+  .map((value) => String(value).toUpperCase());
+const LANGUAGE_CODES_PATTERN = LANGUAGE_CODES.join('|');
 
 function setMediaInfoBadgeVisible(isVisible) {
   ui.mediaInfoBadge.classList.toggle('hidden', !isVisible);
@@ -411,6 +57,40 @@ function setAutoFieldState(input, active) {
     return;
   }
   field.classList.toggle('auto-field', Boolean(active));
+}
+
+function extractPasskeyFromAnnounce(url) {
+  if (!url) {
+    return '';
+  }
+  const base = ANNOUNCE_BASE.toLowerCase();
+  const normalized = String(url).trim();
+  if (normalized.toLowerCase().startsWith(base)) {
+    return normalized.slice(base.length);
+  }
+  return '';
+}
+
+function resolveAnnounceInput(value) {
+  const cleaned = String(value || '').trim();
+  if (!cleaned) {
+    return { announceUrl: '', passkey: '' };
+  }
+  if (/^https?:\/\//i.test(cleaned)) {
+    const passkey = extractPasskeyFromAnnounce(cleaned);
+    return { announceUrl: cleaned, passkey };
+  }
+  return { announceUrl: `${ANNOUNCE_BASE}${cleaned}`, passkey: cleaned };
+}
+
+function getAnnounceUrlFromSettings(settings) {
+  if (settings?.torrentPasskey) {
+    return `${ANNOUNCE_BASE}${settings.torrentPasskey}`;
+  }
+  if (settings?.torrentAnnounceUrl) {
+    return settings.torrentAnnounceUrl;
+  }
+  return '';
 }
 
 function applyTheme(theme) {
@@ -765,7 +445,11 @@ function loadSettings() {
       preferredLanguage: 'it-IT',
       serviceList: '',
       tagList: '',
-      autoTagDetect: true
+      autoTagDetect: true,
+      torrentPasskey: '',
+      torrentAnnounceUrl: '',
+      torrentOutputDir: '',
+      torrentPrivate: true
     };
     if (!raw) {
       return defaults;
@@ -780,7 +464,11 @@ function loadSettings() {
       preferredLanguage: 'it-IT',
       serviceList: '',
       tagList: '',
-      autoTagDetect: true
+      autoTagDetect: true,
+      torrentPasskey: '',
+      torrentAnnounceUrl: '',
+      torrentOutputDir: '',
+      torrentPrivate: true
     };
   }
 }
@@ -799,6 +487,17 @@ function applySettingsToUI(settings) {
   ui.preferredLanguageSelect.value = preferredLanguage;
   ui.serviceListInput.value = settings.serviceList || '';
   ui.tagListInput.value = settings.tagList || '';
+  if (ui.settingsAnnounceInput) {
+    const passkey = settings.torrentPasskey || '';
+    const fallback = extractPasskeyFromAnnounce(settings.torrentAnnounceUrl || '');
+    ui.settingsAnnounceInput.value = passkey || fallback || '';
+  }
+  if (ui.settingsTorrentOutputInput) {
+    ui.settingsTorrentOutputInput.value = settings.torrentOutputDir || '';
+  }
+  if (ui.settingsTorrentPrivateToggle) {
+    ui.settingsTorrentPrivateToggle.checked = settings.torrentPrivate !== false;
+  }
   if (ui.autoTagDetectToggle) {
     ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
   }
@@ -809,6 +508,12 @@ function applySettingsToUI(settings) {
 }
 
 function getSettings() {
+  const existing = loadSettings();
+  const announceInput = ui.settingsAnnounceInput?.value.trim() || '';
+  const announceResolved = resolveAnnounceInput(announceInput);
+  const passkey = announceResolved.passkey || '';
+  const announceUrl = passkey ? '' : existing.torrentAnnounceUrl || '';
+
   return {
     omdbKey: ui.omdbKeyInput.value.trim(),
     tmdbKey: ui.tmdbKeyInput.value.trim(),
@@ -816,7 +521,11 @@ function getSettings() {
     preferredLanguage: ui.preferredLanguageSelect.value,
     serviceList: ui.serviceListInput.value.trim(),
     tagList: ui.tagListInput.value.trim(),
-    autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked)
+    autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),
+    torrentPasskey: passkey,
+    torrentAnnounceUrl: announceUrl,
+    torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
+    torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked)
   };
 }
 
@@ -904,6 +613,102 @@ function openGroupDefaultsModal() {
 
 function closeGroupDefaultsModal() {
   ui.groupDefaultsModal.classList.add('hidden');
+}
+
+function renderTorrentWarnings(list) {
+  if (!ui.torrentWarnings) {
+    return;
+  }
+  ui.torrentWarnings.innerHTML = '';
+  const warnings = Array.isArray(list) ? list : [];
+  if (!warnings.length) {
+    return;
+  }
+  for (const warning of warnings) {
+    const item = document.createElement('div');
+    item.className = 'warning-item';
+    item.textContent = warning;
+    ui.torrentWarnings.appendChild(item);
+  }
+}
+
+function openTorrentModal() {
+  if (!state.targetPath) {
+    setHint(ui.renameHint, 'Seleziona un file o una cartella.');
+    return;
+  }
+
+  const settings = loadSettings();
+  if (ui.torrentAnnounceInput) {
+    ui.torrentAnnounceInput.value = getAnnounceUrlFromSettings(settings);
+  }
+  if (ui.torrentOutputInput) {
+    ui.torrentOutputInput.value = settings.torrentOutputDir || '';
+  }
+  if (ui.torrentPrivateToggle) {
+    ui.torrentPrivateToggle.checked = settings.torrentPrivate !== false;
+  }
+  if (ui.torrentNameInput) {
+    ui.torrentNameInput.value = getTorrentNameSuggestion() || '';
+  }
+  if (ui.torrentRootName) {
+    const rootName = state.kind === 'dir'
+      ? getPathBaseName(state.targetPath)
+      : getPathBaseName(state.mainVideo || state.targetPath);
+    ui.torrentRootName.textContent = rootName || '-';
+  }
+
+  renderTorrentWarnings(buildTorrentWarnings());
+  setHint(ui.torrentHint, '');
+  resetTorrentProgress();
+  ui.torrentModal.classList.remove('hidden');
+}
+
+function closeTorrentModal() {
+  if (!ui.torrentModal) {
+    return;
+  }
+  resetTorrentProgress();
+  ui.torrentModal.classList.add('hidden');
+}
+
+function setTorrentProgress(value) {
+  if (!ui.torrentProgressRow || !ui.torrentProgressFill || !ui.torrentProgressText) {
+    return;
+  }
+  const progress = Math.max(0, Math.min(1, Number(value) || 0));
+  ui.torrentProgressRow.classList.remove('hidden');
+  ui.torrentProgressFill.style.width = `${Math.round(progress * 100)}%`;
+  ui.torrentProgressText.textContent = `${Math.round(progress * 100)}%`;
+}
+
+function setTorrentStage(stage) {
+  if (!ui.torrentProgressStage || !ui.torrentProgressStageText) {
+    return;
+  }
+  const map = {
+    hashing: 'Hashing in corso...',
+    encoding: 'Creazione buffer...',
+    writing: 'Salvataggio file...',
+    done: 'Completato'
+  };
+  const label = map[stage] || 'Generazione in corso...';
+  ui.torrentProgressStageText.textContent = label;
+  ui.torrentProgressStage.classList.toggle('done', stage === 'done');
+  ui.torrentProgressStage.classList.remove('hidden');
+}
+
+function resetTorrentProgress() {
+  if (!ui.torrentProgressRow || !ui.torrentProgressFill || !ui.torrentProgressText) {
+    return;
+  }
+  ui.torrentProgressRow.classList.add('hidden');
+  ui.torrentProgressFill.style.width = '0%';
+  ui.torrentProgressText.textContent = '0%';
+  if (ui.torrentProgressStage) {
+    ui.torrentProgressStage.classList.remove('done');
+    ui.torrentProgressStage.classList.add('hidden');
+  }
 }
 
 function renderRulesContent() {
@@ -1562,7 +1367,14 @@ function buildLanguageTag(audioLangs, originalLangTag) {
 
   const separator = ' - ';
   if (langs.length >= 3) {
-    return langs.includes('ITA') ? `ITA${separator}MULTI` : `${langs[0]}${separator}MULTI`;
+    if (langs.includes('ITA')) {
+      return `ITA${separator}MULTI`;
+    }
+    const original = normalizeLangTag(originalLangTag);
+    if (original && langs.includes(original)) {
+      return `${original}${separator}MULTI`;
+    }
+    return `${langs[0]}${separator}MULTI`;
   }
 
   if (langs.length === 1) {
@@ -1570,8 +1382,16 @@ function buildLanguageTag(audioLangs, originalLangTag) {
   }
 
   const original = normalizeLangTag(originalLangTag);
-  if (langs.includes('ITA') && original && langs.includes(original)) {
-    return `ITA${separator}${original}`;
+  if (original && langs.includes(original)) {
+    if (original === 'ITA') {
+      const other = langs.find((lang) => lang !== original);
+      return other ? `${original}${separator}${other}` : original;
+    }
+    if (langs.includes('ITA')) {
+      return `${original}${separator}ITA`;
+    }
+    const other = langs.find((lang) => lang !== original);
+    return other ? `${original}${separator}${other}` : original;
   }
   if (langs.includes('ITA')) {
     const other = langs.find((lang) => lang !== 'ITA');
@@ -2221,6 +2041,53 @@ function computeBaseName(form, overrides = {}) {
   return sanitizeName(name);
 }
 
+function getTorrentNameSuggestion() {
+  const { folderName, baseName } = buildRenameTargets();
+  const formatLanguageSeparators = (value) => {
+    if (!value || !LANGUAGE_CODES_PATTERN) {
+      return value;
+    }
+    const pattern = new RegExp(`\\b(${LANGUAGE_CODES_PATTERN})-(${LANGUAGE_CODES_PATTERN})\\b`, 'g');
+    return value.replace(pattern, '$1.-.$2');
+  };
+  if (state.kind === 'dir') {
+    return formatLanguageSeparators(folderName || getPathBaseName(state.targetPath));
+  }
+  if (baseName) {
+    return formatLanguageSeparators(baseName);
+  }
+  const targetFile = state.mainVideo || state.targetPath;
+  return formatLanguageSeparators(stripExtension(getPathBaseName(targetFile)));
+}
+
+function buildTorrentWarnings() {
+  const warnings = [];
+  const { folderName, fileRenames } = buildRenameTargets();
+  if (state.kind === 'dir') {
+    const currentFolder = getPathBaseName(state.targetPath);
+    if (folderName && folderName !== currentFolder) {
+      warnings.push(`Cartella non conforme: ${currentFolder} → ${folderName}`);
+    }
+  }
+
+  const mismatches = fileRenames.filter((item) => {
+    if (!item?.path || !item?.baseName) {
+      return false;
+    }
+    const current = stripExtension(getPathBaseName(item.path));
+    return item.baseName !== current;
+  });
+
+  if (mismatches.length) {
+    const sample = mismatches[0];
+    const current = stripExtension(getPathBaseName(sample.path));
+    warnings.push(
+      `${mismatches.length} file non conformi alle rules (es. ${current} → ${sample.baseName}).`
+    );
+  }
+  return warnings;
+}
+
 function getMissingRenameRequirements(form) {
   const missing = [];
   const format = form.format;
@@ -2523,7 +2390,14 @@ async function fetchMetadataAuto(guess) {
       setIfAuto(ui.yearInput, data.year);
     }
     if (data.originalLanguage) {
-      setInputAuto(ui.originalLanguageInput, normalizeLangTag(data.originalLanguage));
+      const normalizedOriginal = normalizeLangTag(data.originalLanguage);
+      setInputAuto(ui.originalLanguageInput, normalizedOriginal);
+      if (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false') {
+        const recomputed = buildLanguageTag(state.audioLangs, normalizedOriginal);
+        if (recomputed) {
+          setInputAuto(ui.languageTagInput, recomputed);
+        }
+      }
     }
     if (Array.isArray(data.episodes)) {
       const map = {};
@@ -2725,6 +2599,12 @@ ui.resetSourceBtn.addEventListener('click', () => {
   resetSource();
 });
 
+if (ui.openTorrentBtn) {
+  ui.openTorrentBtn.addEventListener('click', () => {
+    openTorrentModal();
+  });
+}
+
 ui.autoDetectBtn.addEventListener('click', async () => {
   await manualDetectFromInputs();
 });
@@ -2779,6 +2659,71 @@ ui.applyRenameBtn.addEventListener('click', async () => {
   schedulePreview();
 });
 
+if (ui.generateTorrentBtn) {
+  ui.generateTorrentBtn.addEventListener('click', async () => {
+    if (!state.targetPath) {
+      setHint(ui.torrentHint, 'Seleziona un file o una cartella.');
+      return;
+    }
+
+    const announceInput = ui.torrentAnnounceInput?.value.trim() || '';
+    const outputDir = ui.torrentOutputInput?.value.trim() || '';
+    const outputName = ui.torrentNameInput?.value.trim() || '';
+    const isPrivate = ui.torrentPrivateToggle?.checked !== false;
+    const announceResolved = resolveAnnounceInput(announceInput);
+    const announce = announceResolved.announceUrl;
+
+    if (!announce) {
+      setHint(ui.torrentHint, 'Inserisci l\'announce URL.');
+      return;
+    }
+    if (!outputDir) {
+      setHint(ui.torrentHint, 'Seleziona la cartella di output.');
+      return;
+    }
+    if (!outputName) {
+      setHint(ui.torrentHint, 'Inserisci un nome per il file .torrent.');
+      return;
+    }
+
+    setHint(ui.torrentHint, 'Generazione in corso...');
+    currentTorrentRequestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    setTorrentProgress(0);
+    setTorrentStage('hashing');
+    const payload = {
+      targetPath: state.targetPath,
+      announce,
+      outputDir,
+      outputName,
+      private: isPrivate,
+      requestId: currentTorrentRequestId
+    };
+    const result = await window.api.createTorrent(payload);
+    logDebug('createTorrent result', result);
+    if (result?.ok) {
+      const updated = {
+        ...loadSettings(),
+        torrentPasskey: announceResolved.passkey || '',
+        torrentAnnounceUrl: announceResolved.passkey ? '' : announce,
+        torrentOutputDir: outputDir,
+        torrentPrivate: isPrivate
+      };
+      saveSettings(updated);
+      applySettingsToUI(updated);
+      const toastMessage = result.warning
+        ? `Torrent creato. ${result.warning}`
+        : 'Torrent creato.';
+      showToast(toastMessage);
+      setHint(ui.torrentHint, `Creato: ${result.outputPath}`);
+      setTorrentProgress(1);
+      setTorrentStage('done');
+    } else {
+      setHint(ui.torrentHint, result?.error || 'Errore nella generazione.');
+      resetTorrentProgress();
+    }
+  });
+}
+
 ui.openSettingsBtn.addEventListener('click', openSettings);
 ui.closeSettingsBtn.addEventListener('click', closeSettings);
 ui.settingsModal.addEventListener('click', (event) => {
@@ -2804,6 +2749,36 @@ ui.mediaInfoBadge.addEventListener('click', async () => {
 
 ui.closeMediaInfoBtn.addEventListener('click', closeMediaInfoModal);
 
+if (ui.closeTorrentBtn) {
+  ui.closeTorrentBtn.addEventListener('click', closeTorrentModal);
+}
+
+if (ui.torrentModal) {
+  ui.torrentModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeTorrentModal();
+    }
+  });
+}
+
+if (ui.browseTorrentOutputBtn) {
+  ui.browseTorrentOutputBtn.addEventListener('click', async () => {
+    const dir = await window.api.selectFolder();
+    if (dir && ui.torrentOutputInput) {
+      ui.torrentOutputInput.value = dir;
+    }
+  });
+}
+
+if (ui.browseTorrentOutputSettingsBtn) {
+  ui.browseTorrentOutputSettingsBtn.addEventListener('click', async () => {
+    const dir = await window.api.selectFolder();
+    if (dir && ui.settingsTorrentOutputInput) {
+      ui.settingsTorrentOutputInput.value = dir;
+    }
+  });
+}
+
 if (ui.confirmCancelBtn) {
   ui.confirmCancelBtn.addEventListener('click', () => resolveConfirm(false));
 }
@@ -2816,6 +2791,23 @@ if (ui.confirmModal) {
   ui.confirmModal.addEventListener('click', (event) => {
     if (event.target.classList.contains('modal-backdrop')) {
       resolveConfirm(false);
+    }
+  });
+}
+
+if (window.api?.onTorrentProgress) {
+  window.api.onTorrentProgress((data) => {
+    if (!data) {
+      return;
+    }
+    if (currentTorrentRequestId && data.requestId !== currentTorrentRequestId) {
+      return;
+    }
+    if (typeof data.progress === 'number') {
+      setTorrentProgress(data.progress);
+    }
+    if (data.stage) {
+      setTorrentStage(data.stage);
     }
   });
 }

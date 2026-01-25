@@ -306,7 +306,10 @@
             <label class="checkbox"><input id="renameFileCheckbox" type="checkbox" checked />Rinomina file</label>
             <label class="checkbox"><input id="renameFolderCheckbox" type="checkbox" checked />Rinomina cartella</label>
           </div>
-          <button id="applyRenameBtn" class="primary">Applica rinomina</button>
+          <div class="action-row">
+            <button id="applyRenameBtn" class="primary">Applica rinomina</button>
+            <button id="openTorrentBtn" class="success torrent-button" type="button">Genera .torrent</button>
+          </div>
           <div id="renameHint" class="hint"></div>
         </section>
 
@@ -364,6 +367,33 @@
             <option value="">Originale</option>
           </select>
         </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="settingsAnnounceInput">PID announce (SHRI)</label>
+          <div class="input-with-action">
+            <input id="settingsAnnounceInput" type="password" placeholder="ILTUOPID" />
+            <button class="icon-button" type="button" data-target="settingsAnnounceInput" aria-label="Mostra announce URL">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="settingsTorrentOutputInput">Cartella output .torrent</label>
+          <div class="input-with-action">
+            <input id="settingsTorrentOutputInput" type="text" placeholder="Seleziona cartella" />
+            <button id="browseTorrentOutputSettingsBtn" class="secondary small" type="button">Sfoglia</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <label class="checkbox">
+          <input id="settingsTorrentPrivateToggle" type="checkbox" checked />
+          Torrent privato (default)
+        </label>
       </div>
       <div class="row">
         <div class="field">
@@ -498,8 +528,76 @@
     </div>
   </div>
 
+  <div id="torrentModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h2>Genera .torrent</h2>
+        <button id="closeTorrentBtn" class="secondary">Chiudi</button>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="torrentAnnounceInput">Announce URL</label>
+          <div class="input-with-action">
+            <input id="torrentAnnounceInput" type="password" placeholder="https://shareisland.org/announce/ILTUOPID" />
+            <button class="icon-button" type="button" data-target="torrentAnnounceInput" aria-label="Mostra announce URL">
+              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                <circle cx="12" cy="12" r="3.5"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+        <div class="field">
+          <label for="torrentOutputInput">Cartella output .torrent</label>
+          <div class="input-with-action">
+            <input id="torrentOutputInput" type="text" placeholder="Seleziona cartella" />
+            <button id="browseTorrentOutputBtn" class="secondary small" type="button">Sfoglia</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="torrentNameInput">Nome file .torrent</label>
+          <input id="torrentNameInput" type="text" placeholder="Nome torrent" />
+        </div>
+        <div class="field">
+          <label>Root name (reale)</label>
+          <div id="torrentRootName" class="preview">-</div>
+        </div>
+      </div>
+      <div class="row">
+        <label class="checkbox">
+          <input id="torrentPrivateToggle" type="checkbox" checked />
+          Torrent privato
+        </label>
+        <div class="hint">Piece size: Auto · Padding: disabilitato</div>
+      </div>
+      <div class="progress-row hidden" id="torrentProgressRow">
+        <div class="progress-bar">
+          <div id="torrentProgressFill" class="progress-fill"></div>
+        </div>
+        <div id="torrentProgressText" class="progress-text">0%</div>
+      </div>
+      <div class="progress-stage hidden" id="torrentProgressStage">
+        <div class="spinner"></div>
+        <div class="progress-check" aria-hidden="true">
+          <svg viewBox="0 0 24 24">
+            <path d="M5 12l4 4 10-10"></path>
+          </svg>
+        </div>
+        <div id="torrentProgressStageText" class="progress-stage-text">Hashing...</div>
+      </div>
+      <div id="torrentWarnings" class="warning-list"></div>
+      <div class="confirm-actions">
+        <button id="generateTorrentBtn" class="primary">Genera .torrent</button>
+      </div>
+      <div id="torrentHint" class="hint"></div>
+    </div>
+  </div>
+
   <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
-  <script src="renderer.js"></script>
+  <script type="module" src="renderer.js"></script>
 </body>
 </html>
