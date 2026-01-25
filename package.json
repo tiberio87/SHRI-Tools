@@ -2,15 +2,35 @@
   "name": "shri-tools",
   "version": "0.1.0",
   "private": true,
+  "description": "SHRI tools",
+  "author": "ExUs",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder"
   },
   "dependencies": {
     "create-torrent": "^6.1.0",
     "mediainfo.js": "^0.3.7"
   },
   "devDependencies": {
-    "electron": "^40.0.0"
+    "electron": "^40.0.0",
+    "electron-builder": "^26.4.0"
+  },
+  "build": {
+    "appId": "com.exus.shri-tools",
+    "productName": "SHRI-Tools",
+    "portable": {},
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "files": [
+      "app/**/*",
+      "main.js",
+      "preload.js",
+      "package.json"
+    ]
   }
 }
