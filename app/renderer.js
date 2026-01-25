@@ -11,6 +11,7 @@ const ui = {
   mediaInfoText: document.getElementById('mediaInfoText'),
   mediaInfoPath: document.getElementById('mediaInfoPath'),
   closeMediaInfoBtn: document.getElementById('closeMediaInfoBtn'),
+  formatRow: document.getElementById('formatRow'),
   openDebugBtn: document.getElementById('openDebugBtn'),
   debugModal: document.getElementById('debugModal'),
   debugLogText: document.getElementById('debugLogText'),
@@ -27,6 +28,9 @@ const ui = {
   fetchBadge: document.getElementById('fetchBadge'),
   typeSelect: document.getElementById('typeSelect'),
   formatSelect: document.getElementById('formatSelect'),
+  formatSelectBtn: document.getElementById('formatSelectBtn'),
+  formatDropdown: document.getElementById('formatDropdown'),
+  formatDropdownMenu: document.getElementById('formatDropdownMenu'),
   titleInput: document.getElementById('titleInput'),
   yearInput: document.getElementById('yearInput'),
   includeYear: document.getElementById('includeYear'),
@@ -40,10 +44,22 @@ const ui = {
   languageTagInput: document.getElementById('languageTagInput'),
   audioLangHint: document.getElementById('audioLangHint'),
   audioCodecInput: document.getElementById('audioCodecInput'),
+  audioCodecSelectBtn: document.getElementById('audioCodecSelectBtn'),
+  audioCodecDropdown: document.getElementById('audioCodecDropdown'),
+  audioCodecDropdownMenu: document.getElementById('audioCodecDropdownMenu'),
   audioChannelsInput: document.getElementById('audioChannelsInput'),
+  audioChannelsSelectBtn: document.getElementById('audioChannelsSelectBtn'),
+  audioChannelsDropdown: document.getElementById('audioChannelsDropdown'),
+  audioChannelsDropdownMenu: document.getElementById('audioChannelsDropdownMenu'),
   audioMetaInput: document.getElementById('audioMetaInput'),
   resolutionInput: document.getElementById('resolutionInput'),
+  resolutionSelectBtn: document.getElementById('resolutionSelectBtn'),
+  resolutionDropdown: document.getElementById('resolutionDropdown'),
+  resolutionDropdownMenu: document.getElementById('resolutionDropdownMenu'),
   videoCodecInput: document.getElementById('videoCodecInput'),
+  videoCodecSelectBtn: document.getElementById('videoCodecSelectBtn'),
+  videoCodecDropdown: document.getElementById('videoCodecDropdown'),
+  videoCodecDropdownMenu: document.getElementById('videoCodecDropdownMenu'),
   uhdCheckbox: document.getElementById('uhdCheckbox'),
   hdrCheckbox: document.getElementById('hdrCheckbox'),
   hdr10plusCheckbox: document.getElementById('hdr10plusCheckbox'),
@@ -70,7 +86,6 @@ const ui = {
   renameFolderCheckbox: document.getElementById('renameFolderCheckbox'),
   applyRenameBtn: document.getElementById('applyRenameBtn'),
   renameHint: document.getElementById('renameHint'),
-  baseNamePreview: document.getElementById('baseNamePreview'),
   fileNamePreview: document.getElementById('fileNamePreview'),
   folderNamePreview: document.getElementById('folderNamePreview'),
   renamePlanList: document.getElementById('renamePlanList'),
@@ -91,8 +106,17 @@ const ui = {
   rulesModal: document.getElementById('rulesModal'),
   rulesContent: document.getElementById('rulesContent'),
   closeRulesBtn: document.getElementById('closeRulesBtn'),
+  openGroupDefaultsBtn: document.getElementById('openGroupDefaultsBtn'),
+  groupDefaultsModal: document.getElementById('groupDefaultsModal'),
+  groupDefaultsList: document.getElementById('groupDefaultsList'),
+  closeGroupDefaultsBtn: document.getElementById('closeGroupDefaultsBtn'),
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-  settingsHint: document.getElementById('settingsHint')
+  settingsHint: document.getElementById('settingsHint'),
+  confirmModal: document.getElementById('confirmModal'),
+  confirmMessage: document.getElementById('confirmMessage'),
+  confirmCancelBtn: document.getElementById('confirmCancelBtn'),
+  confirmOkBtn: document.getElementById('confirmOkBtn'),
+  toast: document.getElementById('toast')
 };
 
 const state = {
@@ -105,8 +129,14 @@ const state = {
   audioLangs: [],
   episodeMap: {},
   tagSuggestion: '',
-  autoDetectRunning: false
+  autoDetectRunning: false,
+  lastTagSuggestion: '',
+  lastTagResolveKey: ''
 };
+
+let toastTimer = null;
+let toastHideTimer = null;
+let confirmResolver = null;
 
 const debugState = {
   enabled: true,
@@ -116,6 +146,78 @@ const debugState = {
 
 const SETTINGS_STORAGE_KEY = 'shri-renamer-settings';
 const THEME_STORAGE_KEY = 'shri-renamer-theme';
+
+const DEFAULT_GROUP_TAGS = [
+  'Blackbit',
+  'G66',
+  'Ubi',
+  'Prometheus',
+  'NST',
+  'Ned',
+  'GP',
+  'NovaRip',
+  'Odino',
+  'CreW',
+  'YELLO',
+  'SpyRo',
+  'iVy',
+  'NTb',
+  'Morpheus',
+  'MRSK',
+  'T7',
+  'TrollHD',
+  'B66',
+  'P67',
+  'MIKE',
+  'TRiADE',
+  'Vitello',
+  'gattopollo',
+  'SAW',
+  'Jsph69',
+  'Mem',
+  'BORDURE',
+  'GeD',
+  'IlSommo',
+  'Pir8',
+  'successfulcrab',
+  'AMBER',
+  'Me7alh',
+  'Pennywise',
+  'ToVaR',
+  'playWEB',
+  'DSR',
+  'M109',
+  'TVSmash',
+  'bamboozle',
+  'ettv',
+  'memento',
+  'TOXiC',
+  'ETHEL',
+  'AMCON',
+  'cielos',
+  'Darksidemux',
+  'ELiTE',
+  'lucidtv',
+  'METCON',
+  'tbs',
+  'FHC',
+  'FraMeSToR',
+  'EPSiLON',
+  'CiNEPHiLES',
+  'SGF',
+  'EbP',
+  'ZioRip',
+  'TheEmojiCrew',
+  'CYBER',
+  'LFi',
+  'Krikk',
+  'SBuR',
+  'CtrlHD',
+  'iSlaNd',
+  'PRiME',
+  'NAHOM',
+  'TMT'
+];
 
 const LANG_MAP = {
   it: 'ITA',
@@ -300,6 +402,17 @@ function setHint(target, text) {
   target.textContent = text || '';
 }
 
+function setAutoFieldState(input, active) {
+  if (!input) {
+    return;
+  }
+  const field = input.closest('.field');
+  if (!field) {
+    return;
+  }
+  field.classList.toggle('auto-field', Boolean(active));
+}
+
 function applyTheme(theme) {
   const useLight = theme === 'light';
   document.body.classList.toggle('light', useLight);
@@ -376,7 +489,9 @@ function resetDropdown(input, trigger, label) {
   }
   input.value = '';
   input.dataset.manual = 'false';
+  input.dataset.auto = 'false';
   trigger.textContent = label;
+  setAutoFieldState(input, false);
 }
 
 function resetMetadataInputs() {
@@ -419,7 +534,10 @@ function resetAllInputs(options = {}) {
   if (ui.formatSelect) {
     ui.formatSelect.value = 'WEB-DL';
     ui.formatSelect.dataset.manual = 'false';
-    applyFormatSuggestion('');
+    ui.formatSelect.dataset.auto = 'false';
+    if (ui.formatSelectBtn) {
+      ui.formatSelectBtn.textContent = 'WEB-DL';
+    }
   }
 
   if (ui.includeYear) {
@@ -442,6 +560,8 @@ function resetAllInputs(options = {}) {
     }
     input.value = '';
     input.dataset.manual = 'false';
+    input.dataset.auto = 'false';
+    setAutoFieldState(input, false);
   });
 
   [
@@ -461,6 +581,10 @@ function resetAllInputs(options = {}) {
   resetDropdown(ui.repackSelect, ui.repackSelectBtn, 'Nessuno');
   resetDropdown(ui.sourceInput, ui.sourceInputBtn, 'Seleziona sorgente');
   resetDropdown(ui.tagInput, ui.tagInputBtn, 'Seleziona tag gruppo');
+  resetDropdown(ui.resolutionInput, ui.resolutionSelectBtn, 'Seleziona risoluzione');
+  resetDropdown(ui.videoCodecInput, ui.videoCodecSelectBtn, 'Seleziona codec');
+  resetDropdown(ui.audioCodecInput, ui.audioCodecSelectBtn, 'Seleziona codec');
+  resetDropdown(ui.audioChannelsInput, ui.audioChannelsSelectBtn, 'Seleziona canali');
 
   if (ui.audioLangHint) {
     ui.audioLangHint.textContent = 'Lingue audio rilevate: -';
@@ -485,9 +609,6 @@ function resetAllInputs(options = {}) {
   }
   if (ui.folderNamePreview) {
     ui.folderNamePreview.textContent = '-';
-  }
-  if (ui.baseNamePreview) {
-    ui.baseNamePreview.textContent = '-';
   }
   if (ui.fileNamePreview) {
     ui.fileNamePreview.textContent = '-';
@@ -681,6 +802,7 @@ function applySettingsToUI(settings) {
   if (ui.autoTagDetectToggle) {
     ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
   }
+  updateTagSuggestion(settings);
   loadServiceDefaults().then(() => updateServiceOptions(settings));
   updateTagOptions(settings);
   schedulePreview();
@@ -775,6 +897,15 @@ function closeRulesModal() {
   ui.rulesModal.classList.add('hidden');
 }
 
+function openGroupDefaultsModal() {
+  renderGroupDefaults();
+  ui.groupDefaultsModal.classList.remove('hidden');
+}
+
+function closeGroupDefaultsModal() {
+  ui.groupDefaultsModal.classList.add('hidden');
+}
+
 function renderRulesContent() {
   if (!ui.rulesContent) {
     return;
@@ -810,6 +941,44 @@ function renderRulesContent() {
 
     wrapper.appendChild(list);
     ui.rulesContent.appendChild(wrapper);
+  }
+}
+
+function renderGroupDefaults() {
+  if (!ui.groupDefaultsList) {
+    return;
+  }
+  ui.groupDefaultsList.innerHTML = '';
+  const currentList = parseSimpleList(ui.tagListInput.value || '');
+  const currentSet = new Set(currentList.map((tag) => tag.trim().toUpperCase()));
+  const unique = [...new Set(DEFAULT_GROUP_TAGS)]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  for (const tag of unique) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'group-chip';
+    chip.textContent = tag;
+    if (currentSet.has(tag.toUpperCase())) {
+      chip.classList.add('active');
+    }
+    chip.addEventListener('click', () => {
+      const list = parseSimpleList(ui.tagListInput.value || '');
+      const key = tag.toUpperCase();
+      const index = list.findIndex((item) => item.trim().toUpperCase() === key);
+      if (index >= 0) {
+        list.splice(index, 1);
+        chip.classList.remove('active');
+      } else {
+        list.push(tag);
+        chip.classList.add('active');
+      }
+      ui.tagListInput.value = list.join('\n');
+      const settings = getSettings();
+      updateTagSuggestion(settings);
+      updateTagOptions(settings);
+      schedulePreview();
+    });
+    ui.groupDefaultsList.appendChild(chip);
   }
 }
 
@@ -866,7 +1035,39 @@ function setDropdownValue(input, trigger, value, label) {
   input.value = value;
   trigger.textContent = label;
   input.dataset.manual = 'true';
+  input.dataset.auto = 'false';
+  setAutoFieldState(input, false);
   input.dispatchEvent(new Event('input', { bubbles: true }));
+  input.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
+function setDropdownAuto(input, trigger, value, label) {
+  if (!input || !trigger || !value) {
+    return;
+  }
+  const manual = input.dataset.manual === 'true';
+  if (manual && input.value) {
+    return;
+  }
+  input.value = value;
+  input.dataset.manual = 'false';
+  input.dataset.auto = 'true';
+  trigger.textContent = `Rilevato: ${label || value}`;
+  setAutoFieldState(input, true);
+}
+
+function setInputAuto(input, value) {
+  if (!input || !value) {
+    return;
+  }
+  const manual = input.dataset.manual === 'true';
+  if (manual && input.value) {
+    return;
+  }
+  input.value = value;
+  input.dataset.manual = 'false';
+  input.dataset.auto = 'true';
+  setAutoFieldState(input, true);
 }
 
 function setupDropdown(dropdown, trigger, input, menu) {
@@ -1034,6 +1235,41 @@ function updateTagOptions(settings) {
   ui.tagInputBtn.textContent = suggestion && autoDetect
     ? `Rilevato: ${suggestion}`
     : 'Seleziona tag gruppo';
+}
+
+function buildKnownGroupTags(settings) {
+  const map = new Map();
+  for (const tag of DEFAULT_GROUP_TAGS) {
+    const clean = String(tag || '').trim();
+    if (clean) {
+      map.set(clean.toUpperCase(), clean);
+    }
+  }
+  const custom = parseSimpleList(settings?.tagList || '');
+  for (const tag of custom) {
+    const clean = String(tag || '').trim();
+    if (clean) {
+      map.set(clean.toUpperCase(), clean);
+    }
+  }
+  return [...map.values()];
+}
+
+function updateTagSuggestion(settings) {
+  const path = state.mainVideo || state.targetPath;
+  if (!path) {
+    state.tagSuggestion = '';
+    return;
+  }
+  state.tagSuggestion = extractGroupTagFromName(path, buildKnownGroupTags(settings));
+  if (state.tagSuggestion !== state.lastTagSuggestion) {
+    logDebug('tag suggestion', {
+      path,
+      suggestion: state.tagSuggestion,
+      settingsAuto: settings?.autoTagDetect !== false
+    });
+    state.lastTagSuggestion = state.tagSuggestion;
+  }
 }
 
 function pad2(value) {
@@ -1209,33 +1445,15 @@ function suggestFormatFromMediaInfo(mediaInfo) {
 
 function applyFormatSuggestion(suggested) {
   const select = ui.formatSelect;
-  if (!select) {
+  const trigger = ui.formatSelectBtn;
+  if (!select || !trigger) {
     return;
   }
-  if (!select.dataset.labelsSaved) {
-    [...select.options].forEach((option) => {
-      option.dataset.label = option.textContent;
-    });
-    select.dataset.labelsSaved = 'true';
-  }
-
   const manual = select.dataset.manual === 'true';
-  [...select.options].forEach((option) => {
-    if (option.dataset.label) {
-      option.textContent = option.dataset.label;
-    }
-  });
-
   if (manual || !suggested) {
     return;
   }
-
-  select.value = suggested;
-  select.dataset.manual = 'false';
-  const option = [...select.options].find((opt) => opt.value === suggested);
-  if (option && option.dataset.label) {
-    option.textContent = `${option.dataset.label} (suggerito)`;
-  }
+  setDropdownAuto(select, trigger, suggested, suggested);
 }
 
 function getResolution(videoTrack) {
@@ -1383,6 +1601,87 @@ function getParentPath(filePath) {
   return parts.join(separator);
 }
 
+function normalizePathValue(value) {
+  return String(value || '').replace(/\//g, '\\');
+}
+
+function isSamePath(left, right) {
+  return normalizePathValue(left).toLowerCase() === normalizePathValue(right).toLowerCase();
+}
+
+function applyFolderRenamePath(value, folderFrom, folderTo) {
+  if (!value || !folderFrom || !folderTo) {
+    return value;
+  }
+  const normValue = normalizePathValue(value);
+  const normFrom = normalizePathValue(folderFrom);
+  const normTo = normalizePathValue(folderTo);
+  const valueLower = normValue.toLowerCase();
+  const fromLower = normFrom.toLowerCase();
+
+  if (valueLower === fromLower) {
+    return normTo;
+  }
+
+  const prefix = fromLower.endsWith('\\') ? fromLower : `${fromLower}\\`;
+  if (valueLower.startsWith(prefix)) {
+    return `${normTo}\\${normValue.slice(prefix.length)}`;
+  }
+  return value;
+}
+
+function showToast(message) {
+  if (!ui.toast) {
+    return;
+  }
+
+  if (toastTimer) {
+    clearTimeout(toastTimer);
+  }
+  if (toastHideTimer) {
+    clearTimeout(toastHideTimer);
+  }
+
+  ui.toast.textContent = message;
+  ui.toast.classList.remove('hidden');
+  requestAnimationFrame(() => {
+    ui.toast.classList.add('show');
+  });
+
+  toastTimer = setTimeout(() => {
+    ui.toast.classList.remove('show');
+    toastHideTimer = setTimeout(() => {
+      ui.toast.classList.add('hidden');
+    }, 220);
+  }, 2400);
+}
+
+function closeConfirmModal() {
+  if (!ui.confirmModal) {
+    return;
+  }
+  ui.confirmModal.classList.add('hidden');
+}
+
+function openConfirmModal(message) {
+  if (!ui.confirmModal || !ui.confirmMessage) {
+    return Promise.resolve(false);
+  }
+  ui.confirmMessage.textContent = message;
+  ui.confirmModal.classList.remove('hidden');
+  return new Promise((resolve) => {
+    confirmResolver = resolve;
+  });
+}
+
+function resolveConfirm(value) {
+  if (confirmResolver) {
+    confirmResolver(value);
+    confirmResolver = null;
+  }
+  closeConfirmModal();
+}
+
 function stripExtension(name) {
   return name.replace(/\.[^/.]+$/, '');
 }
@@ -1405,7 +1704,7 @@ function isNoiseTag(token) {
   return false;
 }
 
-function extractGroupTagFromName(filePath) {
+function extractGroupTagFromName(filePath, knownTags = []) {
   if (!filePath) {
     return '';
   }
@@ -1414,19 +1713,48 @@ function extractGroupTagFromName(filePath) {
     return '';
   }
 
+  if (/\s-\s/.test(base)) {
+    return '';
+  }
+
+  const knownMap = new Map();
+  for (const tag of knownTags) {
+    const clean = String(tag || '').trim();
+    if (clean) {
+      knownMap.set(clean.toUpperCase(), clean);
+    }
+  }
+  if (knownMap.size) {
+    const tokens = base.split(/[._\s-]+/).filter(Boolean);
+    const last = tokens[tokens.length - 1] || '';
+    const known = knownMap.get(last.toUpperCase());
+    if (known && !isNoiseTag(last)) {
+      logDebug('tag detect', { mode: 'known', base, last, known });
+      return known;
+    }
+  }
+
   let candidate = '';
   const bracketMatch = base.match(/[\[\(\{]([A-Za-z0-9][A-Za-z0-9._-]{1,})[\]\)\}]\s*$/);
   if (bracketMatch) {
     candidate = bracketMatch[1];
   } else {
-    const dashMatch = base.match(/[-–—]\s*([A-Za-z0-9][A-Za-z0-9._-]{1,})\s*$/);
-    if (dashMatch) {
-      candidate = dashMatch[1];
+    const tailMatch = base.match(/[-–—]\s*([A-Za-z0-9]{2,20})\s*$/);
+    if (tailMatch) {
+      candidate = tailMatch[1];
     }
   }
 
   candidate = candidate.replace(/^[.\-]+|[.\-]+$/g, '').trim();
+  logDebug('tag detect', {
+    mode: 'suffix',
+    base,
+    rawCandidate: candidate
+  });
   if (!candidate || candidate.length < 2 || candidate.length > 20 || /\s/.test(candidate)) {
+    return '';
+  }
+  if (candidate.length <= 2 && !knownMap.has(candidate.toUpperCase())) {
     return '';
   }
   if (isNoiseTag(candidate)) {
@@ -1474,7 +1802,9 @@ function parseEpisodeTitleFromName(rawName) {
   }
 
   const tokens = after.split(' ').filter((token) => token && !STOP_WORDS.has(token.toUpperCase()));
-  const filtered = tokens.filter((token) => !/^\d{3,4}p$/i.test(token) && !/^\d{4}$/.test(token));
+  const filtered = tokens
+    .filter((token) => !/^\d{3,4}p$/i.test(token) && !/^\d{4}$/.test(token))
+    .filter((token) => !/^(S?\d{1,2}E\d{1,2}|S?\d{1,2}x\d{1,2}|\d{1,2}x\d{1,2})$/i.test(token));
   return filtered.join(' ').trim();
 }
 
@@ -1512,7 +1842,22 @@ function guessMetadataFromName(filePath) {
   const seasonEpisode = parseSeasonEpisode(cleaned);
   const seasonOnly = seasonEpisode.episode ? { season: '', index: -1 } : parseSeasonOnly(cleaned);
   const year = extractYear(cleaned);
-  const title = guessTitleFromName(cleaned);
+  let title = guessTitleFromName(cleaned);
+  if (!title) {
+    const parentPath = getParentPath(filePath);
+    const parentName = parentPath ? getPathBaseName(parentPath) : '';
+    const parentTitle = parentName ? guessTitleFromName(parentName) : '';
+    if (parentTitle) {
+      title = parentTitle;
+    } else if (parentPath) {
+      const grandParent = getParentPath(parentPath);
+      const grandName = grandParent ? getPathBaseName(grandParent) : '';
+      const grandTitle = grandName ? guessTitleFromName(grandName) : '';
+      if (grandTitle) {
+        title = grandTitle;
+      }
+    }
+  }
   const episodeTitle = parseEpisodeTitleFromName(cleaned);
   return {
     title,
@@ -1537,6 +1882,7 @@ function setIfAuto(input, value) {
   if (!input.dataset.manual || input.dataset.manual === 'false' || !input.value) {
     input.value = value;
     input.dataset.manual = 'false';
+    input.dataset.auto = 'false';
   }
 }
 
@@ -1554,7 +1900,11 @@ function fillFromMediaInfo() {
 
   if (videoTrack) {
     const resolution = getResolution(videoTrack);
-    setIfAuto(ui.resolutionInput, resolution);
+    if (ui.resolutionSelectBtn) {
+      setDropdownAuto(ui.resolutionInput, ui.resolutionSelectBtn, resolution, resolution);
+    } else {
+      setInputAuto(ui.resolutionInput, resolution);
+    }
 
     const hdrTokens = getHdrTokens(videoTrack);
     ui.dvCheckbox.checked = hdrTokens.includes('DV');
@@ -1563,15 +1913,18 @@ function fillFromMediaInfo() {
 
     const format = ui.formatSelect.value;
     const videoCodec = mapVideoCodec(videoTrack, format);
-    setIfAuto(ui.videoCodecInput, videoCodec);
+    if (ui.videoCodecSelectBtn) {
+      setDropdownAuto(ui.videoCodecInput, ui.videoCodecSelectBtn, videoCodec, videoCodec);
+    } else {
+      setInputAuto(ui.videoCodecInput, videoCodec);
+    }
 
     if (resolution === '2160p') {
       ui.uhdCheckbox.checked = true;
     }
   }
 
-  const formatSuggestion = suggestFormatFromMediaInfo(state.mediaInfo);
-  applyFormatSuggestion(formatSuggestion);
+  applyFormatSuggestion('');
 
   if (audioTracks.length) {
     const cleanAudio = audioTracks.filter((track) => {
@@ -1598,16 +1951,25 @@ function fillFromMediaInfo() {
     }, null);
 
     if (best) {
-      setIfAuto(ui.audioCodecInput, mapAudioCodec(best));
-      setIfAuto(ui.audioChannelsInput, parseChannels(best.Channels || best['Channel(s)'] || ''));
-      setIfAuto(ui.audioMetaInput, detectAudioMeta(best));
+      const mappedAudio = mapAudioCodec(best);
+      const channels = parseChannels(best.Channels || best['Channel(s)'] || '');
+      if (ui.audioCodecSelectBtn) {
+        setDropdownAuto(ui.audioCodecInput, ui.audioCodecSelectBtn, mappedAudio, mappedAudio);
+      } else {
+        setInputAuto(ui.audioCodecInput, mappedAudio);
+      }
+      if (ui.audioChannelsSelectBtn) {
+        setDropdownAuto(ui.audioChannelsInput, ui.audioChannelsSelectBtn, channels, channels);
+      } else {
+        setInputAuto(ui.audioChannelsInput, channels);
+      }
+      setInputAuto(ui.audioMetaInput, detectAudioMeta(best));
     }
 
     if (!ui.languageTagInput.dataset.manual || !ui.languageTagInput.value) {
       const computedLang = buildLanguageTag(uniqueLangs, ui.originalLanguageInput.value);
       if (computedLang) {
-        ui.languageTagInput.value = computedLang;
-        ui.languageTagInput.dataset.manual = 'false';
+        setInputAuto(ui.languageTagInput, computedLang);
       }
     }
   }
@@ -1622,8 +1984,15 @@ function updateVisibility() {
   ui.seasonEpisodeGroup.style.display = isSeason || isEpisode ? 'grid' : 'none';
   ui.episodeTitleGroup.style.display = isEpisode ? 'grid' : 'none';
 
-  ui.serviceGroup.style.display = format === 'WEB-DL' || format === 'WEBRip' ? 'block' : 'none';
-  ui.sourceGroup.style.display = format === 'Encode' || format === 'Remux' || format === 'Full Disc' ? 'block' : 'none';
+  const showService = format === 'WEB-DL' || format === 'WEBRip';
+  const showSource = format === 'Encode' || format === 'Remux' || format === 'Full Disc';
+
+  ui.serviceGroup.style.display = showService ? 'block' : 'none';
+  ui.sourceGroup.style.display = showSource ? 'block' : 'none';
+  if (ui.formatRow) {
+    ui.formatRow.classList.toggle('no-source', !showSource);
+    ui.formatRow.classList.toggle('no-service', !showService);
+  }
   ui.regionWrapper.style.display = format === 'Full Disc' ? 'block' : 'none';
   ui.threeDWrapper.style.display = format === 'Remux' || format === 'Full Disc' ? 'inline-flex' : 'none';
   ui.languageTagInput.disabled = format === 'Full Disc';
@@ -1665,8 +2034,32 @@ function getFormState() {
     hdrTokens,
     videoCodec: ui.videoCodecInput.value.trim(),
     is3d: ui.threeDCheckbox.checked,
-    tag: ui.tagInput.value.trim()
+    tag: getResolvedTag()
   };
+}
+
+function getResolvedTag() {
+  const value = ui.tagInput.value.trim();
+  if (value) {
+    return value;
+  }
+  const manual = ui.tagInput.dataset.manual === 'true';
+  const settings = loadSettings();
+  const resolved = manual || settings.autoTagDetect === false
+    ? ''
+    : (state.tagSuggestion || '');
+  const key = `${value}|${manual}|${settings.autoTagDetect}|${state.tagSuggestion}|${resolved}`;
+  if (key !== state.lastTagResolveKey) {
+    logDebug('tag resolve', {
+      value,
+      manual,
+      autoDetect: settings.autoTagDetect !== false,
+      suggestion: state.tagSuggestion,
+      resolved
+    });
+    state.lastTagResolveKey = key;
+  }
+  return resolved;
 }
 
 function computeBaseName(form, overrides = {}) {
@@ -1828,6 +2221,18 @@ function computeBaseName(form, overrides = {}) {
   return sanitizeName(name);
 }
 
+function getMissingRenameRequirements(form) {
+  const missing = [];
+  const format = form.format;
+  if ((format === 'WEB-DL' || format === 'WEBRip') && !form.service) {
+    missing.push(`Servizio mancante per il formato ${format}.`);
+  }
+  if ((format === 'Encode' || format === 'Remux' || format === 'Full Disc') && !form.source) {
+    missing.push(`Sorgente mancante per il formato ${format}.`);
+  }
+  return missing;
+}
+
 function buildRenameTargets() {
   if (!state.targetPath) {
     return { folderName: '', baseName: '', fileRenames: [], warnings: [] };
@@ -1886,6 +2291,68 @@ function buildRenameTargets() {
   return { folderName, baseName: previewBase, fileRenames, warnings };
 }
 
+function applyRenameResults(result, payload) {
+  if (!result || !Array.isArray(result.results) || !result.results.length) {
+    return;
+  }
+
+  const okResults = result.results.filter((item) => item && item.ok);
+  if (!okResults.length) {
+    return;
+  }
+
+  const fileMap = new Map();
+  for (const item of okResults) {
+    fileMap.set(normalizePathValue(item.from).toLowerCase(), item.to);
+  }
+
+  const expectedFolderFrom = payload?.renameFolder
+    ? (state.kind === 'dir' ? state.targetPath : getParentPath(state.targetPath))
+    : '';
+  const folderResult = expectedFolderFrom
+    ? okResults.find((item) => isSamePath(item.from, expectedFolderFrom))
+    : null;
+  const folderFrom = folderResult?.from || '';
+  const folderTo = folderResult?.to || '';
+
+  const applyFileRename = (value) => {
+    if (!value) {
+      return value;
+    }
+    const mapped = fileMap.get(normalizePathValue(value).toLowerCase());
+    return mapped || value;
+  };
+
+  const applyAllRenames = (value) => {
+    let updated = applyFileRename(value);
+    if (folderTo && folderFrom) {
+      updated = applyFolderRenamePath(updated, folderFrom, folderTo);
+    }
+    return updated;
+  };
+
+  if (state.kind === 'dir' && folderTo) {
+    state.targetPath = folderTo;
+  } else {
+    state.targetPath = applyAllRenames(state.targetPath);
+  }
+
+  state.mainVideo = applyAllRenames(state.mainVideo);
+  state.videoFiles = state.videoFiles.map((pathValue) => applyAllRenames(pathValue));
+
+  if (state.mainVideo) {
+    const lastDot = state.mainVideo.lastIndexOf('.');
+    state.mainExtension = lastDot !== -1 ? state.mainVideo.slice(lastDot) : '';
+  }
+
+  if (state.targetPath) {
+    ui.selectedPath.textContent = state.targetPath;
+  }
+  if (state.mainVideo) {
+    setHint(ui.scanHint, `File analizzato: ${state.mainVideo}`);
+  }
+}
+
 async function updateRenamePlan() {
   if (!state.targetPath) {
     ui.renamePlanList.innerHTML = '';
@@ -1906,6 +2373,8 @@ async function updateRenamePlan() {
 
   ui.renamePlanList.innerHTML = '';
   ui.warningList.innerHTML = '';
+  const planWarnings = plan.warnings || [];
+  const hasWarnings = warnings.length > 0 || planWarnings.length > 0;
 
   let folderOp = null;
   let filteredOps = plan.ops || [];
@@ -1975,12 +2444,14 @@ async function updateRenamePlan() {
     }
   } else {
     const empty = document.createElement('div');
-    empty.className = 'plan-item empty';
-    empty.textContent = 'Nessuna operazione pronta.';
+    empty.className = `plan-item empty${hasWarnings ? '' : ' success'}`;
+    empty.textContent = hasWarnings
+      ? 'Nessuna operazione pronta.'
+      : 'Nessuna rinomina necessaria con le configurazioni attuali.';
     itemsContainer.appendChild(empty);
   }
 
-  const allWarnings = [...warnings, ...(plan.warnings || [])];
+  const allWarnings = [...warnings, ...planWarnings];
   if (allWarnings.length) {
     for (const warning of allWarnings) {
       const item = document.createElement('div');
@@ -1992,7 +2463,6 @@ async function updateRenamePlan() {
 
   const extension = state.mainExtension;
   ui.folderNamePreview.textContent = folderName || '-';
-  ui.baseNamePreview.textContent = baseName || '-';
   ui.fileNamePreview.textContent = baseName && extension ? `${baseName}${extension}` : '-';
 }
 
@@ -2053,7 +2523,7 @@ async function fetchMetadataAuto(guess) {
       setIfAuto(ui.yearInput, data.year);
     }
     if (data.originalLanguage) {
-      setIfAuto(ui.originalLanguageInput, normalizeLangTag(data.originalLanguage));
+      setInputAuto(ui.originalLanguageInput, normalizeLangTag(data.originalLanguage));
     }
     if (Array.isArray(data.episodes)) {
       const map = {};
@@ -2192,8 +2662,9 @@ async function loadPath(targetPath) {
   ui.resetSourceBtn.classList.remove('hidden');
   setHint(ui.scanHint, scan.mainVideo ? `File analizzato: ${scan.mainVideo}` : 'Nessun file analizzato.');
 
-  state.tagSuggestion = extractGroupTagFromName(scan.mainVideo || targetPath);
-  updateTagOptions(loadSettings());
+  const settings = loadSettings();
+  updateTagSuggestion(settings);
+  updateTagOptions(settings);
 
   if (scan.mediaInfo?.error) {
     setMediaInfoBadgeVisible(false);
@@ -2271,6 +2742,16 @@ ui.applyRenameBtn.addEventListener('click', async () => {
     return;
   }
 
+  const form = getFormState();
+  const missing = getMissingRenameRequirements(form);
+  if (missing.length) {
+    const message = `${missing.join('\n')}\n\nVuoi procedere comunque?`;
+    const proceed = await openConfirmModal(message);
+    if (!proceed) {
+      return;
+    }
+  }
+
   const { folderName, fileRenames } = buildRenameTargets();
   if (!fileRenames.length && !folderName) {
     setHint(ui.renameHint, 'Inserisci i campi minimi per generare il nome.');
@@ -2286,8 +2767,11 @@ ui.applyRenameBtn.addEventListener('click', async () => {
   };
 
   const result = await window.api.applyRename(payload);
+  logDebug('applyRename result', result);
   if (result.ok) {
     setHint(ui.renameHint, 'Rinomina completata.');
+    showToast('Rinomina completata.');
+    applyRenameResults(result, payload);
   } else {
     const warning = result.warnings.length ? result.warnings.join(' | ') : 'Errore nella rinomina.';
     setHint(ui.renameHint, warning);
@@ -2319,6 +2803,22 @@ ui.mediaInfoBadge.addEventListener('click', async () => {
 });
 
 ui.closeMediaInfoBtn.addEventListener('click', closeMediaInfoModal);
+
+if (ui.confirmCancelBtn) {
+  ui.confirmCancelBtn.addEventListener('click', () => resolveConfirm(false));
+}
+
+if (ui.confirmOkBtn) {
+  ui.confirmOkBtn.addEventListener('click', () => resolveConfirm(true));
+}
+
+if (ui.confirmModal) {
+  ui.confirmModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      resolveConfirm(false);
+    }
+  });
+}
 ui.mediaInfoModal.addEventListener('click', (event) => {
   if (event.target.classList.contains('modal-backdrop')) {
     closeMediaInfoModal();
@@ -2377,7 +2877,22 @@ ui.rulesModal.addEventListener('click', (event) => {
   }
 });
 
+if (ui.openGroupDefaultsBtn) {
+  ui.openGroupDefaultsBtn.addEventListener('click', openGroupDefaultsModal);
+}
+if (ui.closeGroupDefaultsBtn) {
+  ui.closeGroupDefaultsBtn.addEventListener('click', closeGroupDefaultsModal);
+}
+if (ui.groupDefaultsModal) {
+  ui.groupDefaultsModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeGroupDefaultsModal();
+    }
+  });
+}
+
 setupDropdown(ui.serviceDropdown, ui.serviceInputBtn, ui.serviceInput, ui.serviceDropdownMenu);
+setupDropdown(ui.formatDropdown, ui.formatSelectBtn, ui.formatSelect, ui.formatDropdownMenu);
 setupDropdown(
   ui.repackDropdown,
   ui.repackSelectBtn,
@@ -2385,6 +2900,10 @@ setupDropdown(
   ui.repackDropdown.querySelector('.dropdown-menu')
 );
 setupDropdown(ui.sourceDropdown, ui.sourceInputBtn, ui.sourceInput, ui.sourceDropdownMenu);
+setupDropdown(ui.resolutionDropdown, ui.resolutionSelectBtn, ui.resolutionInput, ui.resolutionDropdownMenu);
+setupDropdown(ui.videoCodecDropdown, ui.videoCodecSelectBtn, ui.videoCodecInput, ui.videoCodecDropdownMenu);
+setupDropdown(ui.audioCodecDropdown, ui.audioCodecSelectBtn, ui.audioCodecInput, ui.audioCodecDropdownMenu);
+setupDropdown(ui.audioChannelsDropdown, ui.audioChannelsSelectBtn, ui.audioChannelsInput, ui.audioChannelsDropdownMenu);
 setupDropdown(ui.tagDropdown, ui.tagInputBtn, ui.tagInput, ui.tagDropdownMenu);
 
 document.addEventListener('click', (event) => {
@@ -2446,12 +2965,17 @@ ui.originalLanguageInput.addEventListener('input', () => {
   ui.tvdbInput
 ].forEach((element) => {
   element.addEventListener('input', () => {
-    element.dataset.manual = 'true';
+    if (element.dataset.auto === 'true') {
+      element.dataset.auto = 'false';
+    } else {
+      element.dataset.manual = 'true';
+    }
+    setAutoFieldState(element, false);
     schedulePreview();
   });
   element.addEventListener('change', () => {
     if (element === ui.formatSelect && state.mediaInfo) {
-      ui.videoCodecInput.value = '';
+      resetDropdown(ui.videoCodecInput, ui.videoCodecSelectBtn, 'Seleziona codec');
       fillFromMediaInfo();
     }
     schedulePreview();

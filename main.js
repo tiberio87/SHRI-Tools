@@ -605,19 +605,23 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
   const preferredLanguage = payload.preferredLanguage || '';
   let tmdbTvId = '';
 
+  const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
+
   try {
-    if (imdbId && omdbKey) {
-      const omdbData = await fetchOmdbByImdb(imdbId, omdbKey);
-      result.title = omdbData.Title || result.title;
-      result.year = String(omdbData.Year || result.year).slice(0, 4);
-      result.type = omdbData.Type || result.type;
-      result.imdbId = omdbData.imdbID || result.imdbId;
-    } else if (titleGuess && omdbKey) {
-      const omdbData = await fetchOmdbByTitle(titleGuess, yearGuess, omdbKey);
-      result.title = omdbData.Title || result.title;
-      result.year = String(omdbData.Year || result.year).slice(0, 4);
-      result.type = omdbData.Type || result.type;
-      result.imdbId = omdbData.imdbID || result.imdbId;
+    if (!isTvHint) {
+      if (imdbId && omdbKey) {
+        const omdbData = await fetchOmdbByImdb(imdbId, omdbKey);
+        result.title = omdbData.Title || result.title;
+        result.year = String(omdbData.Year || result.year).slice(0, 4);
+        result.type = omdbData.Type || result.type;
+        result.imdbId = omdbData.imdbID || result.imdbId;
+      } else if (titleGuess && omdbKey) {
+        const omdbData = await fetchOmdbByTitle(titleGuess, yearGuess, omdbKey);
+        result.title = omdbData.Title || result.title;
+        result.year = String(omdbData.Year || result.year).slice(0, 4);
+        result.type = omdbData.Type || result.type;
+        result.imdbId = omdbData.imdbID || result.imdbId;
+      }
     }
   } catch (error) {
     result.warnings.push(String(error));
@@ -628,7 +632,6 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       const tmdbFind = await fetchTmdbByImdb(imdbId, tmdbKey);
       const movie = tmdbFind?.movie_results?.[0];
       const tv = tmdbFind?.tv_results?.[0];
-      const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
       if (tv?.id) {
         tmdbTvId = String(tv.id);
       }
@@ -654,7 +657,6 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         result.tmdbType = 'movie';
       }
     } else if (tmdbKey && titleGuess) {
-      const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
       const type = isTvHint ? 'tv' : 'movie';
       const search = await fetchTmdbSearch(titleGuess, type, tmdbKey, preferredLanguage);
       const first = search?.results?.[0];

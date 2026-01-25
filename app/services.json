@@ -7,5 +7,6 @@
   {"code": "DAZN", "label": "DAZN"},
   {"code": "DSCP", "label": "Discovery+"},
   {"code": "CR", "label": "Crunchyroll"},
-  {"code": "iT", "label": "iTunes"}
+  {"code": "iT", "label": "iTunes"},
+  {"code": "HMAX", "label": "Max (HBO Max)"}
 ]

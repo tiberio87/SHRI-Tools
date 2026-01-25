@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.themoviedb.org https://www.omdbapi.com https://api4.thetvdb.com; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ShareIsland Renamer</title>
+  <title>SHRI - Tools</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -15,7 +15,7 @@
     <header class="app-header">
       <div class="title-block">
         <h1>SHRI - Tools</h1>
-        <p>Rinomina file e cartelle rispettando gli standard.</p>
+        <p>Rinomina automatizzata e guidata di file e cartelle rispettando gli standard.. e altri tools</p>
       </div>
       <div class="header-actions">
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
@@ -55,27 +55,76 @@
               <div id="mediaInfoBadge" class="status status-slot hidden">MediaInfo</div>
             </div>
           </div>
-          <div class="row">
+          <div class="row format-row" id="formatRow">
             <div class="field manual-field">
               <label for="formatSelect">Formato</label>
-              <select id="formatSelect">
-                <option value="WEB-DL">WEB-DL</option>
-                <option value="WEBRip">WEBRip</option>
-                <option value="Encode">Encode</option>
-                <option value="Remux">Remux</option>
-                <option value="Full Disc">Full Disc</option>
-              </select>
+              <div class="dropdown down" id="formatDropdown">
+                <button id="formatSelectBtn" class="dropdown-trigger" type="button">WEB-DL</button>
+                <div class="dropdown-menu" id="formatDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="WEB-DL">WEB-DL</button>
+                  <button class="dropdown-item" type="button" data-value="WEBRip">WEBRip</button>
+                  <button class="dropdown-item" type="button" data-value="Encode">Encode</button>
+                  <button class="dropdown-item" type="button" data-value="Remux">Remux</button>
+                  <button class="dropdown-item" type="button" data-value="Full Disc">Full Disc</button>
+                </div>
+                <input id="formatSelect" type="hidden" value="WEB-DL" />
+              </div>
+            </div>
+            <div class="field manual-field" id="sourceGroup">
+              <label for="sourceInput">Sorgente</label>
+              <div class="dropdown down" id="sourceDropdown">
+                <button id="sourceInputBtn" class="dropdown-trigger" type="button">Seleziona sorgente</button>
+                <div class="dropdown-menu" id="sourceDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="">Seleziona sorgente</button>
+                  <button class="dropdown-item" type="button" data-value="BluRay">BluRay</button>
+                  <button class="dropdown-item" type="button" data-value="UHD BluRay">UHD BluRay</button>
+                  <button class="dropdown-item" type="button" data-value="DVD">DVD</button>
+                  <button class="dropdown-item" type="button" data-value="HDTV">HDTV</button>
+                </div>
+                <input id="sourceInput" type="hidden" value="" />
+              </div>
+            </div>
+            <div class="field manual-field" id="serviceGroup">
+              <label for="serviceInput">Servizio</label>
+              <div class="dropdown down" id="serviceDropdown">
+                <button id="serviceInputBtn" class="dropdown-trigger" type="button">Seleziona servizio</button>
+                <div class="dropdown-menu" id="serviceDropdownMenu"></div>
+                <input id="serviceInput" type="hidden" value="" />
+              </div>
             </div>
             <div class="field">
               <label for="resolutionInput">Risoluzione</label>
-              <input id="resolutionInput" type="text" placeholder="2160p" />
+              <div class="dropdown down" id="resolutionDropdown">
+                <button id="resolutionSelectBtn" class="dropdown-trigger" type="button">Seleziona risoluzione</button>
+                <div class="dropdown-menu" id="resolutionDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="">Seleziona risoluzione</button>
+                  <button class="dropdown-item" type="button" data-value="2160p">2160p</button>
+                  <button class="dropdown-item" type="button" data-value="1080p">1080p</button>
+                  <button class="dropdown-item" type="button" data-value="720p">720p</button>
+                  <button class="dropdown-item" type="button" data-value="576p">576p</button>
+                  <button class="dropdown-item" type="button" data-value="480p">480p</button>
+                </div>
+                <input id="resolutionInput" type="hidden" value="" />
+              </div>
             </div>
             <div class="field">
               <label for="videoCodecInput">Codec video</label>
-              <input id="videoCodecInput" type="text" placeholder="H.265 / x265 / HEVC" />
+              <div class="dropdown down" id="videoCodecDropdown">
+                <button id="videoCodecSelectBtn" class="dropdown-trigger" type="button">Seleziona codec</button>
+                <div class="dropdown-menu" id="videoCodecDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="">Seleziona codec</button>
+                  <button class="dropdown-item" type="button" data-value="H.265">H.265</button>
+                  <button class="dropdown-item" type="button" data-value="x265">x265</button>
+                  <button class="dropdown-item" type="button" data-value="HEVC">HEVC</button>
+                  <button class="dropdown-item" type="button" data-value="H.264">H.264</button>
+                  <button class="dropdown-item" type="button" data-value="x264">x264</button>
+                  <button class="dropdown-item" type="button" data-value="AV1">AV1</button>
+                </div>
+                <input id="videoCodecInput" type="hidden" value="" />
+              </div>
             </div>
           </div>
-          <div class="row release-row">
+          <div class="row flags-row">
             <label class="checkbox"><input id="uhdCheckbox" type="checkbox" />UHD</label>
             <label class="checkbox"><input id="hdrCheckbox" type="checkbox" />HDR</label>
             <label class="checkbox"><input id="hdr10plusCheckbox" type="checkbox" />HDR10+</label>
@@ -93,11 +142,36 @@
             </div>
             <div class="field">
               <label for="audioCodecInput">Codec audio</label>
-              <input id="audioCodecInput" type="text" placeholder="DD+ / TrueHD" />
+              <div class="dropdown down" id="audioCodecDropdown">
+                <button id="audioCodecSelectBtn" class="dropdown-trigger" type="button">Seleziona codec</button>
+                <div class="dropdown-menu" id="audioCodecDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="">Seleziona codec</button>
+                  <button class="dropdown-item" type="button" data-value="DD+">DD+</button>
+                  <button class="dropdown-item" type="button" data-value="DD">DD</button>
+                  <button class="dropdown-item" type="button" data-value="DTS">DTS</button>
+                  <button class="dropdown-item" type="button" data-value="DTS-HD MA">DTS-HD MA</button>
+                  <button class="dropdown-item" type="button" data-value="TrueHD">TrueHD</button>
+                  <button class="dropdown-item" type="button" data-value="AAC">AAC</button>
+                  <button class="dropdown-item" type="button" data-value="FLAC">FLAC</button>
+                  <button class="dropdown-item" type="button" data-value="AC3">AC3</button>
+                  <button class="dropdown-item" type="button" data-value="EAC3">EAC3</button>
+                </div>
+                <input id="audioCodecInput" type="hidden" value="" />
+              </div>
             </div>
             <div class="field">
               <label for="audioChannelsInput">Canali</label>
-              <input id="audioChannelsInput" type="text" placeholder="5.1" />
+              <div class="dropdown down" id="audioChannelsDropdown">
+                <button id="audioChannelsSelectBtn" class="dropdown-trigger" type="button">Seleziona canali</button>
+                <div class="dropdown-menu" id="audioChannelsDropdownMenu">
+                  <button class="dropdown-item" type="button" data-value="">Seleziona canali</button>
+                  <button class="dropdown-item" type="button" data-value="7.1">7.1</button>
+                  <button class="dropdown-item" type="button" data-value="5.1">5.1</button>
+                  <button class="dropdown-item" type="button" data-value="2.0">2.0</button>
+                  <button class="dropdown-item" type="button" data-value="1.0">1.0</button>
+                </div>
+                <input id="audioChannelsInput" type="hidden" value="" />
+              </div>
             </div>
             <div class="field">
               <label for="audioMetaInput">Meta</label>
@@ -105,61 +179,42 @@
             </div>
           </div>
           <div id="audioLangHint" class="hint">Lingue audio rilevate: -</div>
-          <div class="row">
-            <div class="field manual-field">
-              <label for="editionInput">Edizione</label>
-              <input id="editionInput" type="text" placeholder="IMAX / Extended" />
+          <div class="row edition-row">
+            <div class="edition-left">
+              <div class="field manual-field">
+                <label for="editionInput">Edizione</label>
+                <input id="editionInput" type="text" placeholder="IMAX / Extended" />
+              </div>
+              <div class="field manual-field checkbox-field">
+                <label>&nbsp;</label>
+                <label class="checkbox"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
+              </div>
             </div>
-            <div class="field manual-field checkbox-field">
-              <label>&nbsp;</label>
-              <label class="checkbox"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
-            </div>
-            <div class="field manual-field">
-              <label for="repackSelect">Repack</label>
-              <div class="dropdown" id="repackDropdown">
-                <button id="repackSelectBtn" class="dropdown-trigger" type="button">Nessuno</button>
-                <div class="dropdown-menu">
-                  <button class="dropdown-item" type="button" data-value="">Nessuno</button>
-                  <button class="dropdown-item" type="button" data-value="REPACK">REPACK</button>
-                  <button class="dropdown-item" type="button" data-value="PROPER">PROPER</button>
-                  <button class="dropdown-item" type="button" data-value="RERIP">RERIP</button>
+            <div class="edition-right">
+              <div class="field manual-field">
+                <label for="repackSelect">Repack</label>
+                <div class="dropdown" id="repackDropdown">
+                  <button id="repackSelectBtn" class="dropdown-trigger" type="button">Nessuno</button>
+                  <div class="dropdown-menu">
+                    <button class="dropdown-item" type="button" data-value="">Nessuno</button>
+                    <button class="dropdown-item" type="button" data-value="REPACK">REPACK</button>
+                    <button class="dropdown-item" type="button" data-value="PROPER">PROPER</button>
+                    <button class="dropdown-item" type="button" data-value="RERIP">RERIP</button>
+                  </div>
+                  <input id="repackSelect" type="hidden" value="" />
                 </div>
-                <input id="repackSelect" type="hidden" value="" />
               </div>
-            </div>
-            <div class="field manual-field" id="serviceGroup">
-              <label for="serviceInput">Servizio</label>
-              <div class="dropdown" id="serviceDropdown">
-                <button id="serviceInputBtn" class="dropdown-trigger" type="button">Seleziona servizio</button>
-                <div class="dropdown-menu" id="serviceDropdownMenu"></div>
-                <input id="serviceInput" type="hidden" value="" />
+              <div class="field manual-field" id="regionWrapper">
+                <label for="regionInput">Regione</label>
+                <input id="regionInput" type="text" placeholder="EUR / USA / IT" />
               </div>
-            </div>
-            <div class="field manual-field" id="sourceGroup">
-              <label for="sourceInput">Sorgente</label>
-              <div class="dropdown" id="sourceDropdown">
-                <button id="sourceInputBtn" class="dropdown-trigger" type="button">Seleziona sorgente</button>
-                <div class="dropdown-menu" id="sourceDropdownMenu">
-                  <button class="dropdown-item" type="button" data-value="">Seleziona sorgente</button>
-                  <button class="dropdown-item" type="button" data-value="BluRay">BluRay</button>
-                  <button class="dropdown-item" type="button" data-value="UHD BluRay">UHD BluRay</button>
-                  <button class="dropdown-item" type="button" data-value="DVD">DVD</button>
-                  <button class="dropdown-item" type="button" data-value="HDTV">HDTV</button>
-                  <button class="dropdown-item" type="button" data-value="WEB">WEB</button>
+              <div class="field manual-field">
+                <label for="tagInput">Tag gruppo</label>
+                <div class="dropdown" id="tagDropdown">
+                  <button id="tagInputBtn" class="dropdown-trigger" type="button">Seleziona tag gruppo</button>
+                  <div class="dropdown-menu" id="tagDropdownMenu"></div>
+                  <input id="tagInput" type="hidden" value="" />
                 </div>
-                <input id="sourceInput" type="hidden" value="" />
-              </div>
-            </div>
-            <div class="field manual-field" id="regionWrapper">
-              <label for="regionInput">Regione</label>
-              <input id="regionInput" type="text" placeholder="EUR / USA / IT" />
-            </div>
-            <div class="field manual-field">
-              <label for="tagInput">Tag gruppo</label>
-              <div class="dropdown" id="tagDropdown">
-                <button id="tagInputBtn" class="dropdown-trigger" type="button">Seleziona tag gruppo</button>
-                <div class="dropdown-menu" id="tagDropdownMenu"></div>
-                <input id="tagInput" type="hidden" value="" />
               </div>
             </div>
           </div>
@@ -262,10 +317,6 @@
             <div id="folderNamePreview" class="preview">-</div>
           </div>
           <div class="preview-block">
-            <div class="label">Nome base file</div>
-            <div id="baseNamePreview" class="preview">-</div>
-          </div>
-          <div class="preview-block">
             <div class="label">Esempio file</div>
             <div id="fileNamePreview" class="preview">-</div>
           </div>
@@ -287,19 +338,20 @@
         <h2>Impostazioni</h2>
         <button id="closeSettingsBtn" class="secondary">Chiudi</button>
       </div>
-      <div class="row">
+      <div class="row settings-grid">
         <div class="field">
           <label for="serviceListInput">Servizi personalizzati (uno per riga, es. Amazon=AMZN)</label>
           <textarea id="serviceListInput" rows="3" placeholder="Es. Amazon=AMZN"></textarea>
         </div>
         <div class="field">
-          <label for="tagListInput">Tag gruppo salvati (uno per riga)</label>
+          <label for="tagListInput">Aggiungi Tag gruppo (uno per riga)</label>
           <textarea id="tagListInput" rows="3" placeholder="Es. iSlaNd"></textarea>
-          <div class="settings-checkbox">
+          <div class="settings-checkbox settings-row">
             <label class="checkbox">
               <input id="autoTagDetectToggle" type="checkbox" checked />
-              Rileva e usa tag gruppo in automatico
+              Rilevazione autom. gruppi
             </label>
+            <button id="openGroupDefaultsBtn" class="secondary small" type="button">Gruppi default</button>
           </div>
         </div>
       </div>
@@ -415,6 +467,38 @@
       <div id="rulesContent" class="rules-content"></div>
     </div>
   </div>
+
+  <div id="groupDefaultsModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Gruppi default</h2>
+        <button id="closeGroupDefaultsBtn" class="secondary">Chiudi</button>
+      </div>
+      <div id="groupDefaultsHint" class="hint">
+        Questi gruppi servono solo per la rilevazione automatica. Nel menu a tendina compaiono
+        solo i tag che aggiungi nelle Impostazioni.
+        Seleziona i badge qui sotto per aggiungerli o rimuoverli dalla lista dei tuoi tag.
+      </div>
+      <div id="groupDefaultsList" class="group-list"></div>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Conferma</h2>
+      </div>
+      <div id="confirmMessage" class="confirm-text"></div>
+      <div class="confirm-actions">
+        <button id="confirmCancelBtn" class="secondary">Annulla</button>
+        <button id="confirmOkBtn" class="primary">Procedi</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
 
   <script src="renderer.js"></script>
 </body>
