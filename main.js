@@ -1049,7 +1049,14 @@ async function tvdbFetchEpisodes(seriesId, token, language) {
 
   while (hasNext && safety < 50) {
     const data = await tvdbRequest(`/series/${seriesId}/episodes/default?page=${page}`, token, language);
-    const pageEpisodes = Array.isArray(data?.data) ? data.data : [];
+    const dataNode = data?.data;
+    const pageEpisodes = Array.isArray(dataNode)
+      ? dataNode
+      : Array.isArray(dataNode?.episodes)
+        ? dataNode.episodes
+        : Array.isArray(dataNode?.items)
+          ? dataNode.items
+          : [];
     episodes.push(...pageEpisodes);
     debug.pages += 1;
     debug.pageSizes.push(pageEpisodes.length);
