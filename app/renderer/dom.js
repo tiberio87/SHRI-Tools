@@ -15,6 +15,8 @@ export const ui = {
   mediaInfoPath: document.getElementById('mediaInfoPath'),
   closeMediaInfoBtn: document.getElementById('closeMediaInfoBtn'),
   formatRow: document.getElementById('formatRow'),
+  formatSuggestRow: document.getElementById('formatSuggestRow'),
+  formatSuggestText: document.getElementById('formatSuggestText'),
   openDebugBtn: document.getElementById('openDebugBtn'),
   debugModal: document.getElementById('debugModal'),
   debugLogText: document.getElementById('debugLogText'),

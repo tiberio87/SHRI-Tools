@@ -845,6 +845,78 @@ function applyFormatSuggestion(suggested) {
   setDropdownAuto(select, trigger, suggested, suggested);
 }
 
+function detectFormatFromName(name) {
+  const upper = String(name || '').toUpperCase();
+  if (/\bWEB[-.\s]?DL\b/.test(upper) || /\bWEBDL\b/.test(upper)) {
+    return 'WEB-DL';
+  }
+  if (/\bWEB[-.\s]?RIP\b/.test(upper) || /\bWEBRIP\b/.test(upper)) {
+    return 'WEBRip';
+  }
+  if (/\bREMUX\b/.test(upper)) {
+    return 'Remux';
+  }
+  if (/\bFULL\s*DISC\b/.test(upper) || /\bBDMV\b/.test(upper) || /\bBDISO\b/.test(upper)) {
+    return 'Full Disc';
+  }
+  if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper) || /\bUHD\b/.test(upper)) {
+    return 'Encode';
+  }
+  return '';
+}
+
+function extractTokensPresent(name, tokens) {
+  const matches = [];
+  const safeName = String(name || '');
+  for (const token of tokens) {
+    if (!token) {
+      continue;
+    }
+    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+    if (regex.test(safeName)) {
+      matches.push(token);
+    }
+  }
+  return matches;
+}
+
+function updateFormatServiceSuggest() {
+  if (!ui.formatSuggestRow || !ui.formatSuggestText) {
+    return;
+  }
+  if (!state.targetPath) {
+    ui.formatSuggestRow.classList.add('hidden');
+    ui.formatSuggestText.textContent = '';
+    return;
+  }
+  const basePath = state.mainVideo || state.videoFiles?.[0] || state.targetPath;
+  const baseName = basePath ? stripExtension(getPathBaseName(basePath)) : '';
+  if (!baseName) {
+    ui.formatSuggestRow.classList.add('hidden');
+    ui.formatSuggestText.textContent = '';
+    return;
+  }
+  const settings = getSettings();
+  const format = detectFormatFromName(baseName);
+  const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
+  const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
+  if (!format && !service) {
+    ui.formatSuggestRow.classList.add('hidden');
+    ui.formatSuggestText.textContent = '';
+    return;
+  }
+  const parts = [];
+  if (format) {
+    parts.push(format);
+  }
+  if (service) {
+    parts.push(service);
+  }
+  ui.formatSuggestText.innerHTML = `Suggerito dal nome: <span class="suggest-strong">${parts.join(' · ')}</span>`;
+  ui.formatSuggestRow.classList.remove('hidden');
+}
+
 const metadataTools = createMetadataTools({
   state,
   ui,
@@ -1115,6 +1187,7 @@ async function updateRenamePlan() {
 
 async function refreshPreview() {
   updateVisibility();
+  updateFormatServiceSuggest();
   await updateRenamePlan();
 }
 

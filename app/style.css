@@ -788,6 +788,19 @@ button:disabled {
   color: var(--muted);
 }
 
+.format-suggest-row {
+  margin-top: 4px;
+}
+
+.format-suggest-row .hint {
+  font-size: 11px;
+}
+
+.format-suggest-row .suggest-strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 #fetchStatus {
   font-size: 12px;
 }
