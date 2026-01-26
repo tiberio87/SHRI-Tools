@@ -54,6 +54,7 @@ export function createUploadKit(deps) {
   let uploadTitleSourcePath = '';
   let lastUploadDownloadUrl = '';
   let lastTrackerTorrentPath = '';
+  let reopenMode = false;
 
   function getHdrLabelFromForm(form) {
     const tokens = [];
@@ -239,6 +240,22 @@ export function createUploadKit(deps) {
     return `${protocol}://${hostPart}${suffix}`;
   }
 
+  function buildTransmissionBaseUrl(settings) {
+    const hostRaw = String(settings?.transmissionHost || '').trim();
+    if (!hostRaw) {
+      return '';
+    }
+    if (/^https?:\/\//i.test(hostRaw)) {
+      return hostRaw.replace(/\/+$/, '');
+    }
+    const protocol = settings?.transmissionHttps ? 'https' : 'http';
+    const hostPart = hostRaw.replace(/\/+$/, '');
+    const hasPort = /:\d+$/.test(hostPart);
+    const port = String(settings?.transmissionPort || '').trim();
+    const suffix = port && !hasPort ? `:${port}` : '';
+    return `${protocol}://${hostPart}${suffix}`;
+  }
+
   function applyPathMapping(pathValue, localRoot, remoteRoot) {
     const source = String(pathValue || '').trim();
     const local = String(localRoot || '').trim();
@@ -262,10 +279,13 @@ export function createUploadKit(deps) {
     return `${remoteTrimmed}${remoteSep}${normalizedRemainder}`;
   }
 
-  function resolveClientSavePath(settings) {
+  function resolveClientSavePath(settings, client) {
+    const useTransmission = client === 'transmission';
     let basePath = '';
-    if (settings?.qbitSavePath) {
-      basePath = String(settings.qbitSavePath).trim();
+    const explicitSavePath = useTransmission ? settings?.transmissionSavePath : settings?.qbitSavePath;
+    const hasExplicitSavePath = Boolean(explicitSavePath);
+    if (explicitSavePath) {
+      basePath = String(explicitSavePath).trim();
     } else if (state.kind === 'dir') {
       basePath = getParentPath(state.targetPath);
     } else {
@@ -274,12 +294,27 @@ export function createUploadKit(deps) {
     if (!basePath) {
       return '';
     }
-    const localMap = String(settings?.qbitPathMapLocal || '').trim();
-    const remoteMap = String(settings?.qbitPathMapRemote || '').trim();
+    if (hasExplicitSavePath) {
+      return basePath;
+    }
+    const localMap = String(
+      useTransmission ? settings?.transmissionPathMapLocal : settings?.qbitPathMapLocal || ''
+    ).trim();
+    const remoteMap = String(
+      useTransmission ? settings?.transmissionPathMapRemote : settings?.qbitPathMapRemote || ''
+    ).trim();
     if (localMap && remoteMap) {
       return applyPathMapping(basePath, localMap, remoteMap);
     }
     return basePath;
+  }
+
+  function hasClientSavePath(settings) {
+    const client = settings?.torrentClient || 'qbit';
+    if (client === 'transmission') {
+      return Boolean(settings?.transmissionSavePath);
+    }
+    return Boolean(settings?.qbitSavePath);
   }
 
   function extractDownloadUrl(result) {
@@ -306,12 +341,17 @@ export function createUploadKit(deps) {
   }
 
   function canSendToClient(settings) {
-    const hasCreds = Boolean(
-      settings?.qbitHost &&
-      settings?.qbitUsername &&
-      settings?.qbitPassword
-    );
-    return hasCreds && Boolean(lastTrackerTorrentPath);
+    const client = settings?.torrentClient || 'qbit';
+    if (!lastTrackerTorrentPath) {
+      return false;
+    }
+    if (reopenMode && !hasClientSavePath(settings)) {
+      return false;
+    }
+    if (client === 'transmission') {
+      return Boolean(settings?.transmissionHost);
+    }
+    return Boolean(settings?.qbitHost && settings?.qbitUsername && settings?.qbitPassword);
   }
 
   function buildTrackerOutputDir(settings) {
@@ -328,6 +368,7 @@ export function createUploadKit(deps) {
     if (!ui.postUploadModal) {
       return;
     }
+    reopenMode = false;
     lastUploadDownloadUrl = extractDownloadUrl(result);
     const outputDir = buildTrackerOutputDir(settings);
     if (ui.downloadTrackerTorrentBtn) {
@@ -352,10 +393,12 @@ export function createUploadKit(deps) {
   function openLastUploadModal() {
     const last = readLastUpload();
     if (!last) {
+      reopenMode = false;
       showToast('Nessun upload recente.');
       updateReopenUploadButton();
       return;
     }
+    reopenMode = true;
     const settings = loadSettings();
     lastUploadDownloadUrl = last.downloadUrl || '';
     lastTrackerTorrentPath = last.torrentPath || '';
@@ -373,7 +416,10 @@ export function createUploadKit(deps) {
     const titleLabel = last.title ? `Ultimo upload: ${last.title}` : 'Ultimo upload';
     const hintParts = [titleLabel, timeLabel].filter(Boolean);
     const baseHint = hintParts.join(' · ');
-    if (!outputDir) {
+    const savePathMissing = !hasClientSavePath(settings);
+    if (savePathMissing) {
+      setPostUploadHint(`${baseHint} | Imposta un Save path nelle impostazioni per riaprire l'ultimo upload.`);
+    } else if (!outputDir) {
       setPostUploadHint(`${baseHint} | Imposta la cartella output .torrent nelle impostazioni.`);
     } else if (!lastUploadDownloadUrl) {
       setPostUploadHint(`${baseHint} | URL di download non disponibile nella risposta del tracker.`);
@@ -465,25 +511,44 @@ export function createUploadKit(deps) {
       showToast('Scarica prima il .torrent del tracker.');
       return;
     }
-    if (!settings.qbitHost || !settings.qbitUsername || !settings.qbitPassword) {
-      showToast('Configura qBittorrent nelle Impostazioni avanzate.');
+    const client = settings?.torrentClient || 'qbit';
+    const isTransmission = client === 'transmission';
+    if (!isTransmission && (!settings.qbitHost || !settings.qbitUsername || !settings.qbitPassword)) {
+      showToast('Configura qBittorrent nelle Impostazioni.');
       return;
     }
-    if ((settings.qbitPathMapLocal && !settings.qbitPathMapRemote) || (!settings.qbitPathMapLocal && settings.qbitPathMapRemote)) {
+    if (isTransmission && !settings.transmissionHost) {
+      showToast('Configura Transmission nelle Impostazioni.');
+      return;
+    }
+    if (reopenMode && !hasClientSavePath(settings)) {
+      showToast('Imposta un Save path nelle impostazioni per riaprire l\'ultimo upload.');
+      return;
+    }
+    const mapLocal = isTransmission ? settings.transmissionPathMapLocal : settings.qbitPathMapLocal;
+    const mapRemote = isTransmission ? settings.transmissionPathMapRemote : settings.qbitPathMapRemote;
+    const hasSavePathSetting = Boolean(
+      isTransmission ? settings.transmissionSavePath : settings.qbitSavePath
+    );
+    if (!hasSavePathSetting && ((mapLocal && !mapRemote) || (!mapLocal && mapRemote))) {
       showToast('Completa il mapping locale/remoto (entrambi i campi).');
       return;
     }
-    const baseUrl = buildQbitBaseUrl(settings);
+    const baseUrl = isTransmission ? buildTransmissionBaseUrl(settings) : buildQbitBaseUrl(settings);
     if (!baseUrl) {
-      showToast('Host qBittorrent non valido.');
+      showToast(isTransmission ? 'Host Transmission non valido.' : 'Host qBittorrent non valido.');
       return;
     }
-    const savePath = resolveClientSavePath(settings);
+    const savePath = resolveClientSavePath(settings, client);
     if (!savePath) {
       showToast('Percorso dati non valido.');
       return;
     }
-    if (!window.api?.qbitAddTorrent) {
+    if (isTransmission && !window.api?.transmissionAddTorrent) {
+      showToast('Invio al client non disponibile.');
+      return;
+    }
+    if (!isTransmission && !window.api?.qbitAddTorrent) {
       showToast('Invio al client non disponibile.');
       return;
     }
@@ -491,22 +556,40 @@ export function createUploadKit(deps) {
       ui.sendToClientBtn.disabled = true;
     }
     try {
-      const result = await window.api.qbitAddTorrent({
-        baseUrl,
-        username: settings.qbitUsername,
-        password: settings.qbitPassword,
-        torrentPath: lastTrackerTorrentPath,
-        savePath,
-        category: settings.qbitCategory || '',
-        paused: settings.qbitAutoStart === false
-      });
-      logDebug?.('qbit add payload', {
-        baseUrl,
-        savePath,
-        category: settings.qbitCategory || '',
-        paused: settings.qbitAutoStart === false
-      });
-      logDebug?.('qbit add response', result);
+      let result;
+      if (isTransmission) {
+        result = await window.api.transmissionAddTorrent({
+          baseUrl,
+          username: settings.transmissionUsername,
+          password: settings.transmissionPassword,
+          torrentPath: lastTrackerTorrentPath,
+          savePath,
+          paused: settings.transmissionAutoStart === false
+        });
+        logDebug?.('transmission add payload', {
+          baseUrl,
+          savePath,
+          paused: settings.transmissionAutoStart === false
+        });
+        logDebug?.('transmission add response', result);
+      } else {
+        result = await window.api.qbitAddTorrent({
+          baseUrl,
+          username: settings.qbitUsername,
+          password: settings.qbitPassword,
+          torrentPath: lastTrackerTorrentPath,
+          savePath,
+          category: settings.qbitCategory || '',
+          paused: settings.qbitAutoStart === false
+        });
+        logDebug?.('qbit add payload', {
+          baseUrl,
+          savePath,
+          category: settings.qbitCategory || '',
+          paused: settings.qbitAutoStart === false
+        });
+        logDebug?.('qbit add response', result);
+      }
       if (result?.ok) {
         showToast('Torrent inviato al client.');
         setPostUploadHint(`Inviato al client: ${result?.message || 'OK'}`);

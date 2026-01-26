@@ -26,6 +26,7 @@ const DEFAULT_SETTINGS = {
   unit3dCategoryOverrides: '',
   unit3dTypeOverrides: '',
   unit3dResolutionOverrides: '',
+  torrentClient: 'qbit',
   qbitHost: '',
   qbitPort: '',
   qbitUsername: '',
@@ -35,7 +36,16 @@ const DEFAULT_SETTINGS = {
   qbitCategory: '',
   qbitAutoStart: true,
   qbitPathMapLocal: '',
-  qbitPathMapRemote: ''
+  qbitPathMapRemote: '',
+  transmissionHost: '',
+  transmissionPort: '',
+  transmissionUsername: '',
+  transmissionPassword: '',
+  transmissionHttps: false,
+  transmissionSavePath: '',
+  transmissionAutoStart: true,
+  transmissionPathMapLocal: '',
+  transmissionPathMapRemote: ''
 };
 
 export function createSettingsTools({
@@ -110,18 +120,46 @@ export function createSettingsTools({
   }
 
   function updateQbitMappingHint(settings) {
-    const savePath = String(settings?.qbitSavePath || '').trim();
+    const client = settings?.torrentClient || 'qbit';
+    const isTransmission = client === 'transmission';
+    const savePath = isTransmission
+      ? String(settings?.transmissionSavePath || '').trim()
+      : String(settings?.qbitSavePath || '').trim();
     const disableMapping = Boolean(savePath);
     if (ui.qbitPathMapLocalInput) {
-      ui.qbitPathMapLocalInput.disabled = disableMapping;
+      ui.qbitPathMapLocalInput.disabled = !isTransmission && disableMapping;
     }
     if (ui.qbitPathMapRemoteInput) {
-      ui.qbitPathMapRemoteInput.disabled = disableMapping;
+      ui.qbitPathMapRemoteInput.disabled = !isTransmission && disableMapping;
+    }
+    if (ui.transmissionPathMapLocalInput) {
+      ui.transmissionPathMapLocalInput.disabled = isTransmission && disableMapping;
+    }
+    if (ui.transmissionPathMapRemoteInput) {
+      ui.transmissionPathMapRemoteInput.disabled = isTransmission && disableMapping;
     }
     if (ui.qbitMappingHint) {
       ui.qbitMappingHint.textContent = disableMapping
         ? 'Mapping ignorato quando Save path è impostato.'
         : "Usa il mapping solo se il client gira su un'altra macchina.";
+    }
+    if (ui.transmissionMappingHint) {
+      ui.transmissionMappingHint.textContent = disableMapping
+        ? 'Mapping ignorato quando Save path è impostato.'
+        : "Usa il mapping solo se il client gira su un'altra macchina.";
+    }
+  }
+
+  function updateClientSections(settings) {
+    const client = settings?.torrentClient || 'qbit';
+    if (ui.torrentClientSelect) {
+      ui.torrentClientSelect.value = client;
+    }
+    if (ui.qbitSettingsSection) {
+      ui.qbitSettingsSection.classList.toggle('hidden', client !== 'qbit');
+    }
+    if (ui.transmissionSettingsSection) {
+      ui.transmissionSettingsSection.classList.toggle('hidden', client !== 'transmission');
     }
   }
 
@@ -259,6 +297,10 @@ export function createSettingsTools({
     if (ui.unit3dResolutionOverridesInput) {
       ui.unit3dResolutionOverridesInput.value = settings.unit3dResolutionOverrides || '';
     }
+    if (ui.torrentClientSelect) {
+      ui.torrentClientSelect.value = settings.torrentClient || 'qbit';
+    }
+    updateClientSections(settings);
     if (ui.qbitHostInput) {
       ui.qbitHostInput.value = settings.qbitHost || '';
     }
@@ -288,6 +330,33 @@ export function createSettingsTools({
     }
     if (ui.qbitPathMapRemoteInput) {
       ui.qbitPathMapRemoteInput.value = settings.qbitPathMapRemote || '';
+    }
+    if (ui.transmissionHostInput) {
+      ui.transmissionHostInput.value = settings.transmissionHost || '';
+    }
+    if (ui.transmissionPortInput) {
+      ui.transmissionPortInput.value = settings.transmissionPort || '';
+    }
+    if (ui.transmissionUsernameInput) {
+      ui.transmissionUsernameInput.value = settings.transmissionUsername || '';
+    }
+    if (ui.transmissionPasswordInput) {
+      ui.transmissionPasswordInput.value = settings.transmissionPassword || '';
+    }
+    if (ui.transmissionHttpsToggle) {
+      ui.transmissionHttpsToggle.checked = settings.transmissionHttps === true;
+    }
+    if (ui.transmissionSavePathInput) {
+      ui.transmissionSavePathInput.value = settings.transmissionSavePath || '';
+    }
+    if (ui.transmissionAutoStartToggle) {
+      ui.transmissionAutoStartToggle.checked = settings.transmissionAutoStart !== false;
+    }
+    if (ui.transmissionPathMapLocalInput) {
+      ui.transmissionPathMapLocalInput.value = settings.transmissionPathMapLocal || '';
+    }
+    if (ui.transmissionPathMapRemoteInput) {
+      ui.transmissionPathMapRemoteInput.value = settings.transmissionPathMapRemote || '';
     }
     updateQbitMappingHint(settings);
     if (ui.settingsAnnounceInput) {
@@ -341,6 +410,7 @@ export function createSettingsTools({
       unit3dCategoryOverrides: ui.unit3dCategoryOverridesInput?.value.trim() || '',
       unit3dTypeOverrides: ui.unit3dTypeOverridesInput?.value.trim() || '',
       unit3dResolutionOverrides: ui.unit3dResolutionOverridesInput?.value.trim() || '',
+      torrentClient: ui.torrentClientSelect?.value || 'qbit',
       qbitHost: ui.qbitHostInput?.value.trim() || '',
       qbitPort: ui.qbitPortInput?.value.trim() || '',
       qbitUsername: ui.qbitUsernameInput?.value.trim() || '',
@@ -351,6 +421,15 @@ export function createSettingsTools({
       qbitAutoStart: Boolean(ui.qbitAutoStartToggle?.checked),
       qbitPathMapLocal: ui.qbitPathMapLocalInput?.value.trim() || '',
       qbitPathMapRemote: ui.qbitPathMapRemoteInput?.value.trim() || '',
+      transmissionHost: ui.transmissionHostInput?.value.trim() || '',
+      transmissionPort: ui.transmissionPortInput?.value.trim() || '',
+      transmissionUsername: ui.transmissionUsernameInput?.value.trim() || '',
+      transmissionPassword: ui.transmissionPasswordInput?.value.trim() || '',
+      transmissionHttps: Boolean(ui.transmissionHttpsToggle?.checked),
+      transmissionSavePath: ui.transmissionSavePathInput?.value.trim() || '',
+      transmissionAutoStart: Boolean(ui.transmissionAutoStartToggle?.checked),
+      transmissionPathMapLocal: ui.transmissionPathMapLocalInput?.value.trim() || '',
+      transmissionPathMapRemote: ui.transmissionPathMapRemoteInput?.value.trim() || '',
       torrentPasskey: passkey,
       torrentAnnounceUrl: announceUrl,
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
@@ -366,6 +445,7 @@ export function createSettingsTools({
     saveSettings,
     updateFfmpegHint,
     updateQbitMappingHint,
+    updateClientSections,
     buildAppHealthStatus,
     updateAppHealthStatus,
     applySettingsToUI,

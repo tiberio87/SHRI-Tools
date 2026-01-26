@@ -398,6 +398,10 @@ body:not(.light) .theme-toggle .icon-moon {
   margin-left: auto;
 }
 
+.client-section {
+  margin-top: 8px;
+}
+
 .edition-row {
   grid-template-columns: max-content 1fr;
   align-items: start;

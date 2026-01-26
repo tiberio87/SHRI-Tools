@@ -547,71 +547,147 @@
       <div class="row">
         <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
       </div>
-      <h3 class="settings-title">Client torrent (qBittorrent)</h3>
+      <h3 class="settings-title">Client torrent</h3>
       <div class="row settings-grid">
         <div class="field">
-          <label for="qbitHostInput">Host / IP</label>
-          <input id="qbitHostInput" type="text" placeholder="127.0.0.1" />
-        </div>
-        <div class="field">
-          <label for="qbitPortInput">Porta WebUI</label>
-          <input id="qbitPortInput" type="number" min="1" max="65535" placeholder="8080" />
+          <label for="torrentClientSelect">Client</label>
+          <select id="torrentClientSelect">
+            <option value="qbit">qBittorrent</option>
+            <option value="transmission">Transmission</option>
+          </select>
         </div>
       </div>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="qbitUsernameInput">Username</label>
-          <input id="qbitUsernameInput" type="text" placeholder="admin" />
-        </div>
-        <div class="field">
-          <label for="qbitPasswordInput">Password</label>
-          <div class="input-with-icon">
-            <input id="qbitPasswordInput" type="password" placeholder="Password" />
-            <button class="icon-button" type="button" data-target="qbitPasswordInput" aria-label="Mostra password qBittorrent">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
+
+      <div id="qbitSettingsSection" class="client-section">
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="qbitHostInput">Host / IP</label>
+            <input id="qbitHostInput" type="text" placeholder="127.0.0.1" />
+          </div>
+          <div class="field">
+            <label for="qbitPortInput">Porta WebUI</label>
+            <input id="qbitPortInput" type="number" min="1" max="65535" placeholder="8080" />
           </div>
         </div>
-      </div>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="qbitSavePathInput">Save path (opzionale)</label>
-          <input id="qbitSavePathInput" type="text" placeholder="Es. D:\\Downloads" />
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="qbitUsernameInput">Username</label>
+            <input id="qbitUsernameInput" type="text" placeholder="admin" />
+          </div>
+          <div class="field">
+            <label for="qbitPasswordInput">Password</label>
+            <div class="input-with-icon">
+              <input id="qbitPasswordInput" type="password" placeholder="Password" />
+              <button class="icon-button" type="button" data-target="qbitPasswordInput" aria-label="Mostra password qBittorrent">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
-        <div class="field">
-          <label for="qbitCategoryInput">Categoria/Tag (opzionale)</label>
-          <input id="qbitCategoryInput" type="text" placeholder="Es. SHRI" />
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="qbitSavePathInput">Save path (opzionale)</label>
+            <input id="qbitSavePathInput" type="text" placeholder="Es. D:\\Downloads" />
+          </div>
+          <div class="field">
+            <label for="qbitCategoryInput">Categoria/Tag (opzionale)</label>
+            <input id="qbitCategoryInput" type="text" placeholder="Es. SHRI" />
+          </div>
+        </div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="qbitHttpsToggle" type="checkbox" />
+            Usa HTTPS
+          </label>
+          <label class="checkbox">
+            <input id="qbitAutoStartToggle" type="checkbox" checked />
+            Avvia torrent automaticamente
+          </label>
+        </div>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="qbitPathMapLocalInput">Mapping percorso locale</label>
+            <input id="qbitPathMapLocalInput" type="text" placeholder="Es. Z:\\tv_series" />
+          </div>
+          <div class="field">
+            <label for="qbitPathMapRemoteInput">Mapping percorso remoto</label>
+            <input id="qbitPathMapRemoteInput" type="text" placeholder="Es. /mnt/media/tv_series" />
+          </div>
+        </div>
+        <div class="row">
+          <div id="qbitMappingHint" class="hint">Usa il mapping solo se il client gira su un'altra macchina.</div>
+        </div>
+        <div class="settings-row">
+          <button id="qbitTestBtn" class="secondary small" type="button">Test connessione</button>
+          <div id="qbitTestHint" class="hint"></div>
         </div>
       </div>
-      <div class="row">
-        <label class="checkbox">
-          <input id="qbitHttpsToggle" type="checkbox" />
-          Usa HTTPS
-        </label>
-        <label class="checkbox">
-          <input id="qbitAutoStartToggle" type="checkbox" checked />
-          Avvia torrent automaticamente
-        </label>
-      </div>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="qbitPathMapLocalInput">Mapping percorso locale</label>
-          <input id="qbitPathMapLocalInput" type="text" placeholder="Es. Z:\\tv_series" />
+
+      <div id="transmissionSettingsSection" class="client-section hidden">
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="transmissionHostInput">Host / IP</label>
+            <input id="transmissionHostInput" type="text" placeholder="127.0.0.1" />
+          </div>
+          <div class="field">
+            <label for="transmissionPortInput">Porta RPC</label>
+            <input id="transmissionPortInput" type="number" min="1" max="65535" placeholder="9091" />
+          </div>
         </div>
-        <div class="field">
-          <label for="qbitPathMapRemoteInput">Mapping percorso remoto</label>
-          <input id="qbitPathMapRemoteInput" type="text" placeholder="Es. /mnt/media/tv_series" />
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="transmissionUsernameInput">Username (opzionale)</label>
+            <input id="transmissionUsernameInput" type="text" placeholder="admin" />
+          </div>
+          <div class="field">
+            <label for="transmissionPasswordInput">Password (opzionale)</label>
+            <div class="input-with-icon">
+              <input id="transmissionPasswordInput" type="password" placeholder="Password" />
+              <button class="icon-button" type="button" data-target="transmissionPasswordInput" aria-label="Mostra password Transmission">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="row">
-        <div id="qbitMappingHint" class="hint">Usa il mapping solo se il client gira su un'altra macchina.</div>
-      </div>
-      <div class="settings-row">
-        <button id="qbitTestBtn" class="secondary small" type="button">Test connessione</button>
-        <div id="qbitTestHint" class="hint"></div>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="transmissionSavePathInput">Save path (opzionale)</label>
+            <input id="transmissionSavePathInput" type="text" placeholder="Es. /downloads" />
+          </div>
+        </div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="transmissionHttpsToggle" type="checkbox" />
+            Usa HTTPS
+          </label>
+          <label class="checkbox">
+            <input id="transmissionAutoStartToggle" type="checkbox" checked />
+            Avvia torrent automaticamente
+          </label>
+        </div>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="transmissionPathMapLocalInput">Mapping percorso locale</label>
+            <input id="transmissionPathMapLocalInput" type="text" placeholder="Es. Z:\\tv_series" />
+          </div>
+          <div class="field">
+            <label for="transmissionPathMapRemoteInput">Mapping percorso remoto</label>
+            <input id="transmissionPathMapRemoteInput" type="text" placeholder="Es. /mnt/media/tv_series" />
+          </div>
+        </div>
+        <div class="row">
+          <div id="transmissionMappingHint" class="hint">Usa il mapping solo se il client gira su un'altra macchina.</div>
+        </div>
+        <div class="settings-row">
+          <button id="transmissionTestBtn" class="secondary small" type="button">Test connessione</button>
+          <div id="transmissionTestHint" class="hint"></div>
+        </div>
       </div>
       <div class="settings-footer">
         <div class="settings-footer-left">

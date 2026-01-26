@@ -867,6 +867,7 @@ const {
   saveSettings,
   updateFfmpegHint,
   updateQbitMappingHint,
+  updateClientSections,
   applySettingsToUI,
   getSettings
 } = createSettingsTools({
@@ -1873,6 +1874,43 @@ if (ui.qbitTestBtn) {
   });
 }
 
+if (ui.transmissionTestBtn) {
+  ui.transmissionTestBtn.addEventListener('click', async () => {
+    const settings = getSettings();
+    if (!settings.transmissionHost) {
+      setHint(ui.transmissionTestHint, 'Completa host e porta.');
+      showToast('Configura Transmission prima del test.');
+      return;
+    }
+    if (!window.api?.transmissionTest) {
+      showToast('Test Transmission non disponibile.');
+      return;
+    }
+    ui.transmissionTestBtn.disabled = true;
+    setHint(ui.transmissionTestHint, 'Verifica in corso...');
+    try {
+      const result = await window.api.transmissionTest({
+        host: settings.transmissionHost,
+        port: settings.transmissionPort,
+        https: settings.transmissionHttps,
+        username: settings.transmissionUsername,
+        password: settings.transmissionPassword
+      });
+      if (result?.ok) {
+        const version = result.version ? ` (v${result.version})` : '';
+        setHint(ui.transmissionTestHint, `Connessione OK${version}.`);
+        showToast(`Transmission OK${version}`);
+      } else {
+        const error = result?.error || 'Errore connessione.';
+        setHint(ui.transmissionTestHint, error);
+        showToast(error);
+      }
+    } finally {
+      ui.transmissionTestBtn.disabled = false;
+    }
+  });
+}
+
 ui.languageTagInput.addEventListener('input', () => {
   ui.languageTagInput.dataset.manual = 'true';
 });
@@ -1893,6 +1931,20 @@ if (ui.ffmpegPathInput) {
 if (ui.qbitSavePathInput) {
   ui.qbitSavePathInput.addEventListener('input', () => {
     updateQbitMappingHint({ qbitSavePath: ui.qbitSavePathInput.value.trim() });
+  });
+}
+
+if (ui.transmissionSavePathInput) {
+  ui.transmissionSavePathInput.addEventListener('input', () => {
+    updateQbitMappingHint({ torrentClient: 'transmission', transmissionSavePath: ui.transmissionSavePathInput.value.trim() });
+  });
+}
+
+if (ui.torrentClientSelect) {
+  ui.torrentClientSelect.addEventListener('change', () => {
+    const settings = getSettings();
+    updateClientSections(settings);
+    updateQbitMappingHint(settings);
   });
 }
 

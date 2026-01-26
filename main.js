@@ -44,6 +44,7 @@ const TINY_GIF_BASE64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA
 let mediaInfoInstance = null;
 let mediaInfoTextInstance = null;
 let createTorrentModule = null;
+const transmissionSessions = new Map();
 
 async function getMediaInfo() {
   if (!mediaInfoInstance) {
@@ -443,6 +444,142 @@ async function testQbittorrentConnection({ host, port, https, username, password
     return { ok: false, error: normalizeHttpError(text, response.status) };
   }
   return { ok: true, version: text.trim() };
+}
+
+function buildTransmissionBaseUrl(host, port, useHttps) {
+  const raw = String(host || '').trim();
+  if (!raw) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    const trimmed = raw.replace(/\/+$/, '');
+    if (port && !/:\d+$/.test(trimmed)) {
+      return `${trimmed}:${port}`;
+    }
+    return trimmed;
+  }
+  const protocol = useHttps ? 'https' : 'http';
+  const hostTrim = raw.replace(/\/+$/, '');
+  const hasPort = /:\d+$/.test(hostTrim);
+  const portPart = port && !hasPort ? `:${port}` : '';
+  return `${protocol}://${hostTrim}${portPart}`;
+}
+
+function resolveTransmissionRpcUrl(baseUrl) {
+  const trimmed = String(baseUrl || '').trim().replace(/\/+$/, '');
+  if (!trimmed) {
+    return '';
+  }
+  if (/\/transmission\/rpc$/i.test(trimmed)) {
+    return trimmed;
+  }
+  if (/\/transmission$/i.test(trimmed)) {
+    return `${trimmed}/rpc`;
+  }
+  return `${trimmed}/transmission/rpc`;
+}
+
+async function transmissionRpc({ rpcUrl, username, password, sessionId, body }) {
+  const headers = {
+    'content-type': 'application/json'
+  };
+  if (sessionId) {
+    headers['x-transmission-session-id'] = sessionId;
+  }
+  if (username || password) {
+    const token = Buffer.from(`${username || ''}:${password || ''}`).toString('base64');
+    headers.authorization = `Basic ${token}`;
+  }
+  const response = await fetch(rpcUrl, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body)
+  });
+  if (response.status === 409) {
+    const newId = response.headers.get('x-transmission-session-id') || '';
+    return { ok: false, status: response.status, sessionId: newId, error: 'Session ID richiesto.' };
+  }
+  const text = await response.text();
+  let json = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    return { ok: false, status: response.status, error: normalizeHttpError(text, response.status) };
+  }
+  if (!response.ok) {
+    return { ok: false, status: response.status, error: normalizeHttpError(text, response.status) };
+  }
+  if (json?.result && json.result !== 'success') {
+    return { ok: false, status: response.status, error: json.result, data: json };
+  }
+  return { ok: true, status: response.status, data: json, sessionId };
+}
+
+async function transmissionRequest({ rpcUrl, username, password, body }) {
+  const key = `${rpcUrl}|${username || ''}`;
+  let sessionId = transmissionSessions.get(key) || '';
+  let response = await transmissionRpc({ rpcUrl, username, password, sessionId, body });
+  if (response.status === 409 && response.sessionId) {
+    sessionId = response.sessionId;
+    transmissionSessions.set(key, sessionId);
+    response = await transmissionRpc({ rpcUrl, username, password, sessionId, body });
+  }
+  if (response.ok && sessionId) {
+    transmissionSessions.set(key, sessionId);
+  }
+  return response;
+}
+
+async function addTransmissionTorrent({ baseUrl, username, password, torrentPath, savePath, paused }) {
+  const rpcUrl = resolveTransmissionRpcUrl(baseUrl);
+  if (!rpcUrl) {
+    return { ok: false, error: 'Host Transmission non valido.' };
+  }
+  if (!torrentPath) {
+    return { ok: false, error: 'File .torrent mancante.' };
+  }
+  const torrentBytes = await fs.readFile(torrentPath);
+  const argumentsPayload = {
+    metainfo: torrentBytes.toString('base64')
+  };
+  if (savePath) {
+    argumentsPayload['download-dir'] = savePath;
+  }
+  if (paused) {
+    argumentsPayload.paused = true;
+  }
+  const response = await transmissionRequest({
+    rpcUrl,
+    username,
+    password,
+    body: {
+      method: 'torrent-add',
+      arguments: argumentsPayload
+    }
+  });
+  if (!response.ok) {
+    return { ok: false, error: response.error || 'Errore invio.' };
+  }
+  return { ok: true, message: response.data?.result || 'success' };
+}
+
+async function testTransmissionConnection({ host, port, https, username, password }) {
+  const baseUrl = buildTransmissionBaseUrl(host, port, https);
+  const rpcUrl = resolveTransmissionRpcUrl(baseUrl);
+  if (!rpcUrl) {
+    return { ok: false, error: 'Host Transmission non valido.' };
+  }
+  const response = await transmissionRequest({
+    rpcUrl,
+    username,
+    password,
+    body: { method: 'session-get' }
+  });
+  if (!response.ok) {
+    return { ok: false, error: response.error || 'Errore connessione.' };
+  }
+  const version = response.data?.arguments?.version || '';
+  return { ok: true, version };
 }
 
 function normalizeHttpError(text, status) {
@@ -1549,6 +1686,30 @@ ipcMain.handle('qbit-test', async (_event, payload) => {
     return { ok: false, error: result.error || 'Errore qBittorrent.' };
   } catch (error) {
     return { ok: false, error: error?.message || 'Errore qBittorrent.' };
+  }
+});
+
+ipcMain.handle('transmission-add-torrent', async (_event, payload) => {
+  try {
+    const result = await addTransmissionTorrent(payload || {});
+    if (result.ok) {
+      return { ok: true, message: result.message || 'Ok.' };
+    }
+    return { ok: false, error: result.error || 'Errore Transmission.' };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore Transmission.' };
+  }
+});
+
+ipcMain.handle('transmission-test', async (_event, payload) => {
+  try {
+    const result = await testTransmissionConnection(payload || {});
+    if (result.ok) {
+      return { ok: true, version: result.version || '' };
+    }
+    return { ok: false, error: result.error || 'Errore Transmission.' };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore Transmission.' };
   }
 });
 

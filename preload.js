@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
   unit3dDownloadTorrent: (payload) => ipcRenderer.invoke('unit3d-download-torrent', payload),
   qbitAddTorrent: (payload) => ipcRenderer.invoke('qbit-add-torrent', payload),
   qbitTest: (payload) => ipcRenderer.invoke('qbit-test', payload),
+  transmissionAddTorrent: (payload) => ipcRenderer.invoke('transmission-add-torrent', payload),
+  transmissionTest: (payload) => ipcRenderer.invoke('transmission-test', payload),
   generateScreenshots: (payload) => ipcRenderer.invoke('generate-screenshots', payload),
   getAppVersion: () => ipcRenderer.invoke('app-version'),
   onTorrentProgress: (handler) => {
