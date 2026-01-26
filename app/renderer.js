@@ -865,6 +865,14 @@ function detectFormatFromName(name) {
   return '';
 }
 
+function detectSourceFromName(name) {
+  const upper = String(name || '').toUpperCase();
+  if (/\bHDTV\b/.test(upper)) {
+    return 'HDTV';
+  }
+  return '';
+}
+
 function extractTokensPresent(name, tokens) {
   const matches = [];
   const safeName = String(name || '');
@@ -898,9 +906,13 @@ function updateFormatServiceSuggest() {
     return;
   }
   const settings = getSettings();
-  const format = detectFormatFromName(baseName);
+  let format = detectFormatFromName(baseName);
   const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
   const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
+  const source = detectSourceFromName(baseName);
+  if (!format && source === 'HDTV') {
+    format = 'Encode';
+  }
   if (!format && !service) {
     ui.formatSuggestRow.classList.add('hidden');
     ui.formatSuggestText.textContent = '';
@@ -912,6 +924,9 @@ function updateFormatServiceSuggest() {
   }
   if (service) {
     parts.push(service);
+  }
+  if (source) {
+    parts.push(source);
   }
   ui.formatSuggestText.innerHTML = `Suggerito dal nome: <span class="suggest-strong">${parts.join(' · ')}</span>`;
   ui.formatSuggestRow.classList.remove('hidden');
