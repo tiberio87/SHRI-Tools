@@ -8,8 +8,9 @@ export function pad2(value) {
 
 export function sanitizeName(name) {
   return String(name || '')
+    .replace(/\?/g, '')
     .replace(/:/g, '')
-    .replace(/[<>"/\\|?*]/g, '_')
+    .replace(/[<>"/\\|*]/g, '_')
     .replace(/\s+/g, ' ')
     .replace(/\.+/g, '.')
     .replace(/[. ]+$/g, '')

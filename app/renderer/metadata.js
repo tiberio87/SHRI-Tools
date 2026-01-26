@@ -491,6 +491,36 @@ export function createMetadataTools(deps) {
     const seasonOnly = seasonEpisode.episode ? { season: '', index: -1 } : parseSeasonOnly(cleaned);
     const year = extractYear(cleaned);
     let title = guessTitleFromName(cleaned);
+    let episodeTitle = parseEpisodeTitleFromName(cleaned);
+
+    const bracketed = (() => {
+      const match = cleaned.match(/^\s*\[\s*(S[.\s_-]*\d{1,2}[.\s_-]*E[.\s_-]*\d{1,2}|\d{1,2}\s*[xX]\s*\d{1,2})\s*\]\s*/);
+      if (!match) {
+        return null;
+      }
+      const rest = cleaned.slice(match[0].length).trim();
+      const parts = rest.split(/\s[-–—]\s/);
+      if (parts.length < 2) {
+        return null;
+      }
+      const seriesPart = parts.shift().trim();
+      const episodePart = parts.join(' - ').trim();
+      if (!seriesPart || !episodePart) {
+        return null;
+      }
+      const cleanedEpisode = episodePart.replace(/[-_.]?\s*\d+$/g, '').trim();
+      return {
+        title: seriesPart,
+        episodeTitle: cleanedEpisode || episodePart
+      };
+    })();
+
+    if (bracketed?.title) {
+      title = bracketed.title;
+    }
+    if (bracketed?.episodeTitle) {
+      episodeTitle = bracketed.episodeTitle;
+    }
     if (!title && seasonEpisode.index === 0) {
       const tail = cleaned
         .replace(/^\s*\[[^\]]+\]\s*/, '')
@@ -512,7 +542,6 @@ export function createMetadataTools(deps) {
         title = parentTitle;
       }
     }
-    const episodeTitle = parseEpisodeTitleFromName(cleaned);
     return {
       title,
       year,
