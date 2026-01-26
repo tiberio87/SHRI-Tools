@@ -60,7 +60,20 @@ const CLEAN_TITLE_TOKENS = new Set([
   'FRE',
   'DEU',
   'GER',
-  'RUS'
+  'RUS',
+  'AMZN',
+  'NF',
+  'DSNP',
+  'ATVP',
+  'HMAX',
+  'HBO',
+  'MAX',
+  'HULU',
+  'NOW',
+  'DAZN',
+  'DSCP',
+  'CR',
+  'IT'
 ]);
 const SEARCH_CLEAN_TOKENS = new Set([
   'UNRATED',
@@ -271,8 +284,8 @@ export function createMetadataTools(deps) {
 
   function parseSeasonEpisode(text) {
     const match =
-      text.match(/S(\d{1,2})E(\d{1,2})/i) ||
-      text.match(/(\d{1,2})x(\d{1,2})/i);
+      text.match(/S[.\s_-]*(\d{1,2})[.\s_-]*E[.\s_-]*(\d{1,2})/i) ||
+      text.match(/(\d{1,2})\s*[xX]\s*(\d{1,2})/i);
     if (match) {
       return { season: match[1], episode: match[2], index: match.index };
     }
@@ -291,14 +304,55 @@ export function createMetadataTools(deps) {
     return { season: '', index: -1 };
   }
 
+  function isEpisodeNoiseToken(token) {
+    const raw = String(token || '').replace(/[()[\]{}]/g, '').trim();
+    if (!raw) {
+      return true;
+    }
+    const upper = raw.toUpperCase();
+    const normalized = upper.replace(/[^A-Z0-9]/g, '');
+    if (!normalized) {
+      return true;
+    }
+    if (normalized.length === 1) {
+      return true;
+    }
+    if (CLEAN_TITLE_TOKENS.has(normalized) || SEARCH_CLEAN_TOKENS.has(normalized)) {
+      return true;
+    }
+    if (/^\d{3,4}P$/i.test(normalized)) {
+      return true;
+    }
+    if (/^\d{4}$/.test(normalized)) {
+      return true;
+    }
+    if (/^(?:S?\d{1,2}E\d{1,2}|\d{1,2}X\d{1,2})$/i.test(normalized)) {
+      return true;
+    }
+    if (/^(?:DDP?|DTS|AAC|AC3|EAC3|TRUEHD|ATMOS|FLAC|MP3|OPUS)$/i.test(normalized)) {
+      return true;
+    }
+    if (/^(?:H264|H265|X264|X265|HEVC|AVC|AV1)$/i.test(normalized)) {
+      return true;
+    }
+    if (/^\d+(?:\.\d+)?$/.test(raw.replace(/[^0-9.]/g, ''))) {
+      return true;
+    }
+    const parts = raw.split(/[-_/]/).filter(Boolean);
+    if (parts.length > 1 && parts.every((part) => CLEAN_TITLE_TOKENS.has(part.toUpperCase()))) {
+      return true;
+    }
+    return false;
+  }
+
   function parseEpisodeTitleFromName(rawName) {
     const cleaned = stripExtension(rawName)
       .replace(/[_\.]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
     const match =
-      cleaned.match(/S\d{1,2}E\d{1,2}/i) ||
-      cleaned.match(/\d{1,2}x\d{1,2}/i);
+      cleaned.match(/S[.\s_-]*\d{1,2}[.\s_-]*E[.\s_-]*\d{1,2}/i) ||
+      cleaned.match(/\d{1,2}\s*[xX]\s*\d{1,2}/i);
     if (!match) {
       return '';
     }
@@ -310,15 +364,25 @@ export function createMetadataTools(deps) {
     }
 
     const tokens = after.split(' ').filter((token) => token && !STOP_WORDS.has(token.toUpperCase()));
-    const filtered = tokens
-      .filter((token) => !/^\d{3,4}p$/i.test(token) && !/^\d{4}$/.test(token))
-      .filter((token) => !/^(S?\d{1,2}E\d{1,2}|S?\d{1,2}x\d{1,2}|\d{1,2}x\d{1,2})$/i.test(token));
-    return filtered.join(' ').trim();
+    const kept = [];
+    for (const token of tokens) {
+      if (isEpisodeNoiseToken(token)) {
+        if (kept.length) {
+          break;
+        }
+        continue;
+      }
+      kept.push(token);
+    }
+    return kept.join(' ').trim();
   }
 
   function guessTitleFromName(rawName) {
     let cleaned = stripExtension(rawName);
-    cleaned = cleaned.replace(/\[[^\]]+\]|\([^\)]+\)|\{[^}]+\}/g, ' ');
+    cleaned = cleaned.replace(/\[[^\]]+\]|\([^\)]+\)|\{[^}]+\}/g, (match) => {
+      const year = match.match(/\b(19|20)\d{2}\b/);
+      return year ? ` ${year[0]} ` : ' ';
+    });
     cleaned = cleaned.replace(/[_\.]/g, ' ');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     const seasonEpisode = parseSeasonEpisode(cleaned);
@@ -363,6 +427,10 @@ export function createMetadataTools(deps) {
       .replace(/[_\.]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+
+    while (/[-_.][A-Za-z0-9]{2,20}$/.test(cleaned)) {
+      cleaned = cleaned.replace(/[-_.][A-Za-z0-9]{2,20}$/, '').trim();
+    }
 
     const tokens = cleaned.split(' ');
     let end = tokens.length;
