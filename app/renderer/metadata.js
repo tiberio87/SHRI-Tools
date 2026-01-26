@@ -491,6 +491,19 @@ export function createMetadataTools(deps) {
     const seasonOnly = seasonEpisode.episode ? { season: '', index: -1 } : parseSeasonOnly(cleaned);
     const year = extractYear(cleaned);
     let title = guessTitleFromName(cleaned);
+    if (!title && seasonEpisode.index === 0) {
+      const tail = cleaned
+        .replace(/^\s*\[[^\]]+\]\s*/, '')
+        .replace(
+          /^\s*(S[.\s_-]*\d{1,2}[.\s_-]*E[.\s_-]*\d{1,2}|\d{1,2}\s*[xX]\s*\d{1,2})\s*/i,
+          ''
+        )
+        .replace(/^\s*[-_.]+\s*/, '')
+        .trim();
+      if (tail) {
+        title = guessTitleFromName(tail) || tail;
+      }
+    }
     if (!title) {
       const parentPath = getParentPath(filePath);
       const parentName = parentPath ? getPathBaseName(parentPath) : '';
