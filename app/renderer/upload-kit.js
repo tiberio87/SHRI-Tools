@@ -1006,30 +1006,96 @@ ${downloadBlock}
     return uploadMiFullCache;
   }
 
-  function buildUploadSummary(form, settings) {
+  function escapeHtml(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function buildUploadSummaryData(form, settings) {
     const mapping = getUploadMapping(form, settings);
     const { title } = buildUploadTitle();
     const tmdb = state.metadata?.tmdbId ? `TMDB ${state.metadata.tmdbId}` : 'TMDB -';
     const imdb = state.metadata?.imdbId ? `IMDb ${state.metadata.imdbId}` : 'IMDb -';
     const tvdb = state.metadata?.tvdbSeriesId ? `TVDB ${state.metadata.tvdbSeriesId}` : 'TVDB -';
-    const flags = [
-      settings.unit3dAnonymous ? 'Anonimo' : null,
-      settings.unit3dPersonalRelease ? 'Personal' : null,
-      settings.unit3dModQueue ? 'Mod Queue' : null
-    ].filter(Boolean);
     const torrentLabel = state.lastTorrentPath ? state.lastTorrentPath : 'Nessun .torrent';
-    return [
-      `Titolo: ${title || '-'}`,
-      `Categoria: ${mapping.categoryKey || '-'}`,
-      `Tipo: ${mapping.typeKey || '-'}`,
-      `Risoluzione: ${form.resolution || '-'}`,
-      `ID: ${[tmdb, imdb, tvdb].join(' | ')}`,
-      `Flags: ${flags.length ? flags.join(', ') : 'Nessuno'}`,
-      `Torrent: ${torrentLabel}`
-    ].join('\n');
+    return {
+      title: title || '-',
+      category: mapping.categoryKey || '-',
+      type: mapping.typeKey || '-',
+      resolution: form.resolution || '-',
+      ids: [tmdb, imdb, tvdb].join(' | '),
+      torrent: torrentLabel
+    };
   }
 
-  async function buildUnit3dPayload(form, settings) {
+  function buildUploadSummaryHtml(summary, settings) {
+    const anonymousChecked = settings.unit3dAnonymous ? 'checked' : '';
+    const personalChecked = settings.unit3dPersonalRelease ? 'checked' : '';
+    const modQueueChecked = settings.unit3dModQueue ? 'checked' : '';
+    return `
+      <div class="confirm-summary">
+        <div class="confirm-intro">Confermi l'upload con questi dati?</div>
+        <div class="confirm-row">
+          <span class="confirm-label">Titolo:</span>
+          <span class="confirm-value highlight-title">${escapeHtml(summary.title)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Categoria:</span>
+          <span class="confirm-value highlight-category">${escapeHtml(summary.category)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Tipo:</span>
+          <span class="confirm-value highlight-type">${escapeHtml(summary.type)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Risoluzione:</span>
+          <span class="confirm-value">${escapeHtml(summary.resolution)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">ID:</span>
+          <span class="confirm-value">${escapeHtml(summary.ids)}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Torrent:</span>
+          <span class="confirm-value">${escapeHtml(summary.torrent)}</span>
+        </div>
+        <div class="confirm-flags">
+          <div class="confirm-flags-title">Opzioni upload</div>
+          <div class="confirm-flags-row">
+            <label class="checkbox inline">
+              <input id="confirmFlagAnonymous" type="checkbox" ${anonymousChecked} />
+              Anonimo
+            </label>
+            <label class="checkbox inline">
+              <input id="confirmFlagPersonal" type="checkbox" ${personalChecked} />
+              Personal release
+            </label>
+            <label class="checkbox inline">
+              <input id="confirmFlagModQueue" type="checkbox" ${modQueueChecked} />
+              Coda moderazione
+            </label>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function readUploadConfirmFlags(settings) {
+    const anonymous = document.getElementById('confirmFlagAnonymous');
+    const personal = document.getElementById('confirmFlagPersonal');
+    const modQueue = document.getElementById('confirmFlagModQueue');
+    return {
+      anonymous: anonymous ? anonymous.checked : settings.unit3dAnonymous,
+      personal: personal ? personal.checked : settings.unit3dPersonalRelease,
+      modQueue: modQueue ? modQueue.checked : settings.unit3dModQueue
+    };
+  }
+
+  async function buildUnit3dPayload(form, settings, flagOverrides = {}) {
     const mapping = getUploadMapping(form, settings);
     const { title } = buildUploadTitle();
     const description = buildUploadDescription(form);
@@ -1043,6 +1109,10 @@ ${downloadBlock}
     const typeId = normalizeIntValue(mapping.typeId);
     const resolutionId = normalizeIntValue(mapping.resolutionId);
 
+    const useAnonymous = flagOverrides.anonymous ?? settings.unit3dAnonymous;
+    const usePersonal = flagOverrides.personal ?? settings.unit3dPersonalRelease;
+    const useModQueue = flagOverrides.modQueue ?? settings.unit3dModQueue;
+
     const payload = {
       name: title || '',
       description,
@@ -1051,9 +1121,9 @@ ${downloadBlock}
       tmdb,
       imdb,
       tvdb,
-      anonymous: settings.unit3dAnonymous ? '1' : '0',
-      personal_release: settings.unit3dPersonalRelease ? '1' : '0',
-      mod_queue_opt_in: settings.unit3dModQueue ? '1' : '0',
+      anonymous: useAnonymous ? '1' : '0',
+      personal_release: usePersonal ? '1' : '0',
+      mod_queue_opt_in: useModQueue ? '1' : '0',
       stream: '0',
       sd: mapping.isSd ? '1' : '0',
       keywords: '',
@@ -1098,18 +1168,21 @@ ${downloadBlock}
       return;
     }
     const form = getFormState();
-    const summary = buildUploadSummary(form, settings);
+    const summary = buildUploadSummaryData(form, settings);
+    const summaryHtml = buildUploadSummaryHtml(summary, settings);
     const confirmed = await openConfirmModal(
-      `Confermi l'upload con questi dati?\n\n${summary}`
+      summaryHtml,
+      { html: true }
     );
     if (!confirmed) {
       return;
     }
+    const flagOverrides = readUploadConfirmFlags(settings);
     if (ui.uploadToUnit3dBtn) {
       ui.uploadToUnit3dBtn.disabled = true;
     }
     try {
-      const data = await buildUnit3dPayload(form, settings);
+      const data = await buildUnit3dPayload(form, settings, flagOverrides);
       logDebug?.('unit3d upload payload', {
         category_id: data.category_id,
         type_id: data.type_id,

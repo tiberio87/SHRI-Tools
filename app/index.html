@@ -37,7 +37,7 @@
 
     <div class="content-grid">
       <div class="left-stack">
-        <section class="section">
+        <section class="section" id="sourceSection">
           <div class="section-header">
             <h2>Sorgente</h2>
             <div class="section-actions">
@@ -45,7 +45,8 @@
               <button id="selectFolderBtn" class="primary">Seleziona cartella</button>
             </div>
           </div>
-          <div id="selectedPath" class="path">Nessun percorso selezionato.</div>
+          <div id="selectedPath" class="path">Seleziona un file/cartella o trascinalo qui.</div>
+          <div class="drop-hint">Rilascia qui</div>
           <div class="scan-row">
             <div id="scanHint" class="hint scan-hint">
               <span id="scanHintLabel" class="scan-hint-label"></span>
@@ -86,7 +87,7 @@
                   <button class="dropdown-item" type="button" data-value="BluRay">BluRay</button>
                   <button class="dropdown-item" type="button" data-value="UHD BluRay">UHD BluRay</button>
                   <button class="dropdown-item" type="button" data-value="DVD">DVD</button>
-                  <button class="dropdown-item" type="button" data-value="HDTV">HDTV</button>
+                  <button class="dropdown-item" type="button" data-value="HDTV">HDTV (obsoleta)</button>
                 </div>
                 <input id="sourceInput" type="hidden" value="" />
               </div>
@@ -131,6 +132,9 @@
           </div>
           <div class="row format-suggest-row is-empty" id="formatSuggestRow">
             <div id="formatSuggestText" class="hint"></div>
+            <button id="applyNameSuggestBtn" class="secondary small suggest-apply" type="button">
+              Applica suggerimenti
+            </button>
           </div>
           <div class="row video-flags-row">
             <div class="video-fields">

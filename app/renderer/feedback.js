@@ -54,11 +54,18 @@ export function createFeedbackTools({ ui }) {
     ui.confirmModal.classList.add('hidden');
   }
 
-  function openConfirmModal(message) {
+  function openConfirmModal(message, options = {}) {
     if (!ui.confirmModal || !ui.confirmMessage) {
       return Promise.resolve(false);
     }
-    ui.confirmMessage.textContent = message;
+    if (options.html) {
+      ui.confirmMessage.innerHTML = message;
+    } else {
+      ui.confirmMessage.textContent = message;
+    }
+    if (typeof options.onOpen === 'function') {
+      options.onOpen();
+    }
     ui.confirmModal.classList.remove('hidden');
     return new Promise((resolve) => {
       confirmResolver = resolve;

@@ -774,6 +774,33 @@ button:disabled {
   text-overflow: ellipsis;
 }
 
+.drop-hint {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px dashed transparent;
+  font-size: 11px;
+  color: var(--muted);
+  display: none;
+  text-align: center;
+}
+
+.section.drag-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(240, 180, 94, 0.15);
+}
+
+.section.drag-active .drop-hint {
+  display: block;
+  border-color: rgba(240, 180, 94, 0.4);
+  color: var(--accent);
+  background: rgba(240, 180, 94, 0.08);
+}
+
+.section.drag-active .path {
+  border-color: rgba(240, 180, 94, 0.4);
+}
+
 .scan-row {
   display: flex;
   align-items: center;
@@ -813,6 +840,9 @@ button:disabled {
 }
 
 .format-suggest-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 4px;
   min-height: 16px;
 }
@@ -825,7 +855,17 @@ button:disabled {
   visibility: hidden;
 }
 
-.format-suggest-row .suggest-strong {
+.format-suggest-row .suggest-apply {
+  font-size: 10px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
+.format-suggest-row .suggest-label {
+  color: var(--muted);
+}
+
+.format-suggest-row .suggest-value {
   color: var(--accent);
   font-weight: 600;
 }
@@ -1050,7 +1090,73 @@ body.light .fetch-warning {
   font-size: 13px;
   color: var(--text);
   line-height: 1.45;
-  white-space: pre-line;
+  white-space: normal;
+}
+
+#confirmModal .modal-content {
+  width: min(840px, 94vw);
+}
+
+.confirm-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.confirm-intro {
+  font-size: 13px;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.confirm-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.confirm-label {
+  font-weight: 600;
+  color: var(--text);
+  min-width: 88px;
+}
+
+.confirm-value {
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.confirm-value.highlight-title {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.confirm-value.highlight-category {
+  color: var(--plan-new);
+  font-weight: 600;
+}
+
+.confirm-value.highlight-type {
+  color: var(--accent-strong);
+  font-weight: 600;
+}
+
+.confirm-flags {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border-dashed);
+}
+
+.confirm-flags-title {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.confirm-flags-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .confirm-actions {
@@ -1256,6 +1362,10 @@ body.light .fetch-warning {
 
 #advancedSettingsModal {
   z-index: 130;
+}
+
+#groupDefaultsModal {
+  z-index: 135;
 }
 
 #advancedSettingsModal .modal-content {

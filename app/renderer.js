@@ -73,7 +73,7 @@ function setSelectedPath(pathValue) {
   if (!ui.selectedPath) {
     return;
   }
-  const text = pathValue || 'Nessun percorso selezionato.';
+  const text = pathValue || 'Seleziona un file/cartella o trascinalo qui.';
   ui.selectedPath.textContent = truncateMiddle(text);
   ui.selectedPath.title = text;
 }
@@ -969,27 +969,45 @@ function updateFormatServiceSuggest() {
   if (!format && !service && !source && !repack) {
     ui.formatSuggestRow.classList.add('is-empty');
     ui.formatSuggestText.textContent = '';
+    if (ui.applyNameSuggestBtn) {
+      ui.applyNameSuggestBtn.disabled = true;
+      ui.applyNameSuggestBtn.dataset.format = '';
+      ui.applyNameSuggestBtn.dataset.service = '';
+      ui.applyNameSuggestBtn.dataset.source = '';
+      ui.applyNameSuggestBtn.dataset.repack = '';
+    }
     return;
   }
   const parts = [];
   if (format) {
-    parts.push(`Formato: ${format}`);
+    parts.push({ label: 'Formato:', value: format });
   }
   const serviceSourceParts = [];
   if (service) {
     serviceSourceParts.push(service);
   }
   if (source) {
-    serviceSourceParts.push(source);
+    const sourceLabel = source === 'HDTV' ? 'HDTV (obsoleta)' : source;
+    serviceSourceParts.push(sourceLabel);
   }
   if (serviceSourceParts.length) {
-    parts.push(`Servizio/Sorgente: ${serviceSourceParts.join(' / ')}`);
+    parts.push({ label: 'Servizio/Sorgente:', value: serviceSourceParts.join(' / ') });
   }
   if (repack) {
-    parts.push(`Repack: ${repack}`);
+    parts.push({ label: 'Repack:', value: repack });
   }
-  ui.formatSuggestText.innerHTML = `Suggerimento del nome: <span class="suggest-strong">${parts.join(' · ')}</span>`;
+  const html = parts
+    .map((part) => `<span class="suggest-label">${part.label}</span> <span class="suggest-value">${part.value}</span>`)
+    .join(' · ');
+  ui.formatSuggestText.innerHTML = `Suggerimento del nome: ${html}`;
   ui.formatSuggestRow.classList.remove('is-empty');
+  if (ui.applyNameSuggestBtn) {
+    ui.applyNameSuggestBtn.disabled = false;
+    ui.applyNameSuggestBtn.dataset.format = format || '';
+    ui.applyNameSuggestBtn.dataset.service = service || '';
+    ui.applyNameSuggestBtn.dataset.source = source || '';
+    ui.applyNameSuggestBtn.dataset.repack = repack || '';
+  }
 }
 
 const metadataTools = createMetadataTools({
@@ -1573,6 +1591,172 @@ ui.selectFolderBtn.addEventListener('click', async () => {
 ui.resetSourceBtn.addEventListener('click', () => {
   resetSource();
 });
+
+if (ui.sourceSection) {
+  let dragDepth = 0;
+  const resetDrag = () => {
+    dragDepth = 0;
+    ui.sourceSection.classList.remove('drag-active');
+  };
+  const uriToPath = (uri) => {
+    if (!uri) {
+      return '';
+    }
+    try {
+      const url = new URL(uri);
+      if (url.protocol === 'file:') {
+        let filePath = decodeURIComponent(url.pathname || '');
+        if (/^\/[A-Za-z]:/.test(filePath)) {
+          filePath = filePath.slice(1);
+        }
+        return filePath.replace(/\//g, '\\');
+      }
+    } catch {
+      // Ignore invalid URL
+    }
+    if (/^[A-Za-z]:[\\/]/.test(uri)) {
+      return uri;
+    }
+    return '';
+  };
+  const getDropPath = (event) => {
+    const files = event.dataTransfer?.files;
+    let path = files && files.length ? files[0].path : '';
+    if (!path && event.dataTransfer?.items?.length) {
+      const item = event.dataTransfer.items[0];
+      const file = item.getAsFile?.();
+      path = file?.path || '';
+    }
+    if (!path && event.dataTransfer) {
+      const uriList = event.dataTransfer.getData('text/uri-list') || '';
+      const text = event.dataTransfer.getData('text/plain') || '';
+      const raw = uriList || text;
+      const firstLine = raw
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .find((line) => line && !line.startsWith('#'));
+      path = uriToPath(firstLine || '');
+    }
+    return path;
+  };
+
+  document.addEventListener('dragover', (event) => {
+    event.preventDefault();
+  });
+
+  document.addEventListener('drop', (event) => {
+    event.preventDefault();
+    const files = event.dataTransfer?.files;
+    const items = event.dataTransfer?.items;
+    const firstFile = files?.length ? files[0] : null;
+    const firstItem = items?.length ? items[0] : null;
+    logDebug?.('dragdrop: document drop', {
+      files: files?.length || 0,
+      items: items?.length || 0,
+      types: event.dataTransfer?.types || [],
+      fileInfo: firstFile
+        ? {
+            name: firstFile.name || '',
+            path: firstFile.path || '',
+            webkitRelativePath: firstFile.webkitRelativePath || '',
+            size: Number.isFinite(firstFile.size) ? firstFile.size : null,
+            type: firstFile.type || ''
+          }
+        : null,
+      itemInfo: firstItem
+        ? {
+            kind: firstItem.kind || '',
+            type: firstItem.type || ''
+          }
+        : null,
+      uriList: event.dataTransfer?.getData?.('text/uri-list') || '',
+      text: event.dataTransfer?.getData?.('text/plain') || ''
+    });
+  });
+
+  ui.sourceSection.addEventListener('dragenter', (event) => {
+    event.preventDefault();
+    logDebug?.('dragdrop: enter source');
+    dragDepth += 1;
+    ui.sourceSection.classList.add('drag-active');
+  });
+
+  ui.sourceSection.addEventListener('dragover', (event) => {
+    event.preventDefault();
+  });
+
+  ui.sourceSection.addEventListener('dragleave', () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (dragDepth === 0) {
+      ui.sourceSection.classList.remove('drag-active');
+    }
+  });
+
+  ui.sourceSection.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    const files = event.dataTransfer?.files;
+    const items = event.dataTransfer?.items;
+    const firstFile = files?.length ? files[0] : null;
+    const firstItem = items?.length ? items[0] : null;
+    const path = getDropPath(event);
+    logDebug?.('dragdrop: drop source', {
+      files: files?.length || 0,
+      items: items?.length || 0,
+      types: event.dataTransfer?.types || [],
+      fileInfo: firstFile
+        ? {
+            name: firstFile.name || '',
+            path: firstFile.path || '',
+            webkitRelativePath: firstFile.webkitRelativePath || '',
+            size: Number.isFinite(firstFile.size) ? firstFile.size : null,
+            type: firstFile.type || ''
+          }
+        : null,
+      itemInfo: firstItem
+        ? {
+            kind: firstItem.kind || '',
+            type: firstItem.type || ''
+          }
+        : null,
+      path: path || ''
+    });
+    if (!path) {
+      showToast('Drag & drop non disponibile, usa Seleziona file/cartella.');
+      resetDrag();
+      return;
+    }
+    await loadPath(path);
+    resetDrag();
+  });
+}
+
+if (ui.applyNameSuggestBtn) {
+  ui.applyNameSuggestBtn.addEventListener('click', () => {
+    const format = ui.applyNameSuggestBtn.dataset.format || '';
+    const service = ui.applyNameSuggestBtn.dataset.service || '';
+    const source = ui.applyNameSuggestBtn.dataset.source || '';
+    const repack = ui.applyNameSuggestBtn.dataset.repack || '';
+    const settings = getSettings();
+    const serviceOptions = buildServiceOptions(settings);
+
+    if (format) {
+      setDropdownValue(ui.formatSelect, ui.formatSelectBtn, format, format);
+    }
+    if (source) {
+      setDropdownValue(ui.sourceInput, ui.sourceInputBtn, source, source);
+    }
+    if (service) {
+      const option = serviceOptions.find((item) => item.code === service);
+      if (option) {
+        setDropdownValue(ui.serviceInput, ui.serviceInputBtn, service, `${option.label} (${option.code})`);
+      }
+    }
+    if (repack) {
+      setDropdownValue(ui.repackSelect, ui.repackSelectBtn, repack, repack);
+    }
+    schedulePreview();
+  });
+}
 
 if (ui.openTorrentBtn) {
   ui.openTorrentBtn.addEventListener('click', () => {

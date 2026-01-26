@@ -1,6 +1,7 @@
 export const ui = {
   mediaInfoBadge: document.getElementById('mediaInfoBadge'),
   renameBadge: document.getElementById('renameBadge'),
+  sourceSection: document.getElementById('sourceSection'),
   autoDetectToggle: document.getElementById('autoDetectToggle'),
   autoDetectBtn: document.getElementById('autoDetectBtn'),
   themeToggle: document.getElementById('themeToggle'),
@@ -17,6 +18,7 @@ export const ui = {
   formatRow: document.getElementById('formatRow'),
   formatSuggestRow: document.getElementById('formatSuggestRow'),
   formatSuggestText: document.getElementById('formatSuggestText'),
+  applyNameSuggestBtn: document.getElementById('applyNameSuggestBtn'),
   openDebugBtn: document.getElementById('openDebugBtn'),
   debugModal: document.getElementById('debugModal'),
   debugLogText: document.getElementById('debugLogText'),
