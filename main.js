@@ -10,6 +10,17 @@ function createFormData() {
   }
   return new global.FormData();
 }
+
+function appendFormField(form, key, value) {
+  if (value === undefined || value === null) {
+    return;
+  }
+  if (typeof value === 'boolean') {
+    form.append(key, value ? '1' : '0');
+    return;
+  }
+  form.append(key, String(value));
+}
 const { mediaInfoFactory } = require('mediainfo.js');
 const { readFile } = require('fs/promises');
 
@@ -212,6 +223,72 @@ async function verifyUnit3dKey(apiKey, baseUrl) {
     const text = await response.text();
     throw new Error(`HTTP ${response.status}: ${text || 'Errore API'}`);
   }
+}
+
+async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, data }) {
+  if (!baseUrl || !apiKey) {
+    return { ok: false, error: 'Base URL o API key mancanti.' };
+  }
+  if (!torrentPath) {
+    return { ok: false, error: 'File .torrent non disponibile.' };
+  }
+  const base = String(baseUrl).replace(/\/+$/, '');
+  const form = createFormData();
+  const torrentBytes = await fs.readFile(torrentPath);
+  if (!global.Blob) {
+    throw new Error('Blob non disponibile. Aggiorna Electron/Node o abilita una versione che includa fetch.');
+  }
+  const torrentBlob = new global.Blob([torrentBytes], { type: 'application/x-bittorrent' });
+  form.append('torrent', torrentBlob, path.basename(torrentPath));
+
+  Object.entries(data || {}).forEach(([key, value]) => {
+    appendFormField(form, key, value);
+  });
+
+  const response = await fetch(`${base}/api/torrents/upload`, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: 'application/json'
+    },
+    body: form
+  });
+  const text = await response.text();
+  const raw = text || '';
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+  const details = payload?.errors
+    ? Object.entries(payload.errors)
+        .map(([field, messages]) => {
+          const list = Array.isArray(messages) ? messages.join(', ') : String(messages);
+          return `${field}: ${list}`;
+        })
+        .join(' | ')
+    : '';
+
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      error: payload?.message || text || 'Errore API',
+      details,
+      raw
+    };
+  }
+  if (payload && payload.success === false) {
+    return {
+      ok: false,
+      status: response.status,
+      error: payload.message || 'Errore API',
+      details,
+      raw
+    };
+  }
+  return { ok: true, status: response.status, data: payload, raw };
 }
 
 function resolveFfprobePath(ffmpegPath) {
@@ -784,13 +861,20 @@ function buildRenamePlan(payload) {
 }
 
 function createWindow() {
+  const iconPath = path.join(
+    __dirname,
+    'assets',
+    'icons',
+    process.platform === 'win32' ? 'app.ico' : 'app.png'
+  );
   const win = new BrowserWindow({
-    width: 1560,
+    width: 1600,
     height: 960,
     minWidth: 1280,
     minHeight: 840,
     autoHideMenuBar: true,
     backgroundColor: '#111319',
+    icon: iconPath,
     webPreferences: {
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js')
@@ -864,6 +948,8 @@ ipcMain.handle('select-any-file', async () => {
   return result.filePaths[0];
 });
 
+ipcMain.handle('app-version', () => app.getVersion());
+
 ipcMain.handle('generate-screenshots', async (_event, payload) => {
   const videoPath = payload?.videoPath || '';
   const ffmpegPath = payload?.ffmpegPath || '';
@@ -872,6 +958,16 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
   const fallbackHost = payload?.fallbackHost || 'ptscreens';
   const imgbbKey = payload?.imgbbKey || '';
   const ptscreensKey = payload?.ptscreensKey || '';
+  const requestId = payload?.requestId || '';
+  const sendProgress = (data) => {
+    if (!_event?.sender) {
+      return;
+    }
+    _event.sender.send('screens-progress', {
+      requestId,
+      ...data
+    });
+  };
 
   if (!videoPath) {
     return { ok: false, error: 'File video mancante.' };
@@ -891,6 +987,10 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
   try {
     const duration = await getVideoDurationSeconds(ffprobePath, videoPath);
     const times = buildScreenshotTimes(duration, count);
+    const totalShots = times.length;
+    const totalSteps = totalShots * 2;
+    let stepIndex = 0;
+    sendProgress({ progress: 0, stage: 'start', current: 0, total: totalShots });
     let mediaInfo = null;
     try {
       mediaInfo = await analyzeMedia(videoPath);
@@ -939,10 +1039,25 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
           throw error;
         }
       }
+      stepIndex += 1;
+      sendProgress({
+        progress: totalSteps ? stepIndex / totalSteps : 0,
+        stage: 'extract',
+        current: index,
+        total: totalShots
+      });
 
       const upload = await uploadWithFallback(filePath, primaryHost, fallbackHost, {
         imgbbKey,
         ptscreensKey
+      });
+      stepIndex += 1;
+      sendProgress({
+        progress: totalSteps ? stepIndex / totalSteps : 0,
+        stage: 'upload',
+        current: index,
+        total: totalShots,
+        host: upload.host
       });
 
       images.push({
@@ -956,8 +1071,10 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       });
     }
 
+    sendProgress({ progress: 1, stage: 'done', current: totalShots, total: totalShots });
     return { ok: true, outputDir, images, tonemapped: tonemapApplied };
   } catch (error) {
+    sendProgress({ stage: 'error', error: String(error) });
     return { ok: false, error: String(error) };
   }
 });
@@ -1189,6 +1306,31 @@ ipcMain.handle('verify-api-key', async (_event, payload) => {
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('unit3d-upload', async (_event, payload) => {
+  try {
+    const result = await uploadUnit3dTorrent(payload || {});
+    if (result.ok) {
+      const message = result.data?.message || 'Upload completato.';
+      return {
+        ok: true,
+        message,
+        data: result.data || null,
+        raw: result.raw || '',
+        status: result.status || 0
+      };
+    }
+    return {
+      ok: false,
+      error: result.error || 'Errore upload.',
+      details: result.details || '',
+      raw: result.raw || '',
+      status: result.status || 0
+    };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore upload.' };
   }
 });
 

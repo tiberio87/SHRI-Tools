@@ -1,33 +1,33 @@
 import { ui } from './renderer/dom.js';
 import { state, debugState } from './renderer/state.js';
 import {
-  SETTINGS_STORAGE_KEY,
   THEME_STORAGE_KEY,
   DEFAULT_GROUP_TAGS,
   LANG_MAP,
-  RULES_SECTIONS,
-  ANNOUNCE_BASE
+  RULES_SECTIONS
 } from './renderer/constants.js';
 import { normalizeLangTag } from './renderer/media-utils.js';
 import { createUploadKit } from './renderer/upload-kit.js';
 import { createMetadataTools } from './renderer/metadata.js';
 import { createRenameTools } from './renderer/rename.js';
-import { getParentPath, getPathBaseName } from './renderer/path-utils.js';
+import { getParentPath, getPathBaseName, stripExtension } from './renderer/path-utils.js';
 import { createLogger } from './renderer/logger.js';
 import { createThemeTools } from './renderer/theme.js';
 import { createFeedbackTools } from './renderer/feedback.js';
+import { createServiceTagTools } from './renderer/service-tags.js';
+import { createSettingsTools } from './renderer/settings-tools.js';
+import { createRulesCheckTools } from './renderer/rules-check.js';
 
 let previewTimer = null;
 let currentTorrentRequestId = null;
 let settingsSnapshot = '';
 let settingsDirty = false;
-
-const DEFAULT_SERVICES = [];
-let serviceDefaultsLoaded = false;
-const LANGUAGE_CODES = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
+let wizardStepIndex = 0;
+const WIZARD_STEP_COUNT = 3;
+const LANGUAGE_CODES_PATTERN = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
   .filter(Boolean)
-  .map((value) => String(value).toUpperCase());
-const LANGUAGE_CODES_PATTERN = LANGUAGE_CODES.join('|');
+  .map((value) => String(value).toUpperCase())
+  .join('|');
 const { logDebug, updateDebugLogView } = createLogger({ debugState, ui });
 const { applyTheme, loadTheme, saveTheme } = createThemeTools({
   ui,
@@ -69,40 +69,6 @@ function setAutoFieldState(input, active) {
     return;
   }
   field.classList.toggle('auto-field', Boolean(active));
-}
-
-function extractPasskeyFromAnnounce(url) {
-  if (!url) {
-    return '';
-  }
-  const base = ANNOUNCE_BASE.toLowerCase();
-  const normalized = String(url).trim();
-  if (normalized.toLowerCase().startsWith(base)) {
-    return normalized.slice(base.length);
-  }
-  return '';
-}
-
-function resolveAnnounceInput(value) {
-  const cleaned = String(value || '').trim();
-  if (!cleaned) {
-    return { announceUrl: '', passkey: '' };
-  }
-  if (/^https?:\/\//i.test(cleaned)) {
-    const passkey = extractPasskeyFromAnnounce(cleaned);
-    return { announceUrl: cleaned, passkey };
-  }
-  return { announceUrl: `${ANNOUNCE_BASE}${cleaned}`, passkey: cleaned };
-}
-
-function getAnnounceUrlFromSettings(settings) {
-  if (settings?.torrentPasskey) {
-    return `${ANNOUNCE_BASE}${settings.torrentPasskey}`;
-  }
-  if (settings?.torrentAnnounceUrl) {
-    return settings.torrentAnnounceUrl;
-  }
-  return '';
 }
 
 function setFetchBadge(mode, label) {
@@ -413,161 +379,6 @@ function getAutoMatchWarnings(payload, data) {
   return [];
 }
 
-function loadSettings() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
-    const defaults = {
-      omdbKey: '',
-      tmdbKey: '',
-      tvdbKey: '',
-      preferredLanguage: 'it-IT',
-      serviceList: '',
-      tagList: '',
-      autoTagDetect: true,
-      torrentPasskey: '',
-      torrentAnnounceUrl: '',
-      torrentOutputDir: '',
-      torrentPrivate: true,
-      ffmpegPath: '',
-      screenshotsCount: 6,
-      imageHostPrimary: 'imgbb',
-      imageHostFallback: 'ptscreens',
-      imgbbKey: '',
-      ptscreensKey: '',
-      unit3dBaseUrl: 'https://shareisland.org',
-      unit3dApiKey: ''
-    };
-    if (!raw) {
-      return defaults;
-    }
-    const parsed = JSON.parse(raw);
-    return { ...defaults, ...parsed };
-  } catch {
-    return {
-      omdbKey: '',
-      tmdbKey: '',
-      tvdbKey: '',
-      preferredLanguage: 'it-IT',
-      serviceList: '',
-      tagList: '',
-      autoTagDetect: true,
-      torrentPasskey: '',
-      torrentAnnounceUrl: '',
-      torrentOutputDir: '',
-      torrentPrivate: true,
-      ffmpegPath: '',
-      screenshotsCount: 6,
-      imageHostPrimary: 'imgbb',
-      imageHostFallback: 'ptscreens',
-      imgbbKey: '',
-      ptscreensKey: '',
-      unit3dBaseUrl: 'https://shareisland.org',
-      unit3dApiKey: ''
-    };
-  }
-}
-
-function saveSettings(settings) {
-  localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
-}
-
-function updateFfmpegHint(settings) {
-  if (!ui.ffmpegHint) {
-    return;
-  }
-  const hasPath = Boolean(settings?.ffmpegPath);
-  if (hasPath) {
-    ui.ffmpegHint.textContent = '';
-    return;
-  }
-  ui.ffmpegHint.innerHTML = `FFmpeg non configurato. Scaricalo da <a href="https://ffmpeg.org/download.html" data-external="https://ffmpeg.org/download.html">ffmpeg.org</a> e inserisci il percorso completo del file eseguibile (es. ffmpeg.exe).`;
-}
-
-function applySettingsToUI(settings) {
-  const preferredLanguage = Object.prototype.hasOwnProperty.call(settings, 'preferredLanguage')
-    ? settings.preferredLanguage
-    : 'it-IT';
-  ui.omdbKeyInput.value = settings.omdbKey || '';
-  ui.tmdbKeyInput.value = settings.tmdbKey || '';
-  ui.tvdbKeyInput.value = settings.tvdbKey || '';
-  if (ui.imgbbKeyInput) {
-    ui.imgbbKeyInput.value = settings.imgbbKey || '';
-  }
-  if (ui.ptscreensKeyInput) {
-    ui.ptscreensKeyInput.value = settings.ptscreensKey || '';
-  }
-  ui.preferredLanguageSelect.value = preferredLanguage;
-  ui.serviceListInput.value = settings.serviceList || '';
-  ui.tagListInput.value = settings.tagList || '';
-  if (ui.ffmpegPathInput) {
-    ui.ffmpegPathInput.value = settings.ffmpegPath || '';
-  }
-  if (ui.screenshotsCountInput) {
-    ui.screenshotsCountInput.value = settings.screenshotsCount || 6;
-  }
-  if (ui.imageHostPrimarySelect) {
-    ui.imageHostPrimarySelect.value = settings.imageHostPrimary || 'imgbb';
-  }
-  if (ui.imageHostFallbackSelect) {
-    ui.imageHostFallbackSelect.value = settings.imageHostFallback || 'ptscreens';
-  }
-  if (ui.unit3dBaseUrlInput) {
-    ui.unit3dBaseUrlInput.value = settings.unit3dBaseUrl || 'https://shareisland.org';
-  }
-  if (ui.unit3dApiKeyInput) {
-    ui.unit3dApiKeyInput.value = settings.unit3dApiKey || '';
-  }
-  if (ui.settingsAnnounceInput) {
-    const passkey = settings.torrentPasskey || '';
-    const fallback = extractPasskeyFromAnnounce(settings.torrentAnnounceUrl || '');
-    ui.settingsAnnounceInput.value = passkey || fallback || '';
-  }
-  if (ui.settingsTorrentOutputInput) {
-    ui.settingsTorrentOutputInput.value = settings.torrentOutputDir || '';
-  }
-  if (ui.settingsTorrentPrivateToggle) {
-    ui.settingsTorrentPrivateToggle.checked = settings.torrentPrivate !== false;
-  }
-  if (ui.autoTagDetectToggle) {
-    ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
-  }
-  updateFfmpegHint(settings);
-  updateTagSuggestion(settings);
-  loadServiceDefaults().then(() => updateServiceOptions(settings));
-  updateTagOptions(settings);
-  schedulePreview();
-}
-
-function getSettings() {
-  const existing = loadSettings();
-  const announceInput = ui.settingsAnnounceInput?.value.trim() || '';
-  const announceResolved = resolveAnnounceInput(announceInput);
-  const passkey = announceResolved.passkey || '';
-  const announceUrl = passkey ? '' : existing.torrentAnnounceUrl || '';
-
-  return {
-    omdbKey: ui.omdbKeyInput.value.trim(),
-    tmdbKey: ui.tmdbKeyInput.value.trim(),
-    tvdbKey: ui.tvdbKeyInput.value.trim(),
-    imgbbKey: ui.imgbbKeyInput?.value.trim() || '',
-    ptscreensKey: ui.ptscreensKeyInput?.value.trim() || '',
-    preferredLanguage: ui.preferredLanguageSelect.value,
-    serviceList: ui.serviceListInput.value.trim(),
-    tagList: ui.tagListInput.value.trim(),
-    autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),
-    ffmpegPath: ui.ffmpegPathInput?.value.trim() || '',
-    screenshotsCount: parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6,
-    imageHostPrimary: ui.imageHostPrimarySelect?.value || 'imgbb',
-    imageHostFallback: ui.imageHostFallbackSelect?.value || 'ptscreens',
-    unit3dBaseUrl: ui.unit3dBaseUrlInput?.value.trim() || 'https://shareisland.org',
-    unit3dApiKey: ui.unit3dApiKeyInput?.value.trim() || '',
-    torrentPasskey: passkey,
-    torrentAnnounceUrl: announceUrl,
-    torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
-    torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked)
-  };
-}
-
 function refreshSettingsSnapshot() {
   settingsSnapshot = JSON.stringify(getSettings());
   settingsDirty = false;
@@ -584,10 +395,84 @@ function isSettingsOpen() {
 function openSettings() {
   refreshSettingsSnapshot();
   ui.settingsModal.classList.remove('hidden');
+  closeAdvancedSettings();
 }
 
 function closeSettings() {
   ui.settingsModal.classList.add('hidden');
+  closeAdvancedSettings();
+}
+
+function setWizardStep(index) {
+  if (!ui.uploadWizardTrack) {
+    return;
+  }
+  const safeIndex = Number.isFinite(index) ? index : 0;
+  const clamped = Math.max(0, Math.min(safeIndex, WIZARD_STEP_COUNT - 1));
+  wizardStepIndex = clamped;
+  ui.uploadWizardTrack.style.transform = `translateX(-${clamped * 100}%)`;
+  if (ui.uploadWizardSteps) {
+    const buttons = ui.uploadWizardSteps.querySelectorAll('.wizard-step-btn');
+    buttons.forEach((button) => {
+      const stepIndex = Number(button.dataset.step);
+      const isActive = stepIndex === clamped;
+      button.classList.toggle('active', isActive);
+      if (isActive) {
+        button.setAttribute('aria-current', 'step');
+      } else {
+        button.removeAttribute('aria-current');
+      }
+    });
+  }
+  if (ui.wizardStepStatus) {
+    ui.wizardStepStatus.textContent = `Step ${clamped + 1} di ${WIZARD_STEP_COUNT}`;
+  }
+  if (ui.wizardPrevBtn) {
+    ui.wizardPrevBtn.disabled = clamped === 0;
+  }
+  if (ui.wizardNextBtn) {
+    ui.wizardNextBtn.disabled = clamped === WIZARD_STEP_COUNT - 1;
+  }
+  if (clamped === 0) {
+    updateWizardRulesCheck(getFormState());
+  } else if (clamped === 1) {
+    prepareTorrentStep();
+  } else if (clamped === 2) {
+    uploadKit?.prepareUploadKitStep?.();
+  }
+}
+
+function openUploadWizard(step = 0) {
+  if (!ui.uploadWizardModal) {
+    return;
+  }
+  if (!state.targetPath) {
+    showToast('Carica un file o una cartella per avviare il wizard.');
+    return;
+  }
+  ui.uploadWizardModal.classList.remove('hidden');
+  setWizardStep(step);
+}
+
+function closeUploadWizard() {
+  if (!ui.uploadWizardModal) {
+    return;
+  }
+  ui.uploadWizardModal.classList.add('hidden');
+}
+
+function openAdvancedSettings() {
+  if (!ui.advancedSettingsModal) {
+    return;
+  }
+  ui.advancedSettingsModal.classList.remove('hidden');
+}
+
+function closeAdvancedSettings() {
+  if (!ui.advancedSettingsModal) {
+    return;
+  }
+  ui.advancedSettingsModal.classList.add('hidden');
 }
 
 async function requestCloseSettings() {
@@ -672,6 +557,16 @@ function openRulesModal() {
   ui.rulesModal.classList.remove('hidden');
 }
 
+async function updateAppVersionLabel() {
+  if (!ui.appVersion || !window.api?.getAppVersion) {
+    return;
+  }
+  const version = await window.api.getAppVersion();
+  if (version) {
+    ui.appVersion.textContent = `(v. ${version})`;
+  }
+}
+
 function closeRulesModal() {
   ui.rulesModal.classList.add('hidden');
 }
@@ -702,21 +597,15 @@ function renderTorrentWarnings(list) {
   }
 }
 
-function openTorrentModal() {
+function prepareTorrentStep() {
   if (!state.targetPath) {
-    setHint(ui.renameHint, 'Seleziona un file o una cartella.');
+    setHint(ui.torrentHint, 'Seleziona un file o una cartella.');
     return;
   }
 
   const settings = loadSettings();
-  if (ui.torrentAnnounceInput) {
-    ui.torrentAnnounceInput.value = getAnnounceUrlFromSettings(settings);
-  }
   if (ui.torrentOutputInput) {
     ui.torrentOutputInput.value = settings.torrentOutputDir || '';
-  }
-  if (ui.torrentPrivateToggle) {
-    ui.torrentPrivateToggle.checked = settings.torrentPrivate !== false;
   }
   if (ui.torrentNameInput) {
     ui.torrentNameInput.value = renameTools.getTorrentNameSuggestion() || '';
@@ -728,18 +617,20 @@ function openTorrentModal() {
     ui.torrentRootName.textContent = rootName || '-';
   }
 
-  renderTorrentWarnings(renameTools.buildTorrentWarnings());
   setHint(ui.torrentHint, '');
   resetTorrentProgress();
-  ui.torrentModal.classList.remove('hidden');
+}
+
+function openTorrentModal() {
+  if (!state.targetPath) {
+    setHint(ui.renameHint, 'Seleziona un file o una cartella.');
+    return;
+  }
+  openUploadWizard(1);
 }
 
 function closeTorrentModal() {
-  if (!ui.torrentModal) {
-    return;
-  }
   resetTorrentProgress();
-  ui.torrentModal.classList.add('hidden');
 }
 
 function setTorrentProgress(value) {
@@ -857,47 +748,6 @@ function renderGroupDefaults() {
   }
 }
 
-function parseServiceList(raw) {
-  if (!raw) {
-    return [];
-  }
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line) => {
-      let label = '';
-      let code = '';
-      if (line.includes('=')) {
-        [label, code] = line.split('=');
-      } else if (line.includes('|')) {
-        [label, code] = line.split('|');
-      } else if (line.includes(':')) {
-        [label, code] = line.split(':');
-      } else {
-        code = line;
-        label = line;
-      }
-      label = (label || '').trim();
-      code = (code || '').trim();
-      if (!code) {
-        return null;
-      }
-      return { label: label || code, code };
-    })
-    .filter(Boolean);
-}
-
-function parseSimpleList(raw) {
-  if (!raw) {
-    return [];
-  }
-  return raw
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-}
-
 function closeAllDropdowns(except) {
   document.querySelectorAll('.dropdown.open').forEach((dropdown) => {
     if (dropdown !== except) {
@@ -971,182 +821,6 @@ function setupDropdown(dropdown, trigger, input, menu) {
   });
 }
 
-async function loadServiceDefaults() {
-  if (serviceDefaultsLoaded) {
-    return DEFAULT_SERVICES;
-  }
-  try {
-    let data = [];
-    if (window.api?.readServices) {
-      const result = await window.api.readServices();
-      if (result?.ok) {
-        data = Array.isArray(result.data) ? result.data : [];
-      } else {
-        throw new Error(result?.error || 'read-services failed');
-      }
-    } else {
-      const response = await fetch('services.json');
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-      const fallback = await response.json();
-      data = Array.isArray(fallback) ? fallback : [];
-    }
-    DEFAULT_SERVICES.splice(0, DEFAULT_SERVICES.length, ...data);
-    serviceDefaultsLoaded = true;
-    logDebug('services.json loaded', { count: DEFAULT_SERVICES.length });
-  } catch (error) {
-    serviceDefaultsLoaded = true;
-    logDebug('services.json load failed', String(error));
-  }
-  return DEFAULT_SERVICES;
-}
-
-function buildServiceOptions(settings) {
-  const map = new Map();
-  for (const service of DEFAULT_SERVICES) {
-    map.set(service.code, service.label);
-  }
-  const custom = parseServiceList(settings?.serviceList || '');
-  for (const service of custom) {
-    map.set(service.code, service.label);
-  }
-  return [...map.entries()].map(([code, label]) => ({ code, label }));
-}
-
-function updateServiceOptions(settings) {
-  if (!ui.serviceInput || !ui.serviceDropdownMenu || !ui.serviceInputBtn) {
-    return;
-  }
-  const current = ui.serviceInput.value;
-  const options = buildServiceOptions(settings);
-  ui.serviceDropdownMenu.innerHTML = '';
-
-  const blank = document.createElement('button');
-  blank.type = 'button';
-  blank.className = 'dropdown-item';
-  blank.dataset.value = '';
-  blank.textContent = 'Seleziona servizio';
-  ui.serviceDropdownMenu.appendChild(blank);
-
-  for (const option of options) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'dropdown-item';
-    item.dataset.value = option.code;
-    item.textContent = `${option.label} (${option.code})`;
-    ui.serviceDropdownMenu.appendChild(item);
-  }
-  const currentOption = options.find((option) => option.code === current);
-  if (currentOption) {
-    ui.serviceInput.value = current;
-    ui.serviceInputBtn.textContent = `${currentOption.label} (${currentOption.code})`;
-  } else {
-    ui.serviceInput.value = '';
-    ui.serviceInputBtn.textContent = 'Seleziona servizio';
-  }
-}
-
-function updateTagOptions(settings) {
-  if (!ui.tagDropdownMenu || !ui.tagInputBtn || !ui.tagInput) {
-    return;
-  }
-  const tags = parseSimpleList(settings?.tagList || '');
-  const unique = [...new Set(tags)];
-  const suggestion = state.tagSuggestion || '';
-  const autoDetect = settings?.autoTagDetect !== false;
-  ui.tagDropdownMenu.innerHTML = '';
-
-  const blank = document.createElement('button');
-  blank.type = 'button';
-  blank.className = 'dropdown-item';
-  blank.dataset.value = '';
-  if (!unique.length) {
-    blank.dataset.disabled = 'true';
-    blank.classList.add('disabled');
-    blank.textContent = 'Aggiungili nelle Impostazioni';
-  } else {
-    blank.textContent = 'Seleziona tag gruppo';
-  }
-  ui.tagDropdownMenu.appendChild(blank);
-
-  for (const tag of unique) {
-    const item = document.createElement('button');
-    item.type = 'button';
-    item.className = 'dropdown-item';
-    item.dataset.value = tag;
-    item.textContent = tag;
-    ui.tagDropdownMenu.appendChild(item);
-  }
-
-  const manual = ui.tagInput.dataset.manual === 'true';
-  const current = ui.tagInput.value;
-  const currentInList = current && unique.includes(current);
-
-  if (autoDetect && suggestion && !manual) {
-    ui.tagInput.value = suggestion;
-    ui.tagInput.dataset.manual = 'false';
-    ui.tagInputBtn.textContent = `Rilevato: ${suggestion}`;
-    return;
-  }
-
-  if (!autoDetect && !currentInList) {
-    ui.tagInput.value = '';
-    ui.tagInput.dataset.manual = 'false';
-  }
-
-  if (currentInList) {
-    ui.tagInputBtn.textContent = current;
-    return;
-  }
-
-  if (!unique.length) {
-    ui.tagInputBtn.textContent = suggestion && autoDetect
-      ? `Rilevato: ${suggestion}`
-      : 'Aggiungili nelle Impostazioni';
-    return;
-  }
-
-  ui.tagInputBtn.textContent = suggestion && autoDetect
-    ? `Rilevato: ${suggestion}`
-    : 'Seleziona tag gruppo';
-}
-
-function buildKnownGroupTags(settings) {
-  const map = new Map();
-  for (const tag of DEFAULT_GROUP_TAGS) {
-    const clean = String(tag || '').trim();
-    if (clean) {
-      map.set(clean.toUpperCase(), clean);
-    }
-  }
-  const custom = parseSimpleList(settings?.tagList || '');
-  for (const tag of custom) {
-    const clean = String(tag || '').trim();
-    if (clean) {
-      map.set(clean.toUpperCase(), clean);
-    }
-  }
-  return [...map.values()];
-}
-
-function updateTagSuggestion(settings) {
-  const path = state.mainVideo || state.targetPath;
-  if (!path) {
-    state.tagSuggestion = '';
-    return;
-  }
-  state.tagSuggestion = metadataTools.extractGroupTagFromName(path, buildKnownGroupTags(settings));
-  if (state.tagSuggestion !== state.lastTagSuggestion) {
-    logDebug('tag suggestion', {
-      path,
-      suggestion: state.tagSuggestion,
-      settingsAuto: settings?.autoTagDetect !== false
-    });
-    state.lastTagSuggestion = state.tagSuggestion;
-  }
-}
-
 function applyFormatSuggestion(suggested) {
   const select = ui.formatSelect;
   const trigger = ui.formatSelectBtn;
@@ -1167,6 +841,36 @@ const metadataTools = createMetadataTools({
   setDropdownAuto,
   setInputAuto,
   applyFormatSuggestion
+});
+const {
+  parseSimpleList,
+  loadServiceDefaults,
+  buildServiceOptions,
+  updateServiceOptions,
+  updateTagOptions,
+  updateTagSuggestion
+} = createServiceTagTools({ ui, state, logDebug, metadataTools });
+const {
+  getAnnounceUrlFromSettings,
+  loadSettings,
+  saveSettings,
+  updateFfmpegHint,
+  applySettingsToUI,
+  getSettings
+} = createSettingsTools({
+  ui,
+  updateTagSuggestion,
+  updateTagOptions,
+  loadServiceDefaults,
+  updateServiceOptions,
+  schedulePreview
+});
+const { clearWizardRulesCheck, updateWizardRulesCheck } = createRulesCheckTools({
+  ui,
+  state,
+  metadataTools,
+  buildServiceOptions,
+  loadSettings
 });
 
 function setIfAuto(input, value) {
@@ -1191,14 +895,16 @@ function updateVisibility() {
 
   const showService = format === 'WEB-DL' || format === 'WEBRip';
   const showSource = format === 'Encode' || format === 'Remux' || format === 'Full Disc';
+  const showRegion = format === 'Full Disc';
 
   ui.serviceGroup.style.display = showService ? 'block' : 'none';
   ui.sourceGroup.style.display = showSource ? 'block' : 'none';
+  ui.regionWrapper.style.display = showRegion ? 'block' : 'none';
   if (ui.formatRow) {
     ui.formatRow.classList.toggle('no-source', !showSource);
     ui.formatRow.classList.toggle('no-service', !showService);
+    ui.formatRow.classList.toggle('with-region', showRegion);
   }
-  ui.regionWrapper.style.display = format === 'Full Disc' ? 'block' : 'none';
   ui.threeDWrapper.style.display = format === 'Remux' || format === 'Full Disc' ? 'inline-flex' : 'none';
   ui.languageTagInput.disabled = format === 'Full Disc';
 }
@@ -1282,9 +988,11 @@ async function updateRenamePlan() {
     ui.renamePlanList.innerHTML = '';
     ui.warningList.innerHTML = '';
     updateRenameBadge(null);
+    clearWizardRulesCheck();
     return;
   }
 
+  const form = getFormState();
   const { folderName, baseName, fileRenames, warnings } = renameTools.buildRenameTargets();
   const plan = await window.api.previewRename({
     targetPath: state.targetPath,
@@ -1384,6 +1092,8 @@ async function updateRenamePlan() {
       ui.warningList.appendChild(item);
     }
   }
+
+  updateWizardRulesCheck(form);
 
   const extension = state.mainExtension;
   ui.folderNamePreview.textContent = folderName || '-';
@@ -1588,6 +1298,7 @@ async function loadPath(targetPath) {
   }
 
   resetAllInputs({ skipPreview: true });
+  clearWizardRulesCheck();
 
   state.targetPath = targetPath;
   state.kind = scan.kind;
@@ -1614,7 +1325,13 @@ async function loadPath(targetPath) {
 
   ui.selectedPath.textContent = targetPath;
   ui.resetSourceBtn.classList.remove('hidden');
-  setHint(ui.scanHint, scan.mainVideo ? `File analizzato: ${scan.mainVideo}` : 'Nessun file analizzato.');
+  if (scan.mainVideo) {
+    setHint(ui.scanHint, `File analizzato: ${getPathBaseName(scan.mainVideo)}`);
+  } else if (scan.kind === 'dir') {
+    setHint(ui.scanHint, `Cartella analizzata: ${getPathBaseName(targetPath)}`);
+  } else {
+    setHint(ui.scanHint, 'Nessun file analizzato.');
+  }
 
   const settings = loadSettings();
   updateTagSuggestion(settings);
@@ -1669,6 +1386,9 @@ const uploadKit = createUploadKit({
   getMissingRenameRequirements: renameTools.getMissingRenameRequirements,
   getPathBaseName,
   loadSettings,
+  logDebug,
+  openWizardStep: (step) => openUploadWizard(step),
+  openConfirmModal,
   setHint,
   showToast,
   updateFfmpegHint
@@ -1718,13 +1438,6 @@ ui.applyRenameBtn.addEventListener('click', async () => {
 
   const form = getFormState();
   const missing = renameTools.getMissingRenameRequirements(form);
-  if (missing.length) {
-    const message = `${missing.join('\n')}\n\nVuoi procedere comunque?`;
-    const proceed = await openConfirmModal(message);
-    if (!proceed) {
-      return;
-    }
-  }
 
   const { folderName, fileRenames } = renameTools.buildRenameTargets();
   if (!fileRenames.length && !folderName) {
@@ -1732,10 +1445,29 @@ ui.applyRenameBtn.addEventListener('click', async () => {
     return;
   }
 
+  const renameFiles = ui.renameFileCheckbox.checked;
+  const renameFolder = state.kind === 'dir' && ui.renameFolderCheckbox.checked;
+  const fileCount = renameFiles ? fileRenames.length : 0;
+  const folderCount = renameFolder && folderName ? 1 : 0;
+  const parts = [];
+  if (folderCount > 0) {
+    parts.push(`${folderCount} ${folderCount === 1 ? 'cartella' : 'cartelle'}`);
+  }
+  if (fileCount > 0) {
+    parts.push(`${fileCount} file`);
+  }
+  const confirmMessage = `${missing.length ? `${missing.join('\n')}\n\n` : ''}Stai per rinominare ${
+    parts.length ? parts.join(' e ') : '0 elementi'
+  }. Confermi?`;
+  const proceed = await openConfirmModal(confirmMessage);
+  if (!proceed) {
+    return;
+  }
+
   const payload = {
     targetPath: state.targetPath,
-    renameFiles: ui.renameFileCheckbox.checked,
-    renameFolder: state.kind === 'dir' && ui.renameFolderCheckbox.checked,
+    renameFiles,
+    renameFolder,
     folderName: state.kind === 'dir' ? folderName : '',
     fileRenames
   };
@@ -1760,15 +1492,14 @@ if (ui.generateTorrentBtn) {
       return;
     }
 
-    const announceInput = ui.torrentAnnounceInput?.value.trim() || '';
+    const settings = loadSettings();
     const outputDir = ui.torrentOutputInput?.value.trim() || '';
     const outputName = ui.torrentNameInput?.value.trim() || '';
-    const isPrivate = ui.torrentPrivateToggle?.checked !== false;
-    const announceResolved = resolveAnnounceInput(announceInput);
-    const announce = announceResolved.announceUrl;
+    const isPrivate = settings.torrentPrivate !== false;
+    const announce = getAnnounceUrlFromSettings(settings);
 
     if (!announce) {
-      setHint(ui.torrentHint, 'Inserisci l\'announce URL.');
+      setHint(ui.torrentHint, 'Imposta il PID/announce nelle Impostazioni.');
       return;
     }
     if (!outputDir) {
@@ -1797,11 +1528,8 @@ if (ui.generateTorrentBtn) {
     if (result?.ok) {
       state.lastTorrentPath = result.outputPath || '';
       const updated = {
-        ...loadSettings(),
-        torrentPasskey: announceResolved.passkey || '',
-        torrentAnnounceUrl: announceResolved.passkey ? '' : announce,
-        torrentOutputDir: outputDir,
-        torrentPrivate: isPrivate
+        ...settings,
+        torrentOutputDir: outputDir
       };
       saveSettings(updated);
       applySettingsToUI(updated);
@@ -1824,6 +1552,12 @@ if (ui.generateTorrentBtn) {
 
 ui.openSettingsBtn.addEventListener('click', openSettings);
 ui.closeSettingsBtn.addEventListener('click', requestCloseSettings);
+if (ui.openAdvancedSettingsBtn) {
+  ui.openAdvancedSettingsBtn.addEventListener('click', openAdvancedSettings);
+}
+if (ui.closeAdvancedSettingsBtn) {
+  ui.closeAdvancedSettingsBtn.addEventListener('click', closeAdvancedSettings);
+}
 ui.settingsModal.addEventListener('click', (event) => {
   if (event.target.classList.contains('modal-backdrop')) {
     requestCloseSettings();
@@ -1841,6 +1575,62 @@ ui.settingsModal.addEventListener('change', (event) => {
   }
   updateSettingsDirtyFlag();
 });
+if (ui.advancedSettingsModal) {
+  ui.advancedSettingsModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeAdvancedSettings();
+    }
+  });
+  ui.advancedSettingsModal.addEventListener('input', (event) => {
+    if (!event.target.closest('.advanced-settings-body')) {
+      return;
+    }
+    updateSettingsDirtyFlag();
+  });
+  ui.advancedSettingsModal.addEventListener('change', (event) => {
+    if (!event.target.closest('.advanced-settings-body')) {
+      return;
+    }
+    updateSettingsDirtyFlag();
+  });
+}
+
+if (ui.openUploadWizardBtn) {
+  ui.openUploadWizardBtn.addEventListener('click', openUploadWizard);
+}
+if (ui.closeUploadWizardBtn) {
+  ui.closeUploadWizardBtn.addEventListener('click', closeUploadWizard);
+}
+if (ui.uploadWizardModal) {
+  ui.uploadWizardModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeUploadWizard();
+    }
+  });
+}
+if (ui.uploadWizardSteps) {
+  ui.uploadWizardSteps.addEventListener('click', (event) => {
+    const button = event.target.closest('.wizard-step-btn');
+    if (!button) {
+      return;
+    }
+    const step = Number(button.dataset.step);
+    if (!Number.isFinite(step)) {
+      return;
+    }
+    setWizardStep(step);
+  });
+}
+if (ui.wizardPrevBtn) {
+  ui.wizardPrevBtn.addEventListener('click', () => {
+    setWizardStep(Number(wizardStepIndex) - 1);
+  });
+}
+if (ui.wizardNextBtn) {
+  ui.wizardNextBtn.addEventListener('click', () => {
+    setWizardStep(Number(wizardStepIndex) + 1);
+  });
+}
 
 if (ui.themeToggle) {
   ui.themeToggle.addEventListener('click', () => {
@@ -2024,6 +1814,7 @@ ui.saveSettingsBtn.addEventListener('click', () => {
   saveSettings(settings);
   applySettingsToUI(settings);
   setHint(ui.settingsHint, 'Impostazioni salvate.');
+  showToast('Impostazioni salvate.');
   refreshSettingsSnapshot();
 });
 
@@ -2102,5 +1893,6 @@ applyTheme(loadTheme());
 updateAutoDetectControls();
 updateVisibility();
 refreshPreview();
+updateAppVersionLabel();
 
 logDebug('Renderer loaded');

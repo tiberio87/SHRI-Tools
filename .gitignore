@@ -4,6 +4,8 @@ BRAINSTORMING/
 !.gitignore
 !app/
 !app/**
+!assets/
+!assets/**
 !main.js
 !preload.js
 !package.json

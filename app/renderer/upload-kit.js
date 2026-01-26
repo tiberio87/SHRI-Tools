@@ -28,6 +28,9 @@ export function createUploadKit(deps) {
     getMissingRenameRequirements,
     getPathBaseName,
     loadSettings,
+    logDebug,
+    openWizardStep,
+    openConfirmModal,
     setHint,
     showToast,
     updateFfmpegHint
@@ -37,6 +40,12 @@ export function createUploadKit(deps) {
   let uploadMiShortCache = '';
   let uploadMiFullCache = '';
   let uploadIdsText = '';
+  let screensProgressUnsub = null;
+  let screensProgressRequestId = '';
+  let uploadTitleOverride = '';
+  let uploadTitleBase = '';
+  let uploadTitleFallback = false;
+  let uploadTitleSourcePath = '';
 
   function getHdrLabelFromForm(form) {
     const tokens = [];
@@ -104,7 +113,7 @@ export function createUploadKit(deps) {
     return parts.filter(Boolean).join(' ');
   }
 
-  function buildUploadTitle() {
+  function buildUploadTitleBase() {
     const baseForm = getFormState();
     const metaTitle = state.metadata?.title ? String(state.metadata.title).trim() : '';
     const title = metaTitle || baseForm.title;
@@ -113,14 +122,101 @@ export function createUploadKit(deps) {
     const isDir = state.kind === 'dir';
     const seasonType = baseForm.type.includes('anime') ? 'anime-season' : 'tv-season';
     const type = isDir ? seasonType : baseForm.type;
-    const baseName = computeBaseName(form, { type, separatorStyle: 'spaces' });
+    const dropEpisodeTitle = type === 'tv-episode' || type === 'anime-episode';
+    const baseName = computeBaseName(form, {
+      type,
+      separatorStyle: 'spaces',
+      episodeTitle: dropEpisodeTitle ? '' : form.episodeTitle
+    });
     return { title: baseName, fallback };
   }
 
-  function buildUploadIds() {
-    const form = getFormState();
-    const category = form.type.includes('tv') || form.type.includes('anime') ? 'TV' : 'MOVIE';
-    const categoryId = UNIT3D_CATEGORY_ID[category] || '';
+  function buildUploadTitle() {
+    const { title, fallback } = buildUploadTitleBase();
+    const baseTitle = title || '';
+    const overridden = Boolean(uploadTitleOverride);
+    return {
+      title: overridden ? uploadTitleOverride : baseTitle,
+      baseTitle,
+      fallback,
+      overridden
+    };
+  }
+
+  function updateUploadTitleHint() {
+    if (!ui.uploadTitleHint) {
+      return;
+    }
+    if (uploadTitleOverride) {
+      ui.uploadTitleHint.textContent = 'Titolo modificato manualmente.';
+      return;
+    }
+    ui.uploadTitleHint.textContent = uploadTitleFallback
+      ? 'Titolo API non disponibile: uso fallback dal file.'
+      : '';
+  }
+
+  function syncUploadTitleOverride(value) {
+    const nextValue = String(value || '').trim();
+    if (!nextValue || nextValue === uploadTitleBase) {
+      uploadTitleOverride = '';
+      if (ui.uploadTitleInput) {
+        ui.uploadTitleInput.value = uploadTitleBase || '-';
+      }
+    } else {
+      uploadTitleOverride = nextValue;
+    }
+    updateUploadTitleHint();
+  }
+
+  function normalizeIdValue(value) {
+    if (value === undefined || value === null || value === '') {
+      return '0';
+    }
+    return String(value);
+  }
+
+  function normalizeIntValue(value) {
+    if (value === undefined || value === null || value === '') {
+      return null;
+    }
+    const parsed = Number.parseInt(String(value).trim(), 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function parseOverrideMap(raw, normalizeKey) {
+    const map = {};
+    const lines = String(raw || '').split(/\r?\n/);
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.includes('=')) {
+        continue;
+      }
+      const parts = trimmed.split('=');
+      const keyRaw = parts.shift()?.trim();
+      const value = parts.join('=').trim();
+      if (!keyRaw || !value) {
+        continue;
+      }
+      const key = normalizeKey ? normalizeKey(keyRaw) : keyRaw;
+      if (!key) {
+        continue;
+      }
+      map[key] = value;
+    }
+    return map;
+  }
+
+  function getUploadMapping(form, settings) {
+    const resolvedSettings = settings || loadSettings();
+    const isTv = form.type.includes('tv') || form.type.includes('anime');
+    const categoryKey = isTv ? 'TV' : 'MOVIE';
+    const categoryOverrides = parseOverrideMap(
+      resolvedSettings.unit3dCategoryOverrides,
+      (key) => key.trim().toUpperCase()
+    );
+    const categoryMap = { ...UNIT3D_CATEGORY_ID, ...categoryOverrides };
+    const categoryId = categoryMap[categoryKey] || '';
     const typeKey = form.format === 'WEB-DL'
       ? 'WEBDL'
       : form.format === 'WEBRip'
@@ -132,8 +228,34 @@ export function createUploadKit(deps) {
             : form.format === 'Encode'
               ? 'ENCODE'
               : '';
-    const typeId = typeKey ? SHRI_TYPE_ID[typeKey] : '';
-    const resolutionId = form.resolution ? UNIT3D_RESOLUTION_ID[form.resolution] || '' : '';
+    const typeOverrides = parseOverrideMap(
+      resolvedSettings.unit3dTypeOverrides,
+      (key) => key.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+    );
+    const typeMap = { ...SHRI_TYPE_ID, ...typeOverrides };
+    const typeId = typeKey ? typeMap[typeKey] : '';
+    const resolutionOverrides = parseOverrideMap(
+      resolvedSettings.unit3dResolutionOverrides,
+      (key) => key.trim().toLowerCase()
+    );
+    const resolutionMap = { ...UNIT3D_RESOLUTION_ID, ...resolutionOverrides };
+    const resolutionId = form.resolution ? resolutionMap[form.resolution] || '' : '';
+    const isSd = ['480p', '480i', '576p', '576i'].includes(form.resolution);
+    return {
+      isTv,
+      categoryKey,
+      categoryId,
+      typeKey,
+      typeId,
+      resolutionId,
+      isSd
+    };
+  }
+
+  function buildUploadIds() {
+    const form = getFormState();
+    const settings = loadSettings();
+    const mapping = getUploadMapping(form, settings);
 
     const parts = [];
     if (state.metadata?.tmdbId && state.metadata.tmdbType) {
@@ -161,15 +283,6 @@ export function createUploadKit(deps) {
         link
       });
     }
-    if (categoryId) {
-      parts.push({ label: 'Category ID', value: categoryId });
-    }
-    if (typeId) {
-      parts.push({ label: 'Type ID', value: typeId });
-    }
-    if (resolutionId) {
-      parts.push({ label: 'Resolution ID', value: resolutionId });
-    }
     return parts;
   }
 
@@ -191,11 +304,12 @@ export function createUploadKit(deps) {
     }
     const rows = [];
     for (let index = 0; index < items.length; index += 2) {
-      rows.push(`${items.slice(index, index + 2).join(' ')} \n`);
+      const row = items.slice(index, index + 2).join(' ');
+      rows.push(`[center]${row}[/center]`);
     }
-    let grid = rows.join('').trim();
+    let grid = rows.join('\n').trim();
     if (state.screenshotsMeta?.tonemapped) {
-      grid = `${grid}\n[i]Screenshot tonemappati (HDR -> SDR).[/i]`;
+      grid = `${grid}\n[center][i]Screenshot tonemappati (HDR -> SDR).[/i][/center]`;
     }
     return grid;
   }
@@ -278,14 +392,13 @@ export function createUploadKit(deps) {
     }
     const type = state.metadata?.tmdbType || (form.type.startsWith('tv') || form.type.startsWith('anime') ? 'tv' : 'movie');
     const imdbSlug = imdbId ? (imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`) : '';
-    let lines = '\n[size=13][b][color=#e8024b]--- LINKS ---[/color][/b][/size]\n';
+    let lines = '[size=13][b][color=#e8024b][ LINKS ][/color][/b][/size]\n';
     if (imdbSlug) {
       lines += `[size=11][color=#FFFFFF]IMDb: https://www.imdb.com/title/${imdbSlug}/[/color][/size]\n`;
     }
     if (tmdbId) {
       lines += `[size=11][color=#FFFFFF]TMDb: https://www.themoviedb.org/${type}/${tmdbId}[/color][/size]\n`;
     }
-    lines += '\n';
     return lines;
   }
 
@@ -294,12 +407,13 @@ export function createUploadKit(deps) {
     const tonemapNote = state.screenshotsMeta?.tonemapped
       ? 'Screenshot tonemappati (HDR -> SDR).'
       : '';
+    const manualNotes = ui.uploadReleaseNotesInput?.value.trim();
     const isIsland = tag.toLowerCase() === 'island';
-    const baseNotes = isIsland
+    const baseNotes = manualNotes || (isIsland
       ? 'Questa e una release interna pubblicata in esclusiva su ShareIsland.\nSi prega di non ricaricare questa release su tracker pubblici o privati. Si prega di mantenerla in seed il piu a lungo possibile. Grazie!'
-      : 'Nulla da aggiungere.';
+      : 'Nulla da aggiungere.');
     const notes = tonemapNote ? `${baseNotes}\n${tonemapNote}` : baseNotes;
-    return `[size=13][b][color=#e8024b]--- RELEASE NOTES ---[/color][/b][/size]\n[size=11][color=#FFFFFF]${notes}[/color][/size]`;
+    return `[size=13][b][color=#e8024b][ RELEASE NOTES ][/color][/b][/size]\n[size=11][color=#FFFFFF]${notes}[/color][/size]`;
   }
 
   function buildShoutouts(form) {
@@ -319,16 +433,18 @@ export function createUploadKit(deps) {
   function buildCategoryHeader(form) {
     if (form.type.startsWith('tv') || form.type.startsWith('anime')) {
       return form.type.includes('season')
-        ? '--- SERIE TV (STAGIONE) ---'
-        : '--- SERIE TV (EPISODIO) ---';
+        ? '[ SERIE TV (STAGIONE) ]'
+        : '[ SERIE TV (EPISODIO) ]';
     }
-    return '--- FILM ---';
+    return '[ FILM ]';
   }
 
   function buildUploadDescription(form) {
     const title = state.metadata?.title || form.title || 'Unknown';
     const rawSummary = state.metadata?.tmdbOverview || '';
-    const summary = rawSummary.trim() ? rawSummary.replace(/\s+/g, ' ') : 'Riassunto non disponibile.';
+    const summary = rawSummary.trim()
+      ? rawSummary.replace(/\s+/g, ' ')
+      : 'Riassunto non disponibile.';
     const infoLine = buildUploadInfoLine(form);
     const screens = buildScreensGridBbcode();
     const logoUrl = state.metadata?.tmdbLogoUrl || '';
@@ -340,7 +456,7 @@ export function createUploadKit(deps) {
 
     const synthetic = buildSyntheticMediaInfo();
     const mediainfoSection = synthetic
-      ? `[size=13][b][color=#da8d49]INFO GENERALI[/color][/b][/size]
+      ? `[code][size=13][b][color=#da8d49]MEDIAINFO SINTENTICO[/color][/b][/size]
 [size=11][color=#FFFFFF]Nome File       : ${synthetic.fn}[/color][/size]
 [size=11][color=#FFFFFF]Dimensioni File : ${synthetic.size}[/color][/size]
 [size=11][color=#FFFFFF]Durata          : ${synthetic.dur}[/color][/size]
@@ -363,49 +479,45 @@ export function createUploadKit(deps) {
 [size=11][color=#FFFFFF]Lingua          : ${synthetic.lang}[/color][/size]
 
 [size=13][b][color=#da8d49]SOTTOTITOLI[/color][/b][/size]
-[size=11][color=#FFFFFF]${synthetic.subs}[/color][/size]
-
-`
+[size=11][color=#FFFFFF]${synthetic.subs}[/color][/size][/code]`
       : '';
 
-    return `[code]
-${logoSection}[center][size=13][b][color=#e8024b]${categoryHeader}[/color][/b][/size][/center]
+    const infoBlock = infoLine
+      ? `[center][size=13][color=#ffffff]${infoLine}[/color][/size][/center]`
+      : '';
+    const summaryBlock = `[center][size=13][b][color=#e8024b][ RIASSUNTO ][/color][/b][/size][/center]
+[center][size=13]${summary}[/size][/center]`;
+    const screensBlock = `[center][size=13][b][color=#e8024b][ SCREENSHOT ][/color][/b][/size][/center]
+${screens}`;
+    const extras = [
+      linksSection,
+      releaseNotesSection,
+      `[size=13][b][color=#e8024b][ SHOUTOUTS ][/color][/b][/size]\n[size=11][color=#FFFFFF]${shoutouts}[/color][/size]`
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+    const extrasBlock = extras ? `[center]\n${extras}\n[/center]` : '';
+    const downloadBlock = '[size=13][color=#0592a3][size=16][b][center]BUON DOWNLOAD![/center][/b][/size][/color][/size]';
+
+    return `${logoSection}[center][size=13][b][color=#e8024b]${categoryHeader}[/color][/b][/size][/center]
 [center][size=13][b][color=#ffffff]${title}[/color][/b][/size][/center]
-[center][size=13][color=#ffffff]${infoLine}[/color][/size][/center]
+${infoBlock}
 
-[center][size=13][b][color=#e8024b]--- RIASSUNTO ---[/color][/b][/size][/center]
-${summary}
+${summaryBlock}
 
-[center][size=13][b][color=#e8024b]--- SCREENS ---[/color][/b][/size][/center]
-${screens}
-${linksSection}${mediainfoSection}${releaseNotesSection}
+${screensBlock}
+${extrasBlock}
 
-[size=13][b][color=#e8024b]--- SHOUTOUTS ---[/color][/b][/size]
-[size=11][color=#FFFFFF]${shoutouts}[/color][/size]
+${mediainfoSection}
 
-[size=13][color=#0592a3][size=16][b]BUON DOWNLOAD![/b][/size][/color][/size]
+${downloadBlock}
 
-[right][size=8]Generated by SHRI-Tools[/size][/right]
-[/code]`;
+[right][size=8]Generated by SHRI-Tools[/size][/right]`;
   }
 
   function buildUploadWarnings(form, settings) {
     const warnings = [];
-    const category = form.type.includes('tv') || form.type.includes('anime') ? 'TV' : 'MOVIE';
-    const categoryId = UNIT3D_CATEGORY_ID[category] || '';
-    const typeKey = form.format === 'WEB-DL'
-      ? 'WEBDL'
-      : form.format === 'WEBRip'
-        ? 'WEBRIP'
-        : form.format === 'Remux'
-          ? 'REMUX'
-          : form.format === 'Full Disc'
-            ? 'DISC'
-            : form.format === 'Encode'
-              ? 'ENCODE'
-              : '';
-    const typeId = typeKey ? SHRI_TYPE_ID[typeKey] : '';
-    const resolutionId = form.resolution ? UNIT3D_RESOLUTION_ID[form.resolution] || '' : '';
+    const mapping = getUploadMapping(form, settings);
     if (!state.metadata?.title) {
       warnings.push('Titolo non trovato via API: uso fallback dal file.');
     }
@@ -420,14 +532,14 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     }
     if (!form.resolution) {
       warnings.push('Risoluzione mancante.');
-    } else if (!resolutionId) {
+    } else if (!mapping.resolutionId) {
       warnings.push('Risoluzione non mappata per UNIT3D.');
     }
-    if (!categoryId) {
+    if (!mapping.categoryId) {
       warnings.push('Category ID non disponibile per UNIT3D.');
     }
-    if (!typeId) {
-      warnings.push('Type ID non disponibile per SHRI.');
+    if (!mapping.typeId) {
+      warnings.push('Type ID non disponibile per UNIT3D.');
     }
     warnings.push(...getMissingRenameRequirements(form));
 
@@ -445,6 +557,174 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
       }
     }
     return warnings;
+  }
+
+  async function ensureUploadMiFullCache() {
+    if (!state.mainVideo) {
+      return '';
+    }
+    if (uploadMiFullCache && uploadMiFullCache !== 'Caricamento...') {
+      return uploadMiFullCache;
+    }
+    uploadMiFullCache = 'Caricamento...';
+    if (ui.uploadMiText && uploadMiMode === 'full') {
+      ui.uploadMiText.textContent = uploadMiFullCache;
+    }
+    const result = await window.api.getMediaInfoText(state.mainVideo);
+    uploadMiFullCache = result?.text || result?.error || 'Nessun output disponibile.';
+    if (ui.uploadMiText && uploadMiMode === 'full') {
+      ui.uploadMiText.textContent = uploadMiFullCache;
+    }
+    return uploadMiFullCache;
+  }
+
+  function buildUploadSummary(form, settings) {
+    const mapping = getUploadMapping(form, settings);
+    const { title } = buildUploadTitle();
+    const tmdb = state.metadata?.tmdbId ? `TMDB ${state.metadata.tmdbId}` : 'TMDB -';
+    const imdb = state.metadata?.imdbId ? `IMDb ${state.metadata.imdbId}` : 'IMDb -';
+    const tvdb = state.metadata?.tvdbSeriesId ? `TVDB ${state.metadata.tvdbSeriesId}` : 'TVDB -';
+    const flags = [
+      settings.unit3dAnonymous ? 'Anonimo' : null,
+      settings.unit3dPersonalRelease ? 'Personal' : null,
+      settings.unit3dModQueue ? 'Mod Queue' : null
+    ].filter(Boolean);
+    const torrentLabel = state.lastTorrentPath ? state.lastTorrentPath : 'Nessun .torrent';
+    return [
+      `Titolo: ${title || '-'}`,
+      `Categoria: ${mapping.categoryKey || '-'}`,
+      `Tipo: ${mapping.typeKey || '-'}`,
+      `Risoluzione: ${form.resolution || '-'}`,
+      `ID: ${[tmdb, imdb, tvdb].join(' | ')}`,
+      `Flags: ${flags.length ? flags.join(', ') : 'Nessuno'}`,
+      `Torrent: ${torrentLabel}`
+    ].join('\n');
+  }
+
+  async function buildUnit3dPayload(form, settings) {
+    const mapping = getUploadMapping(form, settings);
+    const { title } = buildUploadTitle();
+    const description = buildUploadDescription(form);
+    const mediainfo = await ensureUploadMiFullCache();
+    const tmdb = normalizeIdValue(state.metadata?.tmdbId || state.metadata?.tmdb);
+    const imdb = normalizeIdValue(state.metadata?.imdbId || state.metadata?.imdb);
+    const tvdb = normalizeIdValue(state.metadata?.tvdbSeriesId || state.metadata?.tvdbId);
+    const seasonNumber = mapping.isTv ? normalizeIntValue(form.season) : null;
+    const episodeNumber = mapping.isTv ? normalizeIntValue(form.episode) : null;
+    const categoryId = normalizeIntValue(mapping.categoryId);
+    const typeId = normalizeIntValue(mapping.typeId);
+    const resolutionId = normalizeIntValue(mapping.resolutionId);
+
+    const payload = {
+      name: title || '',
+      description,
+      mediainfo,
+      bdinfo: '',
+      tmdb,
+      imdb,
+      tvdb,
+      anonymous: settings.unit3dAnonymous ? '1' : '0',
+      personal_release: settings.unit3dPersonalRelease ? '1' : '0',
+      mod_queue_opt_in: settings.unit3dModQueue ? '1' : '0',
+      stream: '0',
+      sd: mapping.isSd ? '1' : '0',
+      keywords: '',
+      internal: '0',
+      featured: '0',
+      free: '0',
+      doubleup: '0',
+      sticky: '0'
+    };
+    if (categoryId !== null) {
+      payload.category_id = categoryId;
+    }
+    if (typeId !== null) {
+      payload.type_id = typeId;
+    }
+    if (resolutionId !== null) {
+      payload.resolution_id = resolutionId;
+    }
+    if (seasonNumber !== null) {
+      payload.season_number = seasonNumber;
+    }
+    if (episodeNumber !== null) {
+      payload.episode_number = episodeNumber;
+    }
+    return payload;
+  }
+
+  async function submitUnit3dUpload() {
+    if (!state.lastTorrentPath) {
+      showToast('Genera prima il .torrent.');
+      return;
+    }
+    const settings = loadSettings();
+    const baseUrl = settings.unit3dBaseUrl || '';
+    const apiKey = settings.unit3dApiKey || '';
+    if (!baseUrl || !apiKey) {
+      showToast('Imposta Base URL e API key UNIT3D nelle impostazioni.');
+      return;
+    }
+    if (!window.api?.unit3dUpload) {
+      showToast('Upload UNIT3D non disponibile.');
+      return;
+    }
+    const form = getFormState();
+    const summary = buildUploadSummary(form, settings);
+    const confirmed = await openConfirmModal(
+      `Confermi l'upload con questi dati?\n\n${summary}`
+    );
+    if (!confirmed) {
+      return;
+    }
+    if (ui.uploadToUnit3dBtn) {
+      ui.uploadToUnit3dBtn.disabled = true;
+    }
+    try {
+      const data = await buildUnit3dPayload(form, settings);
+      logDebug?.('unit3d upload payload', {
+        category_id: data.category_id,
+        type_id: data.type_id,
+        resolution_id: data.resolution_id,
+        season_number: data.season_number,
+        episode_number: data.episode_number,
+        tmdb: data.tmdb,
+        imdb: data.imdb,
+        tvdb: data.tvdb,
+        anonymous: data.anonymous,
+        personal_release: data.personal_release,
+        mod_queue_opt_in: data.mod_queue_opt_in,
+        sd: data.sd
+      });
+      setHint(ui.uploadTitleHint, 'Upload in corso...');
+      const result = await window.api.unit3dUpload({
+        baseUrl,
+        apiKey,
+        torrentPath: state.lastTorrentPath,
+        data
+      });
+      logDebug?.('unit3d upload response', {
+        ok: result?.ok,
+        error: result?.error || '',
+        details: result?.details || '',
+        status: result?.status || '',
+        raw: result?.raw ? String(result.raw).slice(0, 2000) : ''
+      });
+      if (result?.ok) {
+        showToast(result?.message || 'Upload completato.');
+        setHint(ui.uploadTitleHint, 'Upload completato.');
+      } else {
+        const error = result?.error || result?.message || 'Errore upload.';
+        const details = result?.details ? `\n${result.details}` : '';
+        const followup = result?.details || result?.raw ? '' : '\nApri il log per dettagli.';
+        showToast(error);
+        setHint(ui.uploadTitleHint, `${error}${details}${followup}`);
+      }
+    } finally {
+      if (ui.uploadToUnit3dBtn) {
+        ui.uploadToUnit3dBtn.disabled = false;
+      }
+    }
   }
 
   function renderUploadIds(list) {
@@ -540,16 +820,81 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     section.setAttribute('aria-expanded', String(!collapsed));
   }
 
-  async function openUploadKitModal() {
+  function resetScreensProgress() {
+    if (ui.screensProgressRow) {
+      ui.screensProgressRow.classList.add('hidden');
+    }
+    if (ui.screensProgressFill) {
+      ui.screensProgressFill.style.width = '0%';
+    }
+    if (ui.screensProgressText) {
+      ui.screensProgressText.textContent = '0%';
+    }
+    if (ui.screensProgressStage) {
+      ui.screensProgressStage.classList.add('hidden');
+      ui.screensProgressStage.classList.remove('done');
+    }
+    if (ui.screensProgressStageText) {
+      ui.screensProgressStageText.textContent = 'Preparazione...';
+    }
+  }
+
+  function setScreensProgress(value) {
+    if (!ui.screensProgressRow || !ui.screensProgressFill || !ui.screensProgressText) {
+      return;
+    }
+    const progress = Math.max(0, Math.min(1, Number(value) || 0));
+    ui.screensProgressRow.classList.remove('hidden');
+    ui.screensProgressFill.style.width = `${Math.round(progress * 100)}%`;
+    ui.screensProgressText.textContent = `${Math.round(progress * 100)}%`;
+  }
+
+  function setScreensStage(stage, payload = {}) {
+    if (!ui.screensProgressStage || !ui.screensProgressStageText) {
+      return;
+    }
+    ui.screensProgressStage.classList.remove('hidden');
+    ui.screensProgressStage.classList.remove('done');
+    let text = 'Preparazione...';
+    if (stage === 'extract') {
+      text = `Estrazione frame ${payload.current || 0}/${payload.total || 0}`;
+    } else if (stage === 'upload') {
+      text = `Upload ${payload.current || 0}/${payload.total || 0}`;
+    } else if (stage === 'done') {
+      text = 'Completato';
+      ui.screensProgressStage.classList.add('done');
+    } else if (stage === 'error') {
+      text = payload.error ? `Errore: ${payload.error}` : 'Errore durante la generazione.';
+    } else if (stage === 'start') {
+      text = 'Preparazione...';
+    }
+    ui.screensProgressStageText.textContent = text;
+  }
+
+  async function prepareUploadKitStep() {
     if (!state.targetPath) {
       setHint(ui.renameHint, 'Seleziona un file o una cartella.');
       return;
     }
     const settings = loadSettings();
     const form = getFormState();
-    const { title, fallback } = buildUploadTitle();
-    ui.uploadTitleText.textContent = title || '-';
-    ui.uploadTitleHint.textContent = fallback ? 'Titolo API non disponibile: uso fallback dal file.' : '';
+    if (state.targetPath !== uploadTitleSourcePath) {
+      uploadTitleOverride = '';
+      uploadTitleSourcePath = state.targetPath;
+    }
+    const { title, fallback, baseTitle, overridden } = buildUploadTitle();
+    uploadTitleBase = baseTitle || '';
+    uploadTitleFallback = fallback;
+    if (ui.uploadTitleInput) {
+      ui.uploadTitleInput.value = title || '-';
+      ui.uploadTitleInput.readOnly = true;
+      ui.uploadTitleInput.dataset.editing = 'false';
+      ui.uploadTitleInput.classList.remove('editing');
+    }
+    if (ui.editUploadTitleBtn) {
+      ui.editUploadTitleBtn.textContent = 'Modifica';
+    }
+    updateUploadTitleHint(fallback, overridden);
 
     const ids = buildUploadIds();
     renderUploadIds(ids);
@@ -578,20 +923,28 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     renderUploadWarnings(buildUploadWarnings(form, settings));
     updateFfmpegHint(settings);
     ui.screensHint.textContent = settings.ffmpegPath
-      ? 'Pronto a generare gli screenshot.'
+      ? ''
       : 'FFmpeg non configurato.';
+    resetScreensProgress();
     renderScreensList();
 
     setUploadKitCollapsed('uploadMiSection', true);
     setUploadKitCollapsed('uploadDescSection', true);
-    ui.uploadKitModal.classList.remove('hidden');
+    return true;
   }
 
   function closeUploadKitModal() {
-    if (!ui.uploadKitModal) {
+    return;
+  }
+
+  async function openUploadKitModal() {
+    const ready = await prepareUploadKitStep();
+    if (!ready) {
       return;
     }
-    ui.uploadKitModal.classList.add('hidden');
+    if (typeof openWizardStep === 'function') {
+      openWizardStep(2);
+    }
   }
 
   async function generateScreenshots() {
@@ -609,6 +962,10 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     if (ui.generateScreensBtn) {
       ui.generateScreensBtn.disabled = true;
     }
+    screensProgressRequestId = String(Date.now());
+    resetScreensProgress();
+    setScreensProgress(0);
+    setScreensStage('start');
     ui.screensHint.textContent = 'Generazione screenshot in corso...';
     const payload = {
       videoPath,
@@ -617,7 +974,8 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
       primaryHost: settings.imageHostPrimary || 'imgbb',
       fallbackHost: settings.imageHostFallback || 'ptscreens',
       imgbbKey: settings.imgbbKey || '',
-      ptscreensKey: settings.ptscreensKey || ''
+      ptscreensKey: settings.ptscreensKey || '',
+      requestId: screensProgressRequestId
     };
     const result = await window.api.generateScreenshots(payload);
     if (result?.ok) {
@@ -625,8 +983,11 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
       state.screenshotsMeta = { tonemapped: Boolean(result.tonemapped) };
       ui.screensHint.textContent = `Screenshot caricati: ${state.screenshots.filter((s) => s.ok).length}/${state.screenshots.length}`;
       ui.uploadDescText.textContent = buildUploadDescription(getFormState());
+      setScreensProgress(1);
+      setScreensStage('done');
     } else {
       ui.screensHint.textContent = result?.error || 'Errore durante la generazione.';
+      setScreensStage('error', { error: result?.error });
     }
     renderScreensList();
     if (ui.generateScreensBtn) {
@@ -650,17 +1011,42 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     if (ui.closeUploadKitBtn) {
       ui.closeUploadKitBtn.addEventListener('click', closeUploadKitModal);
     }
-    if (ui.uploadKitModal) {
-      ui.uploadKitModal.addEventListener('click', (event) => {
-        if (event.target?.classList.contains('modal-backdrop')) {
-          closeUploadKitModal();
-        }
-      });
+    if (ui.uploadToUnit3dBtn) {
+      ui.uploadToUnit3dBtn.addEventListener('click', submitUnit3dUpload);
     }
 
     if (ui.copyUploadTitleBtn) {
       ui.copyUploadTitleBtn.addEventListener('click', () => {
-        copyToClipboard(ui.uploadTitleText.textContent, 'Titolo copiato.');
+        copyToClipboard(ui.uploadTitleInput?.value || '', 'Titolo copiato.');
+      });
+    }
+
+    if (ui.editUploadTitleBtn && ui.uploadTitleInput) {
+      ui.editUploadTitleBtn.addEventListener('click', () => {
+        const isEditing = ui.uploadTitleInput.dataset.editing === 'true';
+        if (!isEditing) {
+          ui.uploadTitleInput.readOnly = false;
+          ui.uploadTitleInput.dataset.editing = 'true';
+          ui.uploadTitleInput.classList.add('editing');
+          ui.editUploadTitleBtn.textContent = 'Blocca';
+          ui.uploadTitleInput.focus();
+          ui.uploadTitleInput.select();
+          return;
+        }
+        ui.uploadTitleInput.readOnly = true;
+        ui.uploadTitleInput.dataset.editing = 'false';
+        ui.uploadTitleInput.classList.remove('editing');
+        ui.editUploadTitleBtn.textContent = 'Modifica';
+        syncUploadTitleOverride(ui.uploadTitleInput.value);
+      });
+    }
+
+    if (ui.uploadTitleInput) {
+      ui.uploadTitleInput.addEventListener('input', () => {
+        if (ui.uploadTitleInput.readOnly) {
+          return;
+        }
+        syncUploadTitleOverride(ui.uploadTitleInput.value);
       });
     }
 
@@ -700,6 +1086,11 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     if (ui.copyUploadDescBtn) {
       ui.copyUploadDescBtn.addEventListener('click', () => {
         copyToClipboard(ui.uploadDescText.textContent, 'Descrizione copiata.');
+      });
+    }
+    if (ui.uploadReleaseNotesInput) {
+      ui.uploadReleaseNotesInput.addEventListener('input', () => {
+        refreshUploadDescription();
       });
     }
     if (ui.previewUploadDescBtn) {
@@ -744,6 +1135,23 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
       });
     }
 
+    if (window.api?.onScreensProgress && !screensProgressUnsub) {
+      screensProgressUnsub = window.api.onScreensProgress((data) => {
+        if (!data) {
+          return;
+        }
+        if (screensProgressRequestId && data.requestId && data.requestId !== screensProgressRequestId) {
+          return;
+        }
+        if (typeof data.progress === 'number') {
+          setScreensProgress(data.progress);
+        }
+        if (data.stage) {
+          setScreensStage(data.stage, data);
+        }
+      });
+    }
+
     document.querySelectorAll('.upload-section.collapsible').forEach((section) => {
       const sectionId = section.getAttribute('id');
       if (!sectionId) {
@@ -774,6 +1182,7 @@ ${linksSection}${mediainfoSection}${releaseNotesSection}
     generateScreenshots,
     initUploadKitEvents,
     openUploadKitModal,
+    prepareUploadKitStep,
     refreshUploadDescription,
     renderScreensList
   };

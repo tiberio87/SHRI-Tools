@@ -177,7 +177,11 @@ export function createMetadataTools(deps) {
     if (/^\d{3,4}P$/.test(upper) || /^(19|20)\d{2}$/.test(upper)) {
       return true;
     }
-    if (/^(ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR)([-_.](ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR))+$/i.test(upper)) {
+    if (
+      /^(ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR|NLD|POL|SWE)([-_.](ITA|ENG|FRE|GER|SPA|POR|JPN|RUS|CHI|KOR|UKR|NLD|POL|SWE))+$/i.test(
+        upper
+      )
+    ) {
       return true;
     }
     return false;

@@ -22,11 +22,13 @@
     "productName": "SHRI-Tools",
     "portable": {},
     "win": {
+      "icon": "assets/icons/app.ico",
       "target": [
         "portable"
       ]
     },
     "files": [
+      "assets/icons/**/*",
       "app/**/*",
       "main.js",
       "preload.js",

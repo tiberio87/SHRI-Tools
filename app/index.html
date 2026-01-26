@@ -14,10 +14,14 @@
   <div class="app">
     <header class="app-header">
       <div class="title-block">
-        <h1>SHRI - Tools</h1>
-        <p>Rinomina automatizzata e guidata di file e cartelle rispettando gli standard.. e altri tools</p>
+        <h1>SHRI - Tools <span id="appVersion" class="app-version">(v. -)</span></h1>
+        <p>Toolkit automatizzato di rinomina e caricamento .torrent</p>
       </div>
       <div class="header-actions">
+        <div id="appHealth" class="app-health" data-status="red" aria-label="Stato app">
+          <span class="app-health-dot" aria-hidden="true"></span>
+          <div id="appHealthTooltip" class="app-health-tooltip"></div>
+        </div>
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
         <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -92,44 +96,78 @@
                 <input id="serviceInput" type="hidden" value="" />
               </div>
             </div>
-            <div class="field">
-              <label for="resolutionInput">Risoluzione</label>
-              <div class="dropdown down" id="resolutionDropdown">
-                <button id="resolutionSelectBtn" class="dropdown-trigger" type="button">Seleziona risoluzione</button>
-                <div class="dropdown-menu" id="resolutionDropdownMenu">
-                  <button class="dropdown-item" type="button" data-value="">Seleziona risoluzione</button>
-                  <button class="dropdown-item" type="button" data-value="2160p">2160p</button>
-                  <button class="dropdown-item" type="button" data-value="1080p">1080p</button>
-                  <button class="dropdown-item" type="button" data-value="720p">720p</button>
-                  <button class="dropdown-item" type="button" data-value="576p">576p</button>
-                  <button class="dropdown-item" type="button" data-value="480p">480p</button>
+            <div class="field manual-field">
+              <label for="editionInput">Edizione</label>
+              <input id="editionInput" type="text" placeholder="IMAX / Extended" />
+            </div>
+            <div class="field manual-field" id="regionWrapper">
+              <label for="regionInput">Regione</label>
+              <input id="regionInput" type="text" placeholder="EUR / USA / IT" />
+            </div>
+            <div class="field manual-field">
+              <label for="repackSelect">Repack</label>
+              <div class="dropdown down" id="repackDropdown">
+                <button id="repackSelectBtn" class="dropdown-trigger" type="button">Nessuno</button>
+                <div class="dropdown-menu">
+                  <button class="dropdown-item" type="button" data-value="">Nessuno</button>
+                  <button class="dropdown-item" type="button" data-value="REPACK">REPACK</button>
+                  <button class="dropdown-item" type="button" data-value="PROPER">PROPER</button>
+                  <button class="dropdown-item" type="button" data-value="RERIP">RERIP</button>
                 </div>
-                <input id="resolutionInput" type="hidden" value="" />
+                <input id="repackSelect" type="hidden" value="" />
               </div>
             </div>
-            <div class="field">
-              <label for="videoCodecInput">Codec video</label>
-              <div class="dropdown down" id="videoCodecDropdown">
-                <button id="videoCodecSelectBtn" class="dropdown-trigger" type="button">Seleziona codec</button>
-                <div class="dropdown-menu" id="videoCodecDropdownMenu">
-                  <button class="dropdown-item" type="button" data-value="">Seleziona codec</button>
-                  <button class="dropdown-item" type="button" data-value="H.265">H.265</button>
-                  <button class="dropdown-item" type="button" data-value="x265">x265</button>
-                  <button class="dropdown-item" type="button" data-value="HEVC">HEVC</button>
-                  <button class="dropdown-item" type="button" data-value="H.264">H.264</button>
-                  <button class="dropdown-item" type="button" data-value="x264">x264</button>
-                  <button class="dropdown-item" type="button" data-value="AV1">AV1</button>
-                </div>
-                <input id="videoCodecInput" type="hidden" value="" />
+            <div class="field manual-field">
+              <label for="tagInput">Tag gruppo</label>
+              <div class="dropdown down" id="tagDropdown">
+                <button id="tagInputBtn" class="dropdown-trigger" type="button">Seleziona tag gruppo</button>
+                <div class="dropdown-menu" id="tagDropdownMenu"></div>
+                <input id="tagInput" type="hidden" value="" />
               </div>
             </div>
           </div>
-          <div class="row flags-row">
-            <label class="checkbox"><input id="uhdCheckbox" type="checkbox" />UHD</label>
-            <label class="checkbox"><input id="hdrCheckbox" type="checkbox" />HDR</label>
-            <label class="checkbox"><input id="hdr10plusCheckbox" type="checkbox" />HDR10+</label>
-            <label class="checkbox"><input id="dvCheckbox" type="checkbox" />DV</label>
-            <label class="checkbox" id="threeDWrapper"><input id="threeDCheckbox" type="checkbox" />3D</label>
+          <div class="row video-flags-row">
+            <div class="video-fields">
+              <div class="field">
+                <label for="resolutionInput">Risoluzione</label>
+                <div class="dropdown down" id="resolutionDropdown">
+                  <button id="resolutionSelectBtn" class="dropdown-trigger" type="button">Seleziona risoluzione</button>
+                  <div class="dropdown-menu" id="resolutionDropdownMenu">
+                    <button class="dropdown-item" type="button" data-value="">Seleziona risoluzione</button>
+                    <button class="dropdown-item" type="button" data-value="2160p">2160p</button>
+                    <button class="dropdown-item" type="button" data-value="1080p">1080p</button>
+                    <button class="dropdown-item" type="button" data-value="720p">720p</button>
+                    <button class="dropdown-item" type="button" data-value="576p">576p</button>
+                    <button class="dropdown-item" type="button" data-value="480p">480p</button>
+                  </div>
+                  <input id="resolutionInput" type="hidden" value="" />
+                </div>
+              </div>
+              <div class="field">
+                <label for="videoCodecInput">Codec video</label>
+                <div class="dropdown down" id="videoCodecDropdown">
+                  <button id="videoCodecSelectBtn" class="dropdown-trigger" type="button">Seleziona codec</button>
+                  <div class="dropdown-menu" id="videoCodecDropdownMenu">
+                    <button class="dropdown-item" type="button" data-value="">Seleziona codec</button>
+                    <button class="dropdown-item" type="button" data-value="H.265">H.265</button>
+                    <button class="dropdown-item" type="button" data-value="x265">x265</button>
+                    <button class="dropdown-item" type="button" data-value="HEVC">HEVC</button>
+                    <button class="dropdown-item" type="button" data-value="H.264">H.264</button>
+                    <button class="dropdown-item" type="button" data-value="x264">x264</button>
+                    <button class="dropdown-item" type="button" data-value="AV1">AV1</button>
+                  </div>
+                  <input id="videoCodecInput" type="hidden" value="" />
+                </div>
+              </div>
+            </div>
+            <div class="row flags-row">
+              <label class="checkbox"><input id="uhdCheckbox" type="checkbox" />UHD</label>
+              <label class="checkbox"><input id="hdrCheckbox" type="checkbox" />HDR</label>
+              <label class="checkbox"><input id="hdr10plusCheckbox" type="checkbox" />HDR10+</label>
+              <label class="checkbox"><input id="dvCheckbox" type="checkbox" />DV</label>
+              <label class="checkbox" id="threeDWrapper"><input id="threeDCheckbox" type="checkbox" />3D</label>
+              <label class="checkbox"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
+            </div>
           </div>
           <div class="row">
             <div class="field">
@@ -179,45 +217,6 @@
             </div>
           </div>
           <div id="audioLangHint" class="hint">Lingue audio rilevate: -</div>
-          <div class="row edition-row">
-            <div class="edition-left">
-              <div class="field manual-field">
-                <label for="editionInput">Edizione</label>
-                <input id="editionInput" type="text" placeholder="IMAX / Extended" />
-              </div>
-              <div class="field manual-field checkbox-field">
-                <label>&nbsp;</label>
-                <label class="checkbox"><input id="hybridCheckbox" type="checkbox" />Hybrid</label>
-              </div>
-            </div>
-            <div class="edition-right">
-              <div class="field manual-field">
-                <label for="repackSelect">Repack</label>
-                <div class="dropdown" id="repackDropdown">
-                  <button id="repackSelectBtn" class="dropdown-trigger" type="button">Nessuno</button>
-                  <div class="dropdown-menu">
-                    <button class="dropdown-item" type="button" data-value="">Nessuno</button>
-                    <button class="dropdown-item" type="button" data-value="REPACK">REPACK</button>
-                    <button class="dropdown-item" type="button" data-value="PROPER">PROPER</button>
-                    <button class="dropdown-item" type="button" data-value="RERIP">RERIP</button>
-                  </div>
-                  <input id="repackSelect" type="hidden" value="" />
-                </div>
-              </div>
-              <div class="field manual-field" id="regionWrapper">
-                <label for="regionInput">Regione</label>
-                <input id="regionInput" type="text" placeholder="EUR / USA / IT" />
-              </div>
-              <div class="field manual-field">
-                <label for="tagInput">Tag gruppo</label>
-                <div class="dropdown" id="tagDropdown">
-                  <button id="tagInputBtn" class="dropdown-trigger" type="button">Seleziona tag gruppo</button>
-                  <div class="dropdown-menu" id="tagDropdownMenu"></div>
-                  <input id="tagInput" type="hidden" value="" />
-                </div>
-              </div>
-            </div>
-          </div>
         </section>
 
         <section class="section">
@@ -308,8 +307,7 @@
           </div>
           <div class="action-row">
             <button id="applyRenameBtn" class="primary">Applica rinomina</button>
-            <button id="openTorrentBtn" class="success torrent-button" type="button">Genera .torrent</button>
-            <button id="openUploadKitBtn" class="secondary" type="button">Upload Kit</button>
+            <button id="openUploadWizardBtn" class="success torrent-button" type="button">Upload Wizard</button>
           </div>
           <div id="renameHint" class="hint"></div>
         </section>
@@ -342,6 +340,7 @@
         <h2>Impostazioni</h2>
         <div class="modal-actions">
           <button id="saveSettingsBtn" class="primary small">Salva impostazioni</button>
+          <button id="openAdvancedSettingsBtn" class="secondary small">Impostazioni avanzate</button>
           <button id="closeSettingsBtn" class="secondary small">Chiudi</button>
         </div>
       </div>
@@ -547,6 +546,20 @@
           </div>
         </div>
       </div>
+      <div class="row settings-row">
+        <label class="checkbox">
+          <input id="unit3dAnonymousToggle" type="checkbox" />
+          Upload anonimo
+        </label>
+        <label class="checkbox">
+          <input id="unit3dPersonalReleaseToggle" type="checkbox" />
+          Personal release
+        </label>
+        <label class="checkbox">
+          <input id="unit3dModQueueToggle" type="checkbox" />
+          Coda moderazione
+        </label>
+      </div>
       <div class="row">
         <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
       </div>
@@ -559,6 +572,37 @@
           <button id="openDebugBtn" class="secondary small">Apri log</button>
         </div>
       </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="advancedSettingsModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Impostazioni avanzate</h2>
+        <div class="modal-actions">
+          <button id="closeAdvancedSettingsBtn" class="secondary small">Chiudi</button>
+        </div>
+      </div>
+      <div class="advanced-settings-body">
+        <p class="hint">Usa questi override solo se l'istanza UNIT3D ha ID diversi da quelli di SHRI.</p>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="unit3dCategoryOverridesInput">Override Category ID UNIT3D (uno per riga, es. MOVIE=1)</label>
+            <textarea id="unit3dCategoryOverridesInput" rows="3" placeholder="Es. MOVIE=1"></textarea>
+          </div>
+          <div class="field">
+            <label for="unit3dTypeOverridesInput">Override Type ID UNIT3D (uno per riga, es. WEBDL=4)</label>
+            <textarea id="unit3dTypeOverridesInput" rows="3" placeholder="Es. WEBDL=4"></textarea>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="unit3dResolutionOverridesInput">Override Resolution ID UNIT3D (uno per riga, es. 2160p=2)</label>
+            <textarea id="unit3dResolutionOverridesInput" rows="3" placeholder="Es. 2160p=2"></textarea>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -630,140 +674,189 @@
     </div>
   </div>
 
-  <div id="torrentModal" class="modal hidden">
+  <div id="uploadWizardModal" class="modal hidden">
     <div class="modal-backdrop"></div>
-    <div class="modal-content modal-wide">
+    <div class="modal-content modal-wide wizard-modal">
       <div class="modal-header">
-        <h2>Genera .torrent</h2>
-        <button id="closeTorrentBtn" class="secondary">Chiudi</button>
-      </div>
-      <div class="row">
-        <div class="field">
-          <label for="torrentAnnounceInput">Announce URL</label>
-          <div class="input-with-action">
-            <input id="torrentAnnounceInput" type="password" placeholder="https://shareisland.org/announce/ILTUOPID" />
-            <button class="icon-button" type="button" data-target="torrentAnnounceInput" aria-label="Mostra announce URL">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="field">
-          <label for="torrentOutputInput">Cartella output .torrent</label>
-          <div class="input-with-action">
-            <input id="torrentOutputInput" type="text" placeholder="Seleziona cartella" />
-            <button id="browseTorrentOutputBtn" class="secondary small" type="button">Sfoglia</button>
-          </div>
+        <h2>Upload Wizard</h2>
+        <div class="modal-actions">
+          <button id="closeUploadWizardBtn" class="secondary small">Chiudi</button>
         </div>
       </div>
-      <div class="row">
-        <div class="field">
-          <label for="torrentNameInput">Nome file .torrent</label>
-          <input id="torrentNameInput" type="text" placeholder="Nome torrent" />
-        </div>
-        <div class="field">
-          <label>Root name (reale)</label>
-          <div id="torrentRootName" class="preview">-</div>
-        </div>
+      <div id="uploadWizardSteps" class="wizard-steps">
+        <button class="wizard-step-btn active" type="button" data-step="0">Rules check</button>
+        <button class="wizard-step-btn" type="button" data-step="1">Genera .torrent</button>
+        <button class="wizard-step-btn" type="button" data-step="2">Revisione finale e Caricamento</button>
       </div>
-      <div class="row">
-        <label class="checkbox">
-          <input id="torrentPrivateToggle" type="checkbox" checked />
-          Torrent privato
-        </label>
-        <div class="hint">Piece size: Auto · Padding: disabilitato</div>
-      </div>
-      <div class="progress-row hidden" id="torrentProgressRow">
-        <div class="progress-bar">
-          <div id="torrentProgressFill" class="progress-fill"></div>
-        </div>
-        <div id="torrentProgressText" class="progress-text">0%</div>
-      </div>
-      <div class="progress-stage hidden" id="torrentProgressStage">
-        <div class="spinner"></div>
-        <div class="progress-check" aria-hidden="true">
-          <svg viewBox="0 0 24 24">
-            <path d="M5 12l4 4 10-10"></path>
-          </svg>
-        </div>
-        <div id="torrentProgressStageText" class="progress-stage-text">Hashing...</div>
-      </div>
-      <div id="torrentWarnings" class="warning-list"></div>
-      <div class="confirm-actions">
-        <button id="generateTorrentBtn" class="primary">Genera .torrent</button>
-      </div>
-      <div id="torrentHint" class="hint"></div>
-    </div>
-  </div>
-
-  <div id="uploadKitModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content modal-wide">
-      <div class="modal-header">
-        <h2>Upload Kit</h2>
-        <button id="closeUploadKitBtn" class="secondary">Chiudi</button>
-      </div>
-      <div class="upload-kit-grid">
-        <section class="upload-section">
-          <div class="section-header">
-            <h3>Titolo upload</h3>
-            <button id="copyUploadTitleBtn" class="secondary small">Copia</button>
-          </div>
-          <div id="uploadTitleText" class="preview">-</div>
-          <div id="uploadTitleHint" class="hint"></div>
-        </section>
-        <section class="upload-section">
-          <div class="section-header">
-            <h3>ID</h3>
-          </div>
-          <div id="uploadIdsList" class="upload-ids">-</div>
-        </section>
-        <section id="uploadMiSection" class="upload-section full collapsible collapsed">
-          <div class="section-header">
-            <div class="collapse-title">
-              <h3>MediaInfo</h3>
+      <div class="wizard-body">
+        <div id="uploadWizardTrack" class="wizard-track">
+          <section class="wizard-step" data-step="0">
+            <div class="wizard-rules-summary">
+              <div id="wizardRulesFolderBlock" class="wizard-rules-block hidden">
+                <div class="wizard-rules-path">
+                  <div id="wizardRulesFolderLabel" class="label">Cartella</div>
+                  <div id="wizardRulesFolderPath" class="preview">-</div>
+                </div>
+                <div id="wizardRulesFolderBadges" class="wizard-rules-badges"></div>
+                <div id="wizardRulesFolderHint" class="wizard-rules-hint hidden"></div>
+              </div>
+              <div id="wizardRulesFileBlock" class="wizard-rules-block">
+                <div class="wizard-rules-path">
+                  <div id="wizardRulesFileLabel" class="label">File</div>
+                  <div id="wizardRulesFilePath" class="preview">-</div>
+                </div>
+                <div id="wizardRulesFileBadges" class="wizard-rules-badges"></div>
+                <div id="wizardRulesFileHint" class="wizard-rules-hint hidden"></div>
+                <div id="wizardRulesFileNote" class="wizard-rules-note hidden"></div>
+              </div>
+              <div class="wizard-rules-footer">
+                Questo step verifica la coerenza dei nomi con le rules in base ai dati rilevati e alle impostazioni
+                correnti. Sei comunque libero di procedere. Se devi correggere qualcosa rinomina i file nella
+                schermata principale e poi riapri il Wizard
+              </div>
             </div>
-            <div class="section-actions">
-              <button id="uploadMiShortBtn" class="tab-button" type="button">Short</button>
-              <button id="uploadMiFullBtn" class="tab-button active" type="button">Full</button>
-              <button id="copyUploadMiBtn" class="secondary small" type="button">Copia</button>
+          </section>
+          <section class="wizard-step" data-step="1">
+            <h3>Genera .torrent</h3>
+            <div class="hint">Announce URL: usa il PID o l'URL completo nelle Impostazioni.</div>
+            <div class="row">
+              <div class="field">
+                <label for="torrentOutputInput">Cartella output .torrent</label>
+                <div class="input-with-action">
+                  <input id="torrentOutputInput" type="text" placeholder="Seleziona cartella" />
+                  <button id="browseTorrentOutputBtn" class="secondary small" type="button">Sfoglia</button>
+                </div>
+              </div>
+              <div class="field">
+                <label for="torrentNameInput">Nome file .torrent</label>
+                <input id="torrentNameInput" type="text" placeholder="Nome torrent" />
+              </div>
             </div>
-          </div>
-          <div class="collapsible-body">
-            <pre id="uploadMiText" class="text-output text-output-compact">-</pre>
-          </div>
-        </section>
-        <section id="uploadDescSection" class="upload-section full collapsible collapsed">
-          <div class="section-header">
-            <div class="collapse-title">
-              <h3>Descrizione (BBCode)</h3>
+            <div class="row">
+              <div class="field">
+                <label>Root name (reale)</label>
+                <div id="torrentRootName" class="preview">-</div>
+              </div>
             </div>
-            <button id="previewUploadDescBtn" class="secondary small">Preview</button>
-            <button id="copyUploadDescBtn" class="secondary small">Copia</button>
-          </div>
-          <div class="collapsible-body">
-            <pre id="uploadDescText" class="text-output text-output-compact">-</pre>
-          </div>
-        </section>
-        <section class="upload-section full">
-          <div class="section-header">
-            <h3>Screenshots</h3>
-            <div class="section-actions">
-              <button id="generateScreensBtn" class="primary small" type="button">Genera & Carica</button>
-              <button id="copyScreensBbcodeBtn" class="secondary small" type="button">Copia BBCode</button>
+            <div class="progress-row hidden" id="torrentProgressRow">
+              <div class="progress-bar">
+                <div id="torrentProgressFill" class="progress-fill"></div>
+              </div>
+              <div id="torrentProgressText" class="progress-text">0%</div>
             </div>
-          </div>
-          <div id="screensHint" class="hint"></div>
-          <div id="screensList" class="screens-list"></div>
-        </section>
-        <section class="upload-section full">
-          <div class="section-header">
-            <h3>Warning</h3>
-          </div>
-          <div id="uploadWarnings" class="warning-list"></div>
-        </section>
+            <div class="progress-stage hidden" id="torrentProgressStage">
+              <div class="spinner"></div>
+              <div class="progress-check" aria-hidden="true">
+                <svg viewBox="0 0 24 24">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </div>
+              <div id="torrentProgressStageText" class="progress-stage-text">Hashing...</div>
+            </div>
+            <div class="confirm-actions">
+              <button id="generateTorrentBtn" class="primary">Genera .torrent</button>
+            </div>
+            <div id="torrentHint" class="hint"></div>
+          </section>
+          <section class="wizard-step wizard-step-upload" data-step="2">
+            <div class="wizard-step-header">
+              <h3>Revisione finale e Caricamento</h3>
+              <div id="uploadIdsList" class="upload-ids">-</div>
+            </div>
+            <div class="wizard-step-body">
+              <div class="upload-kit-grid">
+                <section id="uploadMiSection" class="upload-section full collapsible collapsed">
+                  <div class="section-header">
+                    <div class="collapse-title">
+                      <h3>MediaInfo</h3>
+                    </div>
+                    <div class="section-actions">
+                      <button id="uploadMiShortBtn" class="tab-button" type="button">Short</button>
+                      <button id="uploadMiFullBtn" class="tab-button active" type="button">Full</button>
+                      <button id="copyUploadMiBtn" class="secondary small" type="button">Copia</button>
+                    </div>
+                  </div>
+                  <div class="collapsible-body">
+                    <pre id="uploadMiText" class="text-output text-output-compact">-</pre>
+                  </div>
+                </section>
+                <section id="uploadReleaseNotesSection" class="upload-section full">
+                  <div class="section-header">
+                    <h3>Release notes (opzionale)</h3>
+                  </div>
+                  <div class="field">
+                    <input id="uploadReleaseNotesInput" type="text" placeholder="Aggiungi note da inserire in release notes" />
+                  </div>
+                </section>
+                <section id="uploadDescSection" class="upload-section full collapsible collapsed">
+                  <div class="section-header">
+                    <div class="collapse-title">
+                      <h3>Descrizione (BBCode)</h3>
+                    </div>
+                    <div class="section-actions">
+                      <button id="previewUploadDescBtn" class="secondary small">Preview</button>
+                      <button id="copyUploadDescBtn" class="secondary small">Copia BBCode</button>
+                    </div>
+                  </div>
+                  <div class="collapsible-body">
+                    <pre id="uploadDescText" class="text-output text-output-compact">-</pre>
+                  </div>
+                </section>
+                <section class="upload-section full">
+                  <div class="section-header">
+                    <h3>Screenshots</h3>
+                    <div class="section-actions">
+                      <button id="generateScreensBtn" class="primary small" type="button">Genera & Carica</button>
+                      <button id="copyScreensBbcodeBtn" class="secondary small" type="button">Copia BBCode Screens</button>
+                    </div>
+                  </div>
+                  <div id="screensHint" class="hint"></div>
+                  <div id="screensProgressRow" class="progress-row screens-progress-row hidden">
+                    <div class="progress-bar">
+                      <div id="screensProgressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="screensProgressText" class="progress-text">0%</div>
+                  </div>
+                  <div id="screensProgressStage" class="progress-stage screens-progress-stage hidden">
+                    <div class="spinner"></div>
+                    <div class="progress-check" aria-hidden="true">
+                      <svg viewBox="0 0 24 24">
+                        <path d="M5 12l4 4 10-10"></path>
+                      </svg>
+                    </div>
+                    <div id="screensProgressStageText" class="progress-stage-text">Preparazione...</div>
+                  </div>
+                  <div id="screensList" class="screens-list"></div>
+                </section>
+              </div>
+            </div>
+            <div class="upload-kit-footer">
+              <div class="upload-kit-footer-row upload-kit-footer-title-row">
+                <div class="upload-kit-footer-title">
+                  <div class="label">Titolo upload</div>
+                  <div class="upload-title-line">
+                    <input id="uploadTitleInput" class="preview" type="text" readonly value="-" />
+                    <div class="upload-title-actions">
+                      <button id="editUploadTitleBtn" class="secondary small">Modifica</button>
+                      <button id="copyUploadTitleBtn" class="secondary small">Copia</button>
+                    </div>
+                  </div>
+                  <div id="uploadTitleHint" class="hint"></div>
+                </div>
+              </div>
+              <div class="upload-kit-footer-row centered">
+                <button id="uploadToUnit3dBtn" class="primary">Carica sul tracker</button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+      <div class="wizard-footer">
+        <div id="wizardStepStatus" class="wizard-status">Step 1 di 3</div>
+        <div class="wizard-actions">
+          <button id="wizardPrevBtn" class="secondary small" type="button">Indietro</button>
+          <button id="wizardNextBtn" class="primary small" type="button">Avanti</button>
+        </div>
       </div>
     </div>
   </div>
