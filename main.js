@@ -1045,11 +1045,16 @@ async function tvdbFetchEpisodes(seriesId, token, language) {
   let page = 0;
   let hasNext = true;
   let safety = 0;
+  const debug = { language: language || '', pages: 0, pageSizes: [], lastKeys: [], lastLinks: null };
 
   while (hasNext && safety < 50) {
     const data = await tvdbRequest(`/series/${seriesId}/episodes/default?page=${page}`, token, language);
     const pageEpisodes = Array.isArray(data?.data) ? data.data : [];
     episodes.push(...pageEpisodes);
+    debug.pages += 1;
+    debug.pageSizes.push(pageEpisodes.length);
+    debug.lastKeys = Object.keys(data || {});
+    debug.lastLinks = data?.links || null;
     const next = data?.links?.next;
     if (typeof next === 'number') {
       page = next;
@@ -1063,11 +1068,14 @@ async function tvdbFetchEpisodes(seriesId, token, language) {
     safety += 1;
   }
 
-  return episodes.map((ep) => ({
-    season: ep.seasonNumber ?? ep.season,
-    episode: ep.number ?? ep.episodeNumber ?? ep.absoluteNumber,
-    name: ep.name || ep.episodeName || ''
-  }));
+  return {
+    episodes: episodes.map((ep) => ({
+      season: ep.seasonNumber ?? ep.season,
+      episode: ep.number ?? ep.episodeNumber ?? ep.absoluteNumber,
+      name: ep.name || ep.episodeName || ''
+    })),
+    debug
+  };
 }
 
 function buildRenamePlan(payload) {
@@ -1798,6 +1806,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     tvdbAttempted: false,
     tvdbSeriesId: '',
     tvdbSeriesSlug: '',
+    tvdbEpisodesInfo: null,
     tmdbFallback: false
   };
 
@@ -1939,11 +1948,20 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       }
 
       if (seriesId) {
-        let episodes = await tvdbFetchEpisodes(seriesId, token, preferredLanguage);
+        let episodesResponse = await tvdbFetchEpisodes(seriesId, token, preferredLanguage);
+        let episodes = episodesResponse.episodes;
+        const tvdbDebug = {
+          seriesId,
+          primary: episodesResponse.debug,
+          fallback: null
+        };
         if (preferredLanguage && episodes.length === 0) {
-          episodes = await tvdbFetchEpisodes(seriesId, token, '');
+          const fallbackResponse = await tvdbFetchEpisodes(seriesId, token, '');
+          episodes = fallbackResponse.episodes;
+          tvdbDebug.fallback = fallbackResponse.debug;
         }
         result.episodes = episodes;
+        result.tvdbEpisodesInfo = tvdbDebug;
       }
     }
   } catch (error) {
