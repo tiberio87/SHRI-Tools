@@ -28,6 +28,8 @@ const CLEAN_TITLE_TOKENS = new Set([
   'WEBDL',
   'WEBRIP',
   'WEBMUX',
+  'DLMUX',
+  'HDTV',
   'BLURAY',
   'BDRIP',
   'BRRIP',
@@ -44,11 +46,18 @@ const CLEAN_TITLE_TOKENS = new Set([
   'DV',
   'DOLBYVISION',
   'AAC',
+  'AC3',
   'DD',
   'DDP',
   'DTS',
+  'EAC3',
   'TRUEHD',
   'ATMOS',
+  'SUBS',
+  'SUBBED',
+  '10BIT',
+  '8BIT',
+  '12BIT',
   'MULTI',
   'ITA',
   'ENG',
@@ -97,6 +106,19 @@ const SEARCH_CLEAN_TOKENS = new Set([
   'VOSTFR',
   'SUBBED',
   'SUBFRENCH'
+]);
+const LANGUAGE_WORDS = new Set([
+  'ITALIAN',
+  'ENGLISH',
+  'FRENCH',
+  'GERMAN',
+  'SPANISH',
+  'PORTUGUESE',
+  'DUTCH',
+  'POLISH',
+  'RUSSIAN',
+  'JAPANESE',
+  'KOREAN'
 ]);
 
 export function createMetadataTools(deps) {
@@ -317,6 +339,12 @@ export function createMetadataTools(deps) {
     if (normalized.length === 1) {
       return true;
     }
+    if (/^(?:SUBS?|SUBBED|HARDSUBS?|HDTV|DLMUX)$/i.test(upper)) {
+      return true;
+    }
+    if (/(?:\b10BIT\b|\b8BIT\b|\b12BIT\b)/i.test(upper)) {
+      return true;
+    }
     if (CLEAN_TITLE_TOKENS.has(normalized) || SEARCH_CLEAN_TOKENS.has(normalized)) {
       return true;
     }
@@ -333,6 +361,9 @@ export function createMetadataTools(deps) {
       return true;
     }
     if (/^(?:H264|H265|X264|X265|HEVC|AVC|AV1)$/i.test(normalized)) {
+      return true;
+    }
+    if (/(?:E-?AC3|AC3|DDP|DD\+?|DTS|TRUEHD|ATMOS)/i.test(upper)) {
       return true;
     }
     if (/^\d+(?:\.\d+)?$/.test(raw.replace(/[^0-9.]/g, ''))) {
@@ -373,6 +404,9 @@ export function createMetadataTools(deps) {
         continue;
       }
       kept.push(token);
+    }
+    if (kept.length === 1 && LANGUAGE_WORDS.has(kept[0].toUpperCase())) {
+      return '';
     }
     return kept.join(' ').trim();
   }
