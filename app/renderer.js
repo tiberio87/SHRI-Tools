@@ -866,6 +866,7 @@ const {
   loadSettings,
   saveSettings,
   updateFfmpegHint,
+  updateQbitMappingHint,
   applySettingsToUI,
   getSettings
 } = createSettingsTools({
@@ -1504,16 +1505,22 @@ if (ui.generateTorrentBtn) {
     }
 
     const settings = loadSettings();
-    const outputDir = ui.torrentOutputInput?.value.trim() || '';
+    const baseOutputDir = ui.torrentOutputInput?.value.trim() || '';
     const outputName = ui.torrentNameInput?.value.trim() || '';
     const isPrivate = settings.torrentPrivate !== false;
     const announce = getAnnounceUrlFromSettings(settings);
+    let outputDir = '';
+    if (baseOutputDir) {
+      const separator = baseOutputDir.includes('\\') ? '\\' : '/';
+      const trimmed = baseOutputDir.replace(/[\\/]+$/, '');
+      outputDir = `${trimmed}${separator}app_generated`;
+    }
 
     if (!announce) {
       setHint(ui.torrentHint, 'Imposta il PID/announce nelle Impostazioni.');
       return;
     }
-    if (!outputDir) {
+    if (!baseOutputDir) {
       setHint(ui.torrentHint, 'Seleziona la cartella di output.');
       return;
     }
@@ -1540,7 +1547,7 @@ if (ui.generateTorrentBtn) {
       state.lastTorrentPath = result.outputPath || '';
       const updated = {
         ...settings,
-        torrentOutputDir: outputDir
+        torrentOutputDir: baseOutputDir
       };
       saveSettings(updated);
       applySettingsToUI(updated);
@@ -1829,6 +1836,43 @@ ui.saveSettingsBtn.addEventListener('click', () => {
   refreshSettingsSnapshot();
 });
 
+if (ui.qbitTestBtn) {
+  ui.qbitTestBtn.addEventListener('click', async () => {
+    const settings = getSettings();
+    if (!settings.qbitHost || !settings.qbitUsername || !settings.qbitPassword) {
+      setHint(ui.qbitTestHint, 'Completa host, username e password.');
+      showToast('Configura qBittorrent prima del test.');
+      return;
+    }
+    if (!window.api?.qbitTest) {
+      showToast('Test qBittorrent non disponibile.');
+      return;
+    }
+    ui.qbitTestBtn.disabled = true;
+    setHint(ui.qbitTestHint, 'Verifica in corso...');
+    try {
+      const result = await window.api.qbitTest({
+        host: settings.qbitHost,
+        port: settings.qbitPort,
+        https: settings.qbitHttps,
+        username: settings.qbitUsername,
+        password: settings.qbitPassword
+      });
+      if (result?.ok) {
+        const version = result.version ? ` (v${result.version})` : '';
+        setHint(ui.qbitTestHint, `Connessione OK${version}.`);
+        showToast(`qBittorrent OK${version}`);
+      } else {
+        const error = result?.error || 'Errore connessione.';
+        setHint(ui.qbitTestHint, error);
+        showToast(error);
+      }
+    } finally {
+      ui.qbitTestBtn.disabled = false;
+    }
+  });
+}
+
 ui.languageTagInput.addEventListener('input', () => {
   ui.languageTagInput.dataset.manual = 'true';
 });
@@ -1843,6 +1887,12 @@ ui.originalLanguageInput.addEventListener('input', () => {
 if (ui.ffmpegPathInput) {
   ui.ffmpegPathInput.addEventListener('input', () => {
     updateFfmpegHint({ ffmpegPath: ui.ffmpegPathInput.value.trim() });
+  });
+}
+
+if (ui.qbitSavePathInput) {
+  ui.qbitSavePathInput.addEventListener('input', () => {
+    updateQbitMappingHint({ qbitSavePath: ui.qbitSavePathInput.value.trim() });
   });
 }
 

@@ -1,5 +1,6 @@
 export const SETTINGS_STORAGE_KEY = 'shri-renamer-settings';
 export const THEME_STORAGE_KEY = 'shri-renamer-theme';
+export const LAST_UPLOAD_STORAGE_KEY = 'shri-renamer-last-upload';
 export const ANNOUNCE_BASE = 'https://shareisland.org/announce/';
 
 export const UNIT3D_CATEGORY_ID = {

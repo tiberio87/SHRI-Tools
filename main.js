@@ -291,6 +291,175 @@ async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, data }) {
   return { ok: true, status: response.status, data: payload, raw };
 }
 
+function sanitizeTorrentFilename(name) {
+  const cleaned = String(name || '')
+    .replace(/[\\/:*?"<>|]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!cleaned) {
+    return 'tracker.torrent';
+  }
+  const base = cleaned.replace(/\.+$/, '');
+  return base.toLowerCase().endsWith('.torrent') ? base : `${base}.torrent`;
+}
+
+async function downloadUnit3dTorrent({ baseUrl, apiKey, downloadUrl, outputDir, fileName }) {
+  if (!baseUrl || !apiKey) {
+    return { ok: false, error: 'Base URL o API key mancanti.' };
+  }
+  if (!downloadUrl) {
+    return { ok: false, error: 'URL di download mancante.' };
+  }
+  if (!outputDir) {
+    return { ok: false, error: 'Cartella output mancante.' };
+  }
+  const base = String(baseUrl).replace(/\/+$/, '');
+  const rawUrl = String(downloadUrl).trim();
+  const resolvedUrl = /^https?:\/\//i.test(rawUrl)
+    ? rawUrl
+    : `${base}/${rawUrl.replace(/^\/+/, '')}`;
+
+  const response = await fetch(resolvedUrl, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: 'application/x-bittorrent'
+    }
+  });
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    return {
+      ok: false,
+      status: response.status,
+      error: text || `HTTP ${response.status}`
+    };
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  await fs.mkdir(outputDir, { recursive: true });
+  const safeName = sanitizeTorrentFilename(fileName);
+  const outputPath = path.join(outputDir, safeName);
+  await fs.writeFile(outputPath, buffer);
+  return { ok: true, outputPath, status: response.status };
+}
+
+async function loginQbittorrent(baseUrl, username, password) {
+  const form = new URLSearchParams();
+  form.set('username', username);
+  form.set('password', password);
+  const response = await fetch(`${baseUrl}/api/v2/auth/login`, {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/x-www-form-urlencoded'
+    },
+    body: form
+  });
+  const text = await response.text();
+  if (!response.ok || !text.toLowerCase().includes('ok')) {
+    return { ok: false, error: normalizeHttpError(text, response.status) };
+  }
+  const cookie = response.headers.get('set-cookie') || '';
+  const match = cookie.match(/SID=([^;]+)/);
+  if (!match) {
+    return { ok: false, error: 'Cookie SID non trovato.' };
+  }
+  return { ok: true, cookie: `SID=${match[1]}` };
+}
+
+async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused }) {
+  if (!baseUrl || !username || !password) {
+    return { ok: false, error: 'Credenziali qBittorrent mancanti.' };
+  }
+  if (!torrentPath) {
+    return { ok: false, error: 'File .torrent mancante.' };
+  }
+  const login = await loginQbittorrent(baseUrl, username, password);
+  if (!login.ok) {
+    return login;
+  }
+  const torrentBytes = await fs.readFile(torrentPath);
+  const form = createFormData();
+  const torrentBlob = new global.Blob([torrentBytes], { type: 'application/x-bittorrent' });
+  form.append('torrents', torrentBlob, path.basename(torrentPath));
+  if (savePath) {
+    form.append('savepath', savePath);
+  }
+  if (category) {
+    form.append('category', category);
+  }
+  if (paused) {
+    form.append('paused', 'true');
+  }
+  const response = await fetch(`${baseUrl}/api/v2/torrents/add`, {
+    method: 'POST',
+    headers: {
+      cookie: login.cookie
+    },
+    body: form
+  });
+  const text = await response.text();
+  if (!response.ok || !text.toLowerCase().includes('ok')) {
+    return { ok: false, error: normalizeHttpError(text, response.status) };
+  }
+  return { ok: true, message: text || 'Ok.' };
+}
+
+function buildQbitBaseUrl(host, port, useHttps) {
+  const raw = String(host || '').trim();
+  if (!raw) {
+    return '';
+  }
+  if (/^https?:\/\//i.test(raw)) {
+    const trimmed = raw.replace(/\/+$/, '');
+    if (port && !/:\d+$/.test(trimmed)) {
+      return `${trimmed}:${port}`;
+    }
+    return trimmed;
+  }
+  const protocol = useHttps ? 'https' : 'http';
+  const hostTrim = raw.replace(/\/+$/, '');
+  const hasPort = /:\d+$/.test(hostTrim);
+  const portPart = port && !hasPort ? `:${port}` : '';
+  return `${protocol}://${hostTrim}${portPart}`;
+}
+
+async function testQbittorrentConnection({ host, port, https, username, password }) {
+  const baseUrl = buildQbitBaseUrl(host, port, https);
+  if (!baseUrl) {
+    return { ok: false, error: 'Host qBittorrent non valido.' };
+  }
+  if (!username || !password) {
+    return { ok: false, error: 'Credenziali mancanti.' };
+  }
+  const login = await loginQbittorrent(baseUrl, username, password);
+  if (!login.ok) {
+    return login;
+  }
+  const response = await fetch(`${baseUrl}/api/v2/app/version`, {
+    headers: {
+      cookie: login.cookie
+    }
+  });
+  const text = await response.text();
+  if (!response.ok) {
+    return { ok: false, error: normalizeHttpError(text, response.status) };
+  }
+  return { ok: true, version: text.trim() };
+}
+
+function normalizeHttpError(text, status) {
+  const raw = String(text || '').trim();
+  if (!raw) {
+    return `HTTP ${status}`;
+  }
+  if (/<html|<!doctype/i.test(raw)) {
+    return `HTTP ${status}: risposta HTML (verifica host/porta)`;
+  }
+  const cleaned = raw.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!cleaned) {
+    return `HTTP ${status}`;
+  }
+  return cleaned.length > 200 ? `${cleaned.slice(0, 200)}…` : cleaned;
+}
+
 function resolveFfprobePath(ffmpegPath) {
   if (!ffmpegPath) {
     return '';
@@ -1051,6 +1220,11 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         imgbbKey,
         ptscreensKey
       });
+      if (upload.ok) {
+        try {
+          await fs.unlink(filePath);
+        } catch {}
+      }
       stepIndex += 1;
       sendProgress({
         progress: totalSteps ? stepIndex / totalSteps : 0,
@@ -1334,6 +1508,50 @@ ipcMain.handle('unit3d-upload', async (_event, payload) => {
   }
 });
 
+ipcMain.handle('unit3d-download-torrent', async (_event, payload) => {
+  try {
+    const result = await downloadUnit3dTorrent(payload || {});
+    if (result.ok) {
+      return {
+        ok: true,
+        outputPath: result.outputPath || '',
+        status: result.status || 0
+      };
+    }
+    return {
+      ok: false,
+      error: result.error || 'Errore download.',
+      status: result.status || 0
+    };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore download.' };
+  }
+});
+
+ipcMain.handle('qbit-add-torrent', async (_event, payload) => {
+  try {
+    const result = await addQbittorrentTorrent(payload || {});
+    if (result.ok) {
+      return { ok: true, message: result.message || 'Ok.' };
+    }
+    return { ok: false, error: result.error || 'Errore qBittorrent.' };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore qBittorrent.' };
+  }
+});
+
+ipcMain.handle('qbit-test', async (_event, payload) => {
+  try {
+    const result = await testQbittorrentConnection(payload || {});
+    if (result.ok) {
+      return { ok: true, version: result.version || '' };
+    }
+    return { ok: false, error: result.error || 'Errore qBittorrent.' };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore qBittorrent.' };
+  }
+});
+
 ipcMain.handle('open-external', async (_event, url) => {
   if (typeof url !== 'string') {
     return { ok: false, error: 'URL non valido.' };
@@ -1344,6 +1562,21 @@ ipcMain.handle('open-external', async (_event, url) => {
   }
   try {
     await shell.openExternal(trimmed);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error) };
+  }
+});
+
+ipcMain.handle('open-path', async (_event, targetPath) => {
+  if (typeof targetPath !== 'string' || !targetPath.trim()) {
+    return { ok: false, error: 'Percorso non valido.' };
+  }
+  try {
+    const result = await shell.openPath(targetPath);
+    if (result) {
+      return { ok: false, error: result };
+    }
     return { ok: true };
   } catch (error) {
     return { ok: false, error: String(error) };

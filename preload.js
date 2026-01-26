@@ -12,8 +12,12 @@ contextBridge.exposeInMainWorld('api', {
   fetchMetadata: (payload) => ipcRenderer.invoke('fetch-metadata', payload),
   verifyApiKey: (payload) => ipcRenderer.invoke('verify-api-key', payload),
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
+  openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
   createTorrent: (payload) => ipcRenderer.invoke('create-torrent', payload),
   unit3dUpload: (payload) => ipcRenderer.invoke('unit3d-upload', payload),
+  unit3dDownloadTorrent: (payload) => ipcRenderer.invoke('unit3d-download-torrent', payload),
+  qbitAddTorrent: (payload) => ipcRenderer.invoke('qbit-add-torrent', payload),
+  qbitTest: (payload) => ipcRenderer.invoke('qbit-test', payload),
   generateScreenshots: (payload) => ipcRenderer.invoke('generate-screenshots', payload),
   getAppVersion: () => ipcRenderer.invoke('app-version'),
   onTorrentProgress: (handler) => {

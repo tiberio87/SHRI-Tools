@@ -25,7 +25,17 @@ const DEFAULT_SETTINGS = {
   unit3dModQueue: false,
   unit3dCategoryOverrides: '',
   unit3dTypeOverrides: '',
-  unit3dResolutionOverrides: ''
+  unit3dResolutionOverrides: '',
+  qbitHost: '',
+  qbitPort: '',
+  qbitUsername: '',
+  qbitPassword: '',
+  qbitHttps: false,
+  qbitSavePath: '',
+  qbitCategory: '',
+  qbitAutoStart: true,
+  qbitPathMapLocal: '',
+  qbitPathMapRemote: ''
 };
 
 export function createSettingsTools({
@@ -97,6 +107,22 @@ export function createSettingsTools({
       return;
     }
     ui.ffmpegHint.innerHTML = `FFmpeg non configurato. Scaricalo da <a href="https://ffmpeg.org/download.html" data-external="https://ffmpeg.org/download.html">ffmpeg.org</a> e inserisci il percorso completo del file eseguibile (es. ffmpeg.exe).`;
+  }
+
+  function updateQbitMappingHint(settings) {
+    const savePath = String(settings?.qbitSavePath || '').trim();
+    const disableMapping = Boolean(savePath);
+    if (ui.qbitPathMapLocalInput) {
+      ui.qbitPathMapLocalInput.disabled = disableMapping;
+    }
+    if (ui.qbitPathMapRemoteInput) {
+      ui.qbitPathMapRemoteInput.disabled = disableMapping;
+    }
+    if (ui.qbitMappingHint) {
+      ui.qbitMappingHint.textContent = disableMapping
+        ? 'Mapping ignorato quando Save path è impostato.'
+        : "Usa il mapping solo se il client gira su un'altra macchina.";
+    }
   }
 
   function buildAppHealthStatus(settings) {
@@ -233,6 +259,37 @@ export function createSettingsTools({
     if (ui.unit3dResolutionOverridesInput) {
       ui.unit3dResolutionOverridesInput.value = settings.unit3dResolutionOverrides || '';
     }
+    if (ui.qbitHostInput) {
+      ui.qbitHostInput.value = settings.qbitHost || '';
+    }
+    if (ui.qbitPortInput) {
+      ui.qbitPortInput.value = settings.qbitPort || '';
+    }
+    if (ui.qbitUsernameInput) {
+      ui.qbitUsernameInput.value = settings.qbitUsername || '';
+    }
+    if (ui.qbitPasswordInput) {
+      ui.qbitPasswordInput.value = settings.qbitPassword || '';
+    }
+    if (ui.qbitHttpsToggle) {
+      ui.qbitHttpsToggle.checked = settings.qbitHttps === true;
+    }
+    if (ui.qbitSavePathInput) {
+      ui.qbitSavePathInput.value = settings.qbitSavePath || '';
+    }
+    if (ui.qbitCategoryInput) {
+      ui.qbitCategoryInput.value = settings.qbitCategory || '';
+    }
+    if (ui.qbitAutoStartToggle) {
+      ui.qbitAutoStartToggle.checked = settings.qbitAutoStart !== false;
+    }
+    if (ui.qbitPathMapLocalInput) {
+      ui.qbitPathMapLocalInput.value = settings.qbitPathMapLocal || '';
+    }
+    if (ui.qbitPathMapRemoteInput) {
+      ui.qbitPathMapRemoteInput.value = settings.qbitPathMapRemote || '';
+    }
+    updateQbitMappingHint(settings);
     if (ui.settingsAnnounceInput) {
       const passkey = settings.torrentPasskey || '';
       const announceUrl = settings.torrentAnnounceUrl || '';
@@ -284,6 +341,16 @@ export function createSettingsTools({
       unit3dCategoryOverrides: ui.unit3dCategoryOverridesInput?.value.trim() || '',
       unit3dTypeOverrides: ui.unit3dTypeOverridesInput?.value.trim() || '',
       unit3dResolutionOverrides: ui.unit3dResolutionOverridesInput?.value.trim() || '',
+      qbitHost: ui.qbitHostInput?.value.trim() || '',
+      qbitPort: ui.qbitPortInput?.value.trim() || '',
+      qbitUsername: ui.qbitUsernameInput?.value.trim() || '',
+      qbitPassword: ui.qbitPasswordInput?.value.trim() || '',
+      qbitHttps: Boolean(ui.qbitHttpsToggle?.checked),
+      qbitSavePath: ui.qbitSavePathInput?.value.trim() || '',
+      qbitCategory: ui.qbitCategoryInput?.value.trim() || '',
+      qbitAutoStart: Boolean(ui.qbitAutoStartToggle?.checked),
+      qbitPathMapLocal: ui.qbitPathMapLocalInput?.value.trim() || '',
+      qbitPathMapRemote: ui.qbitPathMapRemoteInput?.value.trim() || '',
       torrentPasskey: passkey,
       torrentAnnounceUrl: announceUrl,
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
@@ -298,6 +365,7 @@ export function createSettingsTools({
     loadSettings,
     saveSettings,
     updateFfmpegHint,
+    updateQbitMappingHint,
     buildAppHealthStatus,
     updateAppHealthStatus,
     applySettingsToUI,

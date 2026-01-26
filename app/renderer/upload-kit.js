@@ -1,7 +1,13 @@
 import { ui } from './dom.js';
 import { state } from './state.js';
-import { UNIT3D_CATEGORY_ID, SHRI_TYPE_ID, UNIT3D_RESOLUTION_ID } from './constants.js';
+import {
+  UNIT3D_CATEGORY_ID,
+  SHRI_TYPE_ID,
+  UNIT3D_RESOLUTION_ID,
+  LAST_UPLOAD_STORAGE_KEY
+} from './constants.js';
 import { renderBbcodePreview } from './bbcode.js';
+import { getParentPath } from './path-utils.js';
 import {
   formatBitrate,
   formatBytes,
@@ -46,6 +52,8 @@ export function createUploadKit(deps) {
   let uploadTitleBase = '';
   let uploadTitleFallback = false;
   let uploadTitleSourcePath = '';
+  let lastUploadDownloadUrl = '';
+  let lastTrackerTorrentPath = '';
 
   function getHdrLabelFromForm(form) {
     const tokens = [];
@@ -174,6 +182,343 @@ export function createUploadKit(deps) {
       return '0';
     }
     return String(value);
+  }
+
+  function buildTrackerTorrentFilename() {
+    const title = String(ui.uploadTitleInput?.value || '').trim();
+    if (!title) {
+      return 'tracker.torrent';
+    }
+    const safe = title
+      .replace(/[\\/:*?"<>|]+/g, '')
+      .replace(/\s+/g, '.')
+      .replace(/\.+$/g, '');
+    return safe ? `${safe}.torrent` : 'tracker.torrent';
+  }
+
+  function readLastUpload() {
+    try {
+      const raw = localStorage.getItem(LAST_UPLOAD_STORAGE_KEY);
+      if (!raw) {
+        return null;
+      }
+      return JSON.parse(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  function writeLastUpload(data) {
+    if (!data) {
+      return;
+    }
+    localStorage.setItem(LAST_UPLOAD_STORAGE_KEY, JSON.stringify(data));
+  }
+
+  function updateReopenUploadButton() {
+    if (!ui.reopenLastUploadBtn) {
+      return;
+    }
+    const last = readLastUpload();
+    ui.reopenLastUploadBtn.classList.toggle('hidden', !last);
+  }
+
+  function buildQbitBaseUrl(settings) {
+    const hostRaw = String(settings?.qbitHost || '').trim();
+    if (!hostRaw) {
+      return '';
+    }
+    if (/^https?:\/\//i.test(hostRaw)) {
+      return hostRaw.replace(/\/+$/, '');
+    }
+    const protocol = settings?.qbitHttps ? 'https' : 'http';
+    const hostPart = hostRaw.replace(/\/+$/, '');
+    const hasPort = /:\d+$/.test(hostPart);
+    const port = String(settings?.qbitPort || '').trim();
+    const suffix = port && !hasPort ? `:${port}` : '';
+    return `${protocol}://${hostPart}${suffix}`;
+  }
+
+  function applyPathMapping(pathValue, localRoot, remoteRoot) {
+    const source = String(pathValue || '').trim();
+    const local = String(localRoot || '').trim();
+    const remote = String(remoteRoot || '').trim();
+    if (!source || !local || !remote) {
+      return source;
+    }
+    const sourceNorm = source.replace(/\\/g, '/');
+    const localNorm = local.replace(/\\/g, '/').replace(/\/+$/, '');
+    if (!sourceNorm.toLowerCase().startsWith(localNorm.toLowerCase())) {
+      return source;
+    }
+    let remainder = sourceNorm.slice(localNorm.length);
+    remainder = remainder.replace(/^\/+/, '');
+    const remoteTrimmed = remote.replace(/[\\/]+$/, '');
+    const remoteSep = remoteTrimmed.includes('\\') ? '\\' : '/';
+    if (!remainder) {
+      return remoteTrimmed;
+    }
+    const normalizedRemainder = remainder.split('/').join(remoteSep);
+    return `${remoteTrimmed}${remoteSep}${normalizedRemainder}`;
+  }
+
+  function resolveClientSavePath(settings) {
+    let basePath = '';
+    if (settings?.qbitSavePath) {
+      basePath = String(settings.qbitSavePath).trim();
+    } else if (state.kind === 'dir') {
+      basePath = getParentPath(state.targetPath);
+    } else {
+      basePath = getParentPath(state.mainVideo || state.targetPath);
+    }
+    if (!basePath) {
+      return '';
+    }
+    const localMap = String(settings?.qbitPathMapLocal || '').trim();
+    const remoteMap = String(settings?.qbitPathMapRemote || '').trim();
+    if (localMap && remoteMap) {
+      return applyPathMapping(basePath, localMap, remoteMap);
+    }
+    return basePath;
+  }
+
+  function extractDownloadUrl(result) {
+    const data = result?.data;
+    const candidates = [
+      data?.data,
+      data?.download_url,
+      data?.downloadUrl,
+      data?.url
+    ];
+    for (const item of candidates) {
+      if (typeof item === 'string' && item.trim()) {
+        return item.trim();
+      }
+    }
+    return '';
+  }
+
+  function setPostUploadHint(message) {
+    if (!ui.postUploadHint) {
+      return;
+    }
+    ui.postUploadHint.textContent = message || '';
+  }
+
+  function canSendToClient(settings) {
+    const hasCreds = Boolean(
+      settings?.qbitHost &&
+      settings?.qbitUsername &&
+      settings?.qbitPassword
+    );
+    return hasCreds && Boolean(lastTrackerTorrentPath);
+  }
+
+  function buildTrackerOutputDir(settings) {
+    const baseDir = String(settings?.torrentOutputDir || '').trim();
+    if (!baseDir) {
+      return '';
+    }
+    const separator = baseDir.includes('\\') ? '\\' : '/';
+    const trimmed = baseDir.replace(/[\\/]+$/, '');
+    return `${trimmed}${separator}tracker_generated`;
+  }
+
+  function openPostUploadModal(result, settings) {
+    if (!ui.postUploadModal) {
+      return;
+    }
+    lastUploadDownloadUrl = extractDownloadUrl(result);
+    const outputDir = buildTrackerOutputDir(settings);
+    if (ui.downloadTrackerTorrentBtn) {
+      ui.downloadTrackerTorrentBtn.disabled = !lastUploadDownloadUrl || !outputDir;
+    }
+    if (ui.openTrackerOutputBtn) {
+      ui.openTrackerOutputBtn.disabled = !outputDir;
+    }
+    if (ui.sendToClientBtn) {
+      ui.sendToClientBtn.disabled = !canSendToClient(settings);
+    }
+    if (!outputDir) {
+      setPostUploadHint('Imposta la cartella output .torrent nelle impostazioni.');
+    } else if (!lastUploadDownloadUrl) {
+      setPostUploadHint('URL di download non disponibile nella risposta del tracker.');
+    } else {
+      setPostUploadHint(`Salvataggio in: ${outputDir}`);
+    }
+    ui.postUploadModal.classList.remove('hidden');
+  }
+
+  function openLastUploadModal() {
+    const last = readLastUpload();
+    if (!last) {
+      showToast('Nessun upload recente.');
+      updateReopenUploadButton();
+      return;
+    }
+    const settings = loadSettings();
+    lastUploadDownloadUrl = last.downloadUrl || '';
+    lastTrackerTorrentPath = last.torrentPath || '';
+    const outputDir = buildTrackerOutputDir(settings);
+    if (ui.downloadTrackerTorrentBtn) {
+      ui.downloadTrackerTorrentBtn.disabled = !lastUploadDownloadUrl || !outputDir;
+    }
+    if (ui.openTrackerOutputBtn) {
+      ui.openTrackerOutputBtn.disabled = !outputDir;
+    }
+    if (ui.sendToClientBtn) {
+      ui.sendToClientBtn.disabled = !canSendToClient(settings);
+    }
+    const timeLabel = last.createdAt ? new Date(last.createdAt).toLocaleString() : '';
+    const titleLabel = last.title ? `Ultimo upload: ${last.title}` : 'Ultimo upload';
+    const hintParts = [titleLabel, timeLabel].filter(Boolean);
+    const baseHint = hintParts.join(' · ');
+    if (!outputDir) {
+      setPostUploadHint(`${baseHint} | Imposta la cartella output .torrent nelle impostazioni.`);
+    } else if (!lastUploadDownloadUrl) {
+      setPostUploadHint(`${baseHint} | URL di download non disponibile nella risposta del tracker.`);
+    } else {
+      setPostUploadHint(`${baseHint} | Salvataggio in: ${outputDir}`);
+    }
+    ui.postUploadModal.classList.remove('hidden');
+  }
+
+  async function downloadTrackerTorrent() {
+    const settings = loadSettings();
+    const baseUrl = settings.unit3dBaseUrl || '';
+    const apiKey = settings.unit3dApiKey || '';
+    const outputDir = buildTrackerOutputDir(settings);
+    if (!baseUrl || !apiKey) {
+      showToast('Imposta Base URL e API key UNIT3D.');
+      return;
+    }
+    if (!outputDir) {
+      showToast('Imposta la cartella output .torrent.');
+      return;
+    }
+    if (!lastUploadDownloadUrl) {
+      showToast('URL di download non disponibile.');
+      return;
+    }
+    if (!window.api?.unit3dDownloadTorrent) {
+      showToast('Download .torrent non disponibile.');
+      return;
+    }
+    if (ui.downloadTrackerTorrentBtn) {
+      ui.downloadTrackerTorrentBtn.disabled = true;
+    }
+    try {
+      const fileName = buildTrackerTorrentFilename();
+      const result = await window.api.unit3dDownloadTorrent({
+        baseUrl,
+        apiKey,
+        downloadUrl: lastUploadDownloadUrl,
+        outputDir,
+        fileName
+      });
+      if (result?.ok) {
+        lastTrackerTorrentPath = result.outputPath || '';
+        showToast('Torrent scaricato.');
+        setPostUploadHint(`Salvato in: ${result.outputPath || outputDir}`);
+        const last = readLastUpload() || {};
+        writeLastUpload({
+          ...last,
+          torrentPath: lastTrackerTorrentPath,
+          downloadUrl: lastUploadDownloadUrl || last.downloadUrl || '',
+          title: last.title || ui.uploadTitleInput?.value || '',
+          createdAt: last.createdAt || Date.now()
+        });
+        if (ui.sendToClientBtn) {
+          ui.sendToClientBtn.disabled = !canSendToClient(settings);
+        }
+      } else {
+        showToast(result?.error || 'Errore download.');
+        setPostUploadHint(result?.error || 'Errore download.');
+      }
+    } finally {
+      if (ui.downloadTrackerTorrentBtn) {
+        ui.downloadTrackerTorrentBtn.disabled = false;
+      }
+    }
+  }
+
+  async function openTrackerOutputFolder() {
+    const settings = loadSettings();
+    const outputDir = buildTrackerOutputDir(settings);
+    if (!outputDir) {
+      showToast('Imposta la cartella output .torrent.');
+      return;
+    }
+    if (!window.api?.openPath) {
+      showToast('Apertura cartella non disponibile.');
+      return;
+    }
+    const result = await window.api.openPath(outputDir);
+    if (!result?.ok) {
+      showToast(result?.error || 'Errore apertura cartella.');
+    }
+  }
+
+  async function sendToTorrentClient() {
+    const settings = loadSettings();
+    if (!lastTrackerTorrentPath) {
+      showToast('Scarica prima il .torrent del tracker.');
+      return;
+    }
+    if (!settings.qbitHost || !settings.qbitUsername || !settings.qbitPassword) {
+      showToast('Configura qBittorrent nelle Impostazioni avanzate.');
+      return;
+    }
+    if ((settings.qbitPathMapLocal && !settings.qbitPathMapRemote) || (!settings.qbitPathMapLocal && settings.qbitPathMapRemote)) {
+      showToast('Completa il mapping locale/remoto (entrambi i campi).');
+      return;
+    }
+    const baseUrl = buildQbitBaseUrl(settings);
+    if (!baseUrl) {
+      showToast('Host qBittorrent non valido.');
+      return;
+    }
+    const savePath = resolveClientSavePath(settings);
+    if (!savePath) {
+      showToast('Percorso dati non valido.');
+      return;
+    }
+    if (!window.api?.qbitAddTorrent) {
+      showToast('Invio al client non disponibile.');
+      return;
+    }
+    if (ui.sendToClientBtn) {
+      ui.sendToClientBtn.disabled = true;
+    }
+    try {
+      const result = await window.api.qbitAddTorrent({
+        baseUrl,
+        username: settings.qbitUsername,
+        password: settings.qbitPassword,
+        torrentPath: lastTrackerTorrentPath,
+        savePath,
+        category: settings.qbitCategory || '',
+        paused: settings.qbitAutoStart === false
+      });
+      logDebug?.('qbit add payload', {
+        baseUrl,
+        savePath,
+        category: settings.qbitCategory || '',
+        paused: settings.qbitAutoStart === false
+      });
+      logDebug?.('qbit add response', result);
+      if (result?.ok) {
+        showToast('Torrent inviato al client.');
+        setPostUploadHint(`Inviato al client: ${result?.message || 'OK'}`);
+      } else {
+        showToast(result?.error || 'Errore invio al client.');
+        setPostUploadHint(result?.error || 'Errore invio al client.');
+      }
+    } finally {
+      if (ui.sendToClientBtn) {
+        ui.sendToClientBtn.disabled = !canSendToClient(settings);
+      }
+    }
   }
 
   function normalizeIntValue(value) {
@@ -713,6 +1058,15 @@ ${downloadBlock}
       if (result?.ok) {
         showToast(result?.message || 'Upload completato.');
         setHint(ui.uploadTitleHint, 'Upload completato.');
+        const snapshot = {
+          title: ui.uploadTitleInput?.value || '',
+          downloadUrl: extractDownloadUrl(result),
+          torrentPath: '',
+          createdAt: Date.now()
+        };
+        writeLastUpload(snapshot);
+        updateReopenUploadButton();
+        openPostUploadModal(result, settings);
       } else {
         const error = result?.error || result?.message || 'Errore upload.';
         const details = result?.details ? `\n${result.details}` : '';
@@ -881,6 +1235,8 @@ ${downloadBlock}
     if (state.targetPath !== uploadTitleSourcePath) {
       uploadTitleOverride = '';
       uploadTitleSourcePath = state.targetPath;
+      lastUploadDownloadUrl = '';
+      lastTrackerTorrentPath = '';
     }
     const { title, fallback, baseTitle, overridden } = buildUploadTitle();
     uploadTitleBase = baseTitle || '';
@@ -1124,6 +1480,33 @@ ${downloadBlock}
       });
     }
 
+    if (ui.downloadTrackerTorrentBtn) {
+      ui.downloadTrackerTorrentBtn.addEventListener('click', downloadTrackerTorrent);
+    }
+    if (ui.openTrackerOutputBtn) {
+      ui.openTrackerOutputBtn.addEventListener('click', openTrackerOutputFolder);
+    }
+    if (ui.sendToClientBtn) {
+      ui.sendToClientBtn.addEventListener('click', sendToTorrentClient);
+    }
+    if (ui.closePostUploadBtn) {
+      ui.closePostUploadBtn.addEventListener('click', () => {
+        ui.postUploadModal?.classList.add('hidden');
+      });
+    }
+    if (ui.postUploadModal) {
+      ui.postUploadModal.addEventListener('click', (event) => {
+        if (event.target?.classList.contains('modal-backdrop')) {
+          ui.postUploadModal.classList.add('hidden');
+        }
+      });
+    }
+    if (ui.reopenLastUploadBtn) {
+      ui.reopenLastUploadBtn.addEventListener('click', () => {
+        openLastUploadModal();
+      });
+    }
+
     if (ui.generateScreensBtn) {
       ui.generateScreensBtn.addEventListener('click', generateScreenshots);
     }
@@ -1178,6 +1561,8 @@ ${downloadBlock}
         ui.bbcodePreviewModal?.classList.add('hidden');
       });
     }
+
+    updateReopenUploadButton();
   }
 
   return {

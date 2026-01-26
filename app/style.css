@@ -394,7 +394,7 @@ body:not(.light) .theme-toggle .icon-moon {
   width: auto;
 }
 
-.action-row .torrent-button {
+.action-row .push-right {
   margin-left: auto;
 }
 
@@ -1144,6 +1144,10 @@ body.light .fetch-warning {
   z-index: 140;
 }
 
+#postUploadModal {
+  z-index: 145;
+}
+
 .modal.hidden {
   display: none;
 }
@@ -1165,6 +1169,36 @@ body.light .fetch-warning {
   display: flex;
   flex-direction: column;
   gap: 12px;
+}
+
+.post-upload-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.post-upload-actions {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 10px;
+}
+
+.post-upload-center {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-self: center;
+  flex-wrap: wrap;
+}
+
+.post-upload-right {
+  justify-self: end;
+}
+
+.post-upload-actions .primary,
+.post-upload-actions .success {
+  min-width: 210px;
 }
 
 #settingsModal .modal-content {
