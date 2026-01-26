@@ -790,10 +790,15 @@ button:disabled {
 
 .format-suggest-row {
   margin-top: 4px;
+  min-height: 16px;
 }
 
 .format-suggest-row .hint {
   font-size: 11px;
+}
+
+.format-suggest-row.is-empty {
+  visibility: hidden;
 }
 
 .format-suggest-row .suggest-strong {

@@ -894,14 +894,14 @@ function updateFormatServiceSuggest() {
     return;
   }
   if (!state.targetPath) {
-    ui.formatSuggestRow.classList.add('hidden');
+    ui.formatSuggestRow.classList.add('is-empty');
     ui.formatSuggestText.textContent = '';
     return;
   }
   const basePath = state.mainVideo || state.videoFiles?.[0] || state.targetPath;
   const baseName = basePath ? stripExtension(getPathBaseName(basePath)) : '';
   if (!baseName) {
-    ui.formatSuggestRow.classList.add('hidden');
+    ui.formatSuggestRow.classList.add('is-empty');
     ui.formatSuggestText.textContent = '';
     return;
   }
@@ -914,7 +914,7 @@ function updateFormatServiceSuggest() {
     format = 'Encode';
   }
   if (!format && !service) {
-    ui.formatSuggestRow.classList.add('hidden');
+    ui.formatSuggestRow.classList.add('is-empty');
     ui.formatSuggestText.textContent = '';
     return;
   }
@@ -929,7 +929,7 @@ function updateFormatServiceSuggest() {
     parts.push(source);
   }
   ui.formatSuggestText.innerHTML = `Suggerito dal nome: <span class="suggest-strong">${parts.join(' · ')}</span>`;
-  ui.formatSuggestRow.classList.remove('hidden');
+  ui.formatSuggestRow.classList.remove('is-empty');
 }
 
 const metadataTools = createMetadataTools({
