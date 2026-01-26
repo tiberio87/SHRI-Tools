@@ -934,10 +934,17 @@ async function fetchTmdbByImdb(imdbId, apiKey) {
   return fetchJson(url);
 }
 
-async function fetchTmdbSearch(query, type, apiKey, language) {
+async function fetchTmdbSearch(query, type, apiKey, language, year) {
   const params = new URLSearchParams({ api_key: apiKey, query });
   if (language) {
     params.set('language', language);
+  }
+  if (year) {
+    if (type === 'tv') {
+      params.set('first_air_date_year', String(year));
+    } else {
+      params.set('year', String(year));
+    }
   }
   const url = `https://api.themoviedb.org/3/search/${type}?${params.toString()}`;
   return fetchJson(url);
@@ -1887,8 +1894,19 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       }
     } else if (tmdbKey && titleGuess) {
       const type = isTvHint ? 'tv' : 'movie';
-      const search = await fetchTmdbSearch(titleGuess, type, tmdbKey, preferredLanguage);
-      const first = search?.results?.[0];
+      const search = await fetchTmdbSearch(titleGuess, type, tmdbKey, preferredLanguage, yearGuess);
+      const results = Array.isArray(search?.results) ? search.results : [];
+      let first = results[0];
+      if (yearGuess && results.length) {
+        const targetYear = String(yearGuess);
+        const match = results.find((item) => {
+          const date = item?.first_air_date || item?.release_date || '';
+          return date.startsWith(targetYear);
+        });
+        if (match) {
+          first = match;
+        }
+      }
       if (first?.id) {
         if (type === 'tv') {
           tmdbTvId = String(first.id);
