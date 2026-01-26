@@ -769,7 +769,9 @@ button:disabled {
   border: 1px solid var(--border-muted);
   font-size: 11px;
   color: var(--muted);
-  word-break: break-all;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .scan-row {
@@ -786,6 +788,28 @@ button:disabled {
 .hint {
   font-size: 11px;
   color: var(--muted);
+}
+
+.scan-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.scan-hint-label {
+  white-space: nowrap;
+}
+
+.scan-hint-value {
+  flex: 1;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .format-suggest-row {

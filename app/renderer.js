@@ -60,6 +60,35 @@ function setHint(target, text) {
   target.textContent = text || '';
 }
 
+function truncateMiddle(value, maxLength = 78) {
+  const text = String(value || '');
+  if (text.length <= maxLength) {
+    return text;
+  }
+  const keep = Math.floor((maxLength - 1) / 2);
+  return `${text.slice(0, keep)}…${text.slice(-keep)}`;
+}
+
+function setSelectedPath(pathValue) {
+  if (!ui.selectedPath) {
+    return;
+  }
+  const text = pathValue || 'Nessun percorso selezionato.';
+  ui.selectedPath.textContent = truncateMiddle(text);
+  ui.selectedPath.title = text;
+}
+
+function setScanHint(label, value) {
+  if (!ui.scanHintLabel || !ui.scanHintValue) {
+    setHint(ui.scanHint, label ? `${label} ${value || ''}` : value || '');
+    return;
+  }
+  ui.scanHintLabel.textContent = label || '';
+  ui.scanHintLabel.classList.toggle('hidden', !label);
+  ui.scanHintValue.textContent = value || '';
+  ui.scanHintValue.classList.toggle('hidden', !value);
+}
+
 function setAutoFieldState(input, active) {
   if (!input) {
     return;
@@ -244,8 +273,8 @@ function resetSource() {
   state.screenshotsMeta = null;
   state.screenshotsMeta = null;
 
-  ui.selectedPath.textContent = 'Nessun percorso selezionato.';
-  setHint(ui.scanHint, '');
+  setSelectedPath('');
+  setScanHint('', '');
   ui.resetSourceBtn.classList.add('hidden');
   resetAllInputs();
   updateTagOptions(loadSettings());
@@ -882,6 +911,20 @@ function detectSourceFromName(name) {
   return '';
 }
 
+function detectRepackFromName(name) {
+  const upper = String(name || '').toUpperCase();
+  if (/\bRERIP\b/.test(upper)) {
+    return 'RERIP';
+  }
+  if (/\bPROPER\b/.test(upper)) {
+    return 'PROPER';
+  }
+  if (/\bREPACK\b/.test(upper)) {
+    return 'REPACK';
+  }
+  return '';
+}
+
 function extractTokensPresent(name, tokens) {
   const matches = [];
   const safeName = String(name || '');
@@ -919,25 +962,33 @@ function updateFormatServiceSuggest() {
   const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
   const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
   const source = detectSourceFromName(baseName);
+  const repack = detectRepackFromName(baseName);
   if (!format && source) {
     format = 'Encode';
   }
-  if (!format && !service) {
+  if (!format && !service && !source && !repack) {
     ui.formatSuggestRow.classList.add('is-empty');
     ui.formatSuggestText.textContent = '';
     return;
   }
   const parts = [];
   if (format) {
-    parts.push(format);
+    parts.push(`Formato: ${format}`);
   }
+  const serviceSourceParts = [];
   if (service) {
-    parts.push(service);
+    serviceSourceParts.push(service);
   }
   if (source) {
-    parts.push(source);
+    serviceSourceParts.push(source);
   }
-  ui.formatSuggestText.innerHTML = `Suggerito dal nome: <span class="suggest-strong">${parts.join(' · ')}</span>`;
+  if (serviceSourceParts.length) {
+    parts.push(`Servizio/Sorgente: ${serviceSourceParts.join(' / ')}`);
+  }
+  if (repack) {
+    parts.push(`Repack: ${repack}`);
+  }
+  ui.formatSuggestText.innerHTML = `Suggerimento del nome: <span class="suggest-strong">${parts.join(' · ')}</span>`;
   ui.formatSuggestRow.classList.remove('is-empty');
 }
 
@@ -1433,14 +1484,14 @@ async function loadPath(targetPath) {
     state.mainExtension = '';
   }
 
-  ui.selectedPath.textContent = targetPath;
+  setSelectedPath(targetPath);
   ui.resetSourceBtn.classList.remove('hidden');
   if (scan.mainVideo) {
-    setHint(ui.scanHint, `File analizzato: ${getPathBaseName(scan.mainVideo)}`);
+    setScanHint('File analizzato:', getPathBaseName(scan.mainVideo));
   } else if (scan.kind === 'dir') {
-    setHint(ui.scanHint, `Cartella analizzata: ${getPathBaseName(targetPath)}`);
+    setScanHint('Cartella analizzata:', getPathBaseName(targetPath));
   } else {
-    setHint(ui.scanHint, 'Nessun file analizzato.');
+    setScanHint('Nessun file analizzato.', '');
   }
 
   const settings = loadSettings();
@@ -1449,7 +1500,7 @@ async function loadPath(targetPath) {
 
   if (scan.mediaInfo?.error) {
     setMediaInfoBadgeVisible(false);
-    setHint(ui.scanHint, `Errore MediaInfo: ${scan.mediaInfo.error}`);
+    setScanHint('Errore MediaInfo:', scan.mediaInfo.error);
   } else {
     setMediaInfoBadgeVisible(Boolean(scan.mainVideo));
   }

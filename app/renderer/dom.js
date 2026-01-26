@@ -27,6 +27,8 @@ export const ui = {
   resetSourceBtn: document.getElementById('resetSourceBtn'),
   selectedPath: document.getElementById('selectedPath'),
   scanHint: document.getElementById('scanHint'),
+  scanHintLabel: document.getElementById('scanHintLabel'),
+  scanHintValue: document.getElementById('scanHintValue'),
   imdbInput: document.getElementById('imdbInput'),
   tvdbInput: document.getElementById('tvdbInput'),
   fetchStatus: document.getElementById('fetchStatus'),
