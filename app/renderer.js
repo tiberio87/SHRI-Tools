@@ -870,6 +870,15 @@ function detectSourceFromName(name) {
   if (/\bHDTV\b/.test(upper)) {
     return 'HDTV';
   }
+  if (/\bUHD\b/.test(upper) && /(\bBLU[-\s]?RAY\b|\bBLURAY\b)/.test(upper)) {
+    return 'UHD BluRay';
+  }
+  if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper)) {
+    return 'BluRay';
+  }
+  if (/\bDVD\b/.test(upper)) {
+    return 'DVD';
+  }
   return '';
 }
 
@@ -910,7 +919,7 @@ function updateFormatServiceSuggest() {
   const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
   const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
   const source = detectSourceFromName(baseName);
-  if (!format && source === 'HDTV') {
+  if (!format && source) {
     format = 'Encode';
   }
   if (!format && !service) {
