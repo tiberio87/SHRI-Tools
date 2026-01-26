@@ -62,6 +62,29 @@ const CLEAN_TITLE_TOKENS = new Set([
   'GER',
   'RUS'
 ]);
+const SEARCH_CLEAN_TOKENS = new Set([
+  'UNRATED',
+  'UNCUT',
+  'EXTENDED',
+  'DIRECTOR',
+  'DIRECTORS',
+  'DIRECTORSCUT',
+  'DIRECTORSCUT',
+  'THEATRICAL',
+  'LIMITED',
+  'REMASTERED',
+  'SPECIAL',
+  'FINAL',
+  'VF',
+  'VF2',
+  'VFF',
+  'VFI',
+  'VO',
+  'VOST',
+  'VOSTFR',
+  'SUBBED',
+  'SUBFRENCH'
+]);
 
 export function createMetadataTools(deps) {
   const { state, ui, logDebug, setDropdownAuto, setInputAuto, applyFormatSuggestion } = deps;
@@ -247,7 +270,9 @@ export function createMetadataTools(deps) {
   }
 
   function parseSeasonEpisode(text) {
-    const match = text.match(/S(\d{1,2})E(\d{1,2})/i) || text.match(/(\d{1,2})x(\d{1,2})/i);
+    const match =
+      text.match(/S(\d{1,2})E(\d{1,2})/i) ||
+      text.match(/(\d{1,2})x(\d{1,2})/i);
     if (match) {
       return { season: match[1], episode: match[2], index: match.index };
     }
@@ -255,7 +280,7 @@ export function createMetadataTools(deps) {
   }
 
   function parseSeasonOnly(text) {
-    const match = text.match(/\bS(\d{1,2})\b/i);
+    const match = text.match(/\bS[.\s-]*(\d{1,2})\b/i);
     if (match) {
       return { season: match[1], index: match.index };
     }
@@ -323,10 +348,22 @@ export function createMetadataTools(deps) {
     if (!title) {
       return '';
     }
-    const cleaned = String(title)
+    let cleaned = String(title)
+      .replace(/\[[^\]]+\]|\([^\)]+\)|\{[^}]+\}/g, ' ')
+      .replace(/\b(x265|x264|h\.?265|h\.?264|hevc|avc|av1)\b[-_.]([A-Za-z0-9]{2,12})$/gi, '$1')
+      .replace(/^\s*[A-Za-z][A-Za-z0-9]{1,9}[-_.]+/, '')
+      .replace(/^\s*\d{1,2}\s*[-_.]\s*/g, ' ');
+
+    const akaIndex = cleaned.search(/\b(?:aka|a\.k\.a\.?)\b/i);
+    if (akaIndex >= 0) {
+      cleaned = cleaned.slice(0, akaIndex).trim();
+    }
+
+    cleaned = cleaned
       .replace(/[_\.]+/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+
     const tokens = cleaned.split(' ');
     let end = tokens.length;
     while (end > 0) {
@@ -336,7 +373,7 @@ export function createMetadataTools(deps) {
         end -= 1;
         continue;
       }
-      if (CLEAN_TITLE_TOKENS.has(normalized)) {
+      if (CLEAN_TITLE_TOKENS.has(normalized) || SEARCH_CLEAN_TOKENS.has(normalized)) {
         end -= 1;
         continue;
       }
@@ -358,13 +395,6 @@ export function createMetadataTools(deps) {
       const parentTitle = parentName ? guessTitleFromName(parentName) : '';
       if (parentTitle) {
         title = parentTitle;
-      } else if (parentPath) {
-        const grandParent = getParentPath(parentPath);
-        const grandName = grandParent ? getPathBaseName(grandParent) : '';
-        const grandTitle = grandName ? guessTitleFromName(grandName) : '';
-        if (grandTitle) {
-          title = grandTitle;
-        }
       }
     }
     const episodeTitle = parseEpisodeTitleFromName(cleaned);

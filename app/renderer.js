@@ -355,7 +355,18 @@ function renderFetchStatus(payload, data) {
 
   const visibleWarnings = getAutoMatchWarnings(payload, data);
   if (visibleWarnings.length) {
-    ui.fetchStatus.appendChild(document.createTextNode(` | ${visibleWarnings.join(' | ')}`));
+    ui.fetchStatus.appendChild(document.createTextNode(' | '));
+    visibleWarnings.forEach((warning, index) => {
+      if (index > 0) {
+        ui.fetchStatus.appendChild(document.createTextNode(' | '));
+      }
+      const warningNode = document.createElement('span');
+      warningNode.textContent = warning;
+      if (/movie not found/i.test(warning)) {
+        warningNode.classList.add('fetch-warning');
+      }
+      ui.fetchStatus.appendChild(warningNode);
+    });
   }
 }
 

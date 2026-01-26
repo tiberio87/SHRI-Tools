@@ -836,10 +836,14 @@
                   <div class="label">Titolo upload</div>
                   <div class="upload-title-line">
                     <input id="uploadTitleInput" class="preview" type="text" readonly value="-" />
-                    <div class="upload-title-actions">
-                      <button id="editUploadTitleBtn" class="secondary small">Modifica</button>
-                      <button id="copyUploadTitleBtn" class="secondary small">Copia</button>
-                    </div>
+                    <button
+                      id="editUploadTitleBtn"
+                      class="secondary small upload-title-edit"
+                      type="button"
+                      aria-label="Modifica titolo upload"
+                      title="Modifica titolo"
+                    ></button>
+                    <button id="copyUploadTitleBtn" class="secondary small">Copia</button>
                   </div>
                   <div id="uploadTitleHint" class="hint"></div>
                 </div>

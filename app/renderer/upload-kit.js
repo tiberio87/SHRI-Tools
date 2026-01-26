@@ -892,7 +892,9 @@ ${downloadBlock}
       ui.uploadTitleInput.classList.remove('editing');
     }
     if (ui.editUploadTitleBtn) {
-      ui.editUploadTitleBtn.textContent = 'Modifica';
+      ui.editUploadTitleBtn.classList.remove('editing');
+      ui.editUploadTitleBtn.setAttribute('aria-label', 'Modifica titolo upload');
+      ui.editUploadTitleBtn.title = 'Modifica titolo';
     }
     updateUploadTitleHint(fallback, overridden);
 
@@ -1028,7 +1030,9 @@ ${downloadBlock}
           ui.uploadTitleInput.readOnly = false;
           ui.uploadTitleInput.dataset.editing = 'true';
           ui.uploadTitleInput.classList.add('editing');
-          ui.editUploadTitleBtn.textContent = 'Blocca';
+          ui.editUploadTitleBtn.classList.add('editing');
+          ui.editUploadTitleBtn.setAttribute('aria-label', 'Blocca titolo upload');
+          ui.editUploadTitleBtn.title = 'Blocca titolo';
           ui.uploadTitleInput.focus();
           ui.uploadTitleInput.select();
           return;
@@ -1036,7 +1040,9 @@ ${downloadBlock}
         ui.uploadTitleInput.readOnly = true;
         ui.uploadTitleInput.dataset.editing = 'false';
         ui.uploadTitleInput.classList.remove('editing');
-        ui.editUploadTitleBtn.textContent = 'Modifica';
+        ui.editUploadTitleBtn.classList.remove('editing');
+        ui.editUploadTitleBtn.setAttribute('aria-label', 'Modifica titolo upload');
+        ui.editUploadTitleBtn.title = 'Modifica titolo';
         syncUploadTitleOverride(ui.uploadTitleInput.value);
       });
     }
