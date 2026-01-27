@@ -8,9 +8,11 @@ const DEFAULT_SETTINGS = {
   serviceList: '',
   tagList: '',
   autoTagDetect: true,
+  autoNoGroupTag: true,
   torrentPasskey: '',
   torrentAnnounceUrl: '',
   torrentOutputDir: '',
+  torrentMkbrrPath: '',
   torrentPrivate: true,
   ffmpegPath: '',
   screenshotsCount: 6,
@@ -368,11 +370,17 @@ export function createSettingsTools({
     if (ui.settingsTorrentOutputInput) {
       ui.settingsTorrentOutputInput.value = settings.torrentOutputDir || '';
     }
+    if (ui.settingsMkbrrPathInput) {
+      ui.settingsMkbrrPathInput.value = settings.torrentMkbrrPath || '';
+    }
     if (ui.settingsTorrentPrivateToggle) {
       ui.settingsTorrentPrivateToggle.checked = settings.torrentPrivate !== false;
     }
     if (ui.autoTagDetectToggle) {
       ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
+    }
+    if (ui.autoNoGroupTagToggle) {
+      ui.autoNoGroupTagToggle.checked = settings.autoNoGroupTag !== false;
     }
     updateFfmpegHint(settings);
     updateTagSuggestion(settings);
@@ -398,6 +406,7 @@ export function createSettingsTools({
       serviceList: ui.serviceListInput.value.trim(),
       tagList: ui.tagListInput.value.trim(),
       autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),
+      autoNoGroupTag: Boolean(ui.autoNoGroupTagToggle?.checked),
       ffmpegPath: ui.ffmpegPathInput?.value.trim() || '',
       screenshotsCount: parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6,
       imageHostPrimary: ui.imageHostPrimarySelect?.value || 'imgbb',
@@ -433,6 +442,7 @@ export function createSettingsTools({
       torrentPasskey: passkey,
       torrentAnnounceUrl: announceUrl,
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
+      torrentMkbrrPath: ui.settingsMkbrrPathInput?.value.trim() || '',
       torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked)
     };
   }

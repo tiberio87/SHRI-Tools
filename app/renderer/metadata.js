@@ -107,6 +107,7 @@ const SEARCH_CLEAN_TOKENS = new Set([
   'SUBBED',
   'SUBFRENCH'
 ]);
+const NO_GROUP_PATTERN = /-(nogrp|nogroup|unknown|unk)(?=[._\-\s]|$)/i;
 const LANGUAGE_WORDS = new Set([
   'ITALIAN',
   'ENGLISH',
@@ -245,17 +246,23 @@ export function createMetadataTools(deps) {
     return false;
   }
 
-  function extractGroupTagFromName(filePath, knownTags = []) {
+  function extractGroupTagFromName(filePath, knownTags = [], options = {}) {
     if (!filePath) {
       return '';
     }
+    const allowNoGroup = options?.allowNoGroup === true;
     const base = stripExtension(getPathBaseName(filePath)).trim();
     if (!base) {
       return '';
     }
 
     if (/\s-\s/.test(base)) {
-      return '';
+      return allowNoGroup ? 'NoGroup' : '';
+    }
+
+    if (NO_GROUP_PATTERN.test(base)) {
+      logDebug?.('tag detect', { mode: 'invalid-token', base });
+      return allowNoGroup ? 'NoGroup' : '';
     }
 
     const knownMap = new Map();
@@ -293,13 +300,13 @@ export function createMetadataTools(deps) {
       rawCandidate: candidate
     });
     if (!candidate || candidate.length < 2 || candidate.length > 20 || /\s/.test(candidate)) {
-      return '';
+      return allowNoGroup ? 'NoGroup' : '';
     }
     if (candidate.length <= 2 && !knownMap.has(candidate.toUpperCase())) {
-      return '';
+      return allowNoGroup ? 'NoGroup' : '';
     }
     if (isNoiseTag(candidate)) {
-      return '';
+      return allowNoGroup ? 'NoGroup' : '';
     }
     return candidate;
   }

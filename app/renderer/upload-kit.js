@@ -34,6 +34,7 @@ export function createUploadKit(deps) {
     getMissingRenameRequirements,
     getPathBaseName,
     loadSettings,
+    metadataTools,
     logDebug,
     openWizardStep,
     openConfirmModal,
@@ -124,10 +125,16 @@ export function createUploadKit(deps) {
 
   function buildUploadTitleBase() {
     const baseForm = getFormState();
+    const settings = loadSettings?.() || {};
     const metaTitle = state.metadata?.title ? String(state.metadata.title).trim() : '';
     const title = metaTitle || baseForm.title;
     const fallback = !metaTitle && Boolean(baseForm.title);
-    const form = { ...baseForm, title };
+    let tag = baseForm.tag || '';
+    if (!tag && settings.autoNoGroupTag !== false) {
+      const path = state.mainVideo || state.targetPath || '';
+      tag = metadataTools?.extractGroupTagFromName?.(path, [], { allowNoGroup: true }) || '';
+    }
+    const form = { ...baseForm, title, tag };
     const isDir = state.kind === 'dir';
     const seasonType = baseForm.type.includes('anime') ? 'anime-season' : 'tv-season';
     const type = isDir ? seasonType : baseForm.type;
@@ -135,7 +142,8 @@ export function createUploadKit(deps) {
     const baseName = computeBaseName(form, {
       type,
       separatorStyle: 'spaces',
-      episodeTitle: dropEpisodeTitle ? '' : form.episodeTitle
+      episodeTitle: dropEpisodeTitle ? '' : form.episodeTitle,
+      allowNoGroupTag: settings.autoNoGroupTag !== false
     });
     return { title: baseName, fallback };
   }
@@ -1022,13 +1030,19 @@ ${downloadBlock}
     const imdb = state.metadata?.imdbId ? `IMDb ${state.metadata.imdbId}` : 'IMDb -';
     const tvdb = state.metadata?.tvdbSeriesId ? `TVDB ${state.metadata.tvdbSeriesId}` : 'TVDB -';
     const torrentLabel = state.lastTorrentPath ? state.lastTorrentPath : 'Nessun .torrent';
+    const isTv = mapping.isTv;
+    const isSeasonPack = isTv && form.type.includes('season');
     return {
       title: title || '-',
       category: mapping.categoryKey || '-',
       type: mapping.typeKey || '-',
       resolution: form.resolution || '-',
       ids: [tmdb, imdb, tvdb].join(' | '),
-      torrent: torrentLabel
+      torrent: torrentLabel,
+      isTv,
+      season: form.season || '',
+      episode: isSeasonPack ? '0' : (form.episode || ''),
+      isSeasonPack
     };
   }
 
@@ -1036,6 +1050,17 @@ ${downloadBlock}
     const anonymousChecked = settings.unit3dAnonymous ? 'checked' : '';
     const personalChecked = settings.unit3dPersonalRelease ? 'checked' : '';
     const modQueueChecked = settings.unit3dModQueue ? 'checked' : '';
+    const tvInfo = summary.isTv
+      ? `
+        <div class="confirm-row">
+          <span class="confirm-label">Stagione:</span>
+          <span class="confirm-value">${escapeHtml(summary.season || '-')}</span>
+        </div>
+        <div class="confirm-row">
+          <span class="confirm-label">Episodio:</span>
+          <span class="confirm-value">${escapeHtml(summary.episode || '-')}${summary.isSeasonPack ? ' / INTERA STAGIONE' : ''}</span>
+        </div>`
+      : '';
     return `
       <div class="confirm-summary">
         <div class="confirm-intro">Confermi l'upload con questi dati?</div>
@@ -1051,6 +1076,7 @@ ${downloadBlock}
           <span class="confirm-label">Tipo:</span>
           <span class="confirm-value highlight-type">${escapeHtml(summary.type)}</span>
         </div>
+        ${tvInfo}
         <div class="confirm-row">
           <span class="confirm-label">Risoluzione:</span>
           <span class="confirm-value">${escapeHtml(summary.resolution)}</span>
@@ -1103,8 +1129,12 @@ ${downloadBlock}
     const tmdb = normalizeIdValue(state.metadata?.tmdbId || state.metadata?.tmdb);
     const imdb = normalizeIdValue(state.metadata?.imdbId || state.metadata?.imdb);
     const tvdb = normalizeIdValue(state.metadata?.tvdbSeriesId || state.metadata?.tvdbId);
+    const isSeasonPack = mapping.isTv && form.type.includes('season');
     const seasonNumber = mapping.isTv ? normalizeIntValue(form.season) : null;
-    const episodeNumber = mapping.isTv ? normalizeIntValue(form.episode) : null;
+    let episodeNumber = mapping.isTv ? normalizeIntValue(form.episode) : null;
+    if (isSeasonPack) {
+      episodeNumber = 0;
+    }
     const categoryId = normalizeIntValue(mapping.categoryId);
     const typeId = normalizeIntValue(mapping.typeId);
     const resolutionId = normalizeIntValue(mapping.resolutionId);

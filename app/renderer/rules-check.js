@@ -48,19 +48,19 @@ function extractResolutionFromName(name) {
 
 function detectFormatFromName(name) {
   const upper = String(name || '').toUpperCase();
-  if (/\\bWEB[-.\\s]?DL\\b/.test(upper) || /\\bWEBDL\\b/.test(upper)) {
+  if (/\bWEB[-.\s]?DL\b/.test(upper) || /\bWEBDL\b/.test(upper)) {
     return { value: 'WEB-DL', isWeb: true };
   }
-  if (/\\bWEB[-.\\s]?RIP\\b/.test(upper) || /\\bWEBRIP\\b/.test(upper)) {
+  if (/\bWEB[-.\s]?RIP\b/.test(upper) || /\bWEBRIP\b/.test(upper)) {
     return { value: 'WEBRip', isWeb: true };
   }
-  if (/\\bREMUX\\b/.test(upper)) {
+  if (/\bREMUX\b/.test(upper)) {
     return { value: 'REMUX', isWeb: false };
   }
-  if (/\\bFULL\\s*DISC\\b/.test(upper) || /\\bBDMV\\b/.test(upper) || /\\bBDISO\\b/.test(upper)) {
+  if (/\bFULL\s*DISC\b/.test(upper) || /\bBDMV\b/.test(upper) || /\bBDISO\b/.test(upper)) {
     return { value: 'FULL DISC', isWeb: false };
   }
-  if (/\\bBLU[-\\s]?RAY\\b/.test(upper) || /\\bBLURAY\\b/.test(upper) || /\\bUHD\\b/.test(upper)) {
+  if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper) || /\bUHD\b/.test(upper)) {
     return { value: 'ENCODE', isWeb: false };
   }
   return { value: '', isWeb: null };
@@ -68,22 +68,22 @@ function detectFormatFromName(name) {
 
 function detectSourceFromName(name) {
   const upper = String(name || '').toUpperCase();
-  if (/\\bUHD\\b/.test(upper) && /\\bBLU[-\\s]?RAY\\b/.test(upper)) {
+  if (/\bUHD\b/.test(upper) && /\bBLU[-\s]?RAY\b/.test(upper)) {
     return 'UHD BluRay';
   }
-  if (/\\bBLU[-\\s]?RAY\\b/.test(upper) || /\\bBLURAY\\b/.test(upper)) {
+  if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper)) {
     return 'BluRay';
   }
-  if (/\\bHD\\s*DVD\\b/.test(upper)) {
+  if (/\bHD\s*DVD\b/.test(upper)) {
     return 'HD DVD';
   }
-  if (/\\bDVD\\b/.test(upper)) {
+  if (/\bDVD\b/.test(upper)) {
     return 'DVD';
   }
-  if (/\\bPAL\\b/.test(upper)) {
+  if (/\bPAL\b/.test(upper)) {
     return 'PAL';
   }
-  if (/\\bNTSC\\b/.test(upper)) {
+  if (/\bNTSC\b/.test(upper)) {
     return 'NTSC';
   }
   return '';
@@ -91,19 +91,19 @@ function detectSourceFromName(name) {
 
 function extractVideoCodecFromName(name) {
   const upper = String(name || '').toUpperCase();
-  if (/\\bAV1\\b/.test(upper)) {
+  if (/\bAV1\b/.test(upper)) {
     return 'AV1';
   }
-  if (/\\bMPEG[-\\s]?2\\b/.test(upper) || /\\bMPEG2\\b/.test(upper)) {
+  if (/\bMPEG[-\s]?2\b/.test(upper) || /\bMPEG2\b/.test(upper)) {
     return 'MPEG-2';
   }
-  if (/\\bVC[-\\s]?1\\b/.test(upper) || /\\bVC1\\b/.test(upper)) {
+  if (/\bVC[-\s]?1\b/.test(upper) || /\bVC1\b/.test(upper)) {
     return 'VC-1';
   }
-  if (/\\bX265\\b/.test(upper) || /\\bH\\.?265\\b/.test(upper) || /\\bHEVC\\b/.test(upper)) {
+  if (/\bX265\b/.test(upper) || /\bH\.?265\b/.test(upper) || /\bHEVC\b/.test(upper)) {
     return 'H.265';
   }
-  if (/\\bX264\\b/.test(upper) || /\\bH\\.?264\\b/.test(upper) || /\\bAVC\\b/.test(upper)) {
+  if (/\bX264\b/.test(upper) || /\bH\.?264\b/.test(upper) || /\bAVC\b/.test(upper)) {
     return 'H.264';
   }
   return '';
@@ -111,44 +111,44 @@ function extractVideoCodecFromName(name) {
 
 function extractAudioCodecFromName(name) {
   const upper = String(name || '').toUpperCase();
-  if (/\\bTRUEHD\\b/.test(upper)) {
+  if (/\bTRUEHD\b/.test(upper)) {
     return 'TrueHD';
   }
-  if (/\\bDTS[-\\s]?X\\b/.test(upper) || /\\bDTSX\\b/.test(upper)) {
+  if (/\bDTS[-\s]?X\b/.test(upper) || /\bDTSX\b/.test(upper)) {
     return 'DTS:X';
   }
-  if (/\\bDTS[-\\s]?HD\\s*MA\\b/.test(upper) || /\\bDTSHDMA\\b/.test(upper)) {
+  if (/\bDTS[-\s]?HD\s*MA\b/.test(upper) || /\bDTSHDMA\b/.test(upper)) {
     return 'DTS-HD MA';
   }
-  if (/\\bDTS[-\\s]?HD\\s*HRA\\b/.test(upper) || /\\bDTSHDHRA\\b/.test(upper)) {
+  if (/\bDTS[-\s]?HD\s*HRA\b/.test(upper) || /\bDTSHDHRA\b/.test(upper)) {
     return 'DTS-HD HRA';
   }
-  if (/\\bDTS\\b/.test(upper)) {
+  if (/\bDTS\b/.test(upper)) {
     return 'DTS';
   }
-  if (/DD\\+/.test(upper) || /\\bDDP\\b/.test(upper) || /\\bEAC3\\b/.test(upper) || /\\bE-AC-3\\b/.test(upper)) {
+  if (/DD\+/.test(upper) || /\bDDP\b/.test(upper) || /\bEAC3\b/.test(upper) || /\bE-AC-3\b/.test(upper)) {
     return 'DD+';
   }
-  if (/\\bDD\\b/.test(upper) || /\\bAC3\\b/.test(upper)) {
+  if (/\bDD\b/.test(upper) || /\bAC3\b/.test(upper)) {
     return 'DD';
   }
-  if (/\\bAAC\\b/.test(upper)) {
+  if (/\bAAC\b/.test(upper)) {
     return 'AAC';
   }
-  if (/\\bFLAC\\b/.test(upper)) {
+  if (/\bFLAC\b/.test(upper)) {
     return 'FLAC';
   }
-  if (/\\bOPUS\\b/.test(upper)) {
+  if (/\bOPUS\b/.test(upper)) {
     return 'OPUS';
   }
-  if (/\\bPCM\\b/.test(upper)) {
+  if (/\bPCM\b/.test(upper)) {
     return 'PCM';
   }
   return '';
 }
 
 function extractAudioChannelsFromName(name) {
-  const match = String(name || '').match(/\\b([1-7]\\.[01])\\b/);
+  const match = String(name || '').match(/\b([1-7]\.[01])\b/);
   return match ? match[1] : '';
 }
 
@@ -173,7 +173,7 @@ function parseLanguageTag(value) {
     return [];
   }
   return String(value)
-    .replace(/\\.-\\./g, '-')
+    .replace(/\.-\./g, '-')
     .split('-')
     .map((token) => token.trim())
     .filter(Boolean);
@@ -184,14 +184,14 @@ function cleanEpisodeTitle(raw, tokensToRemove) {
     return '';
   }
   let cleaned = String(raw);
-  cleaned = cleaned.replace(/\\b\\d\\.\\d\\b/gi, ' ');
-  cleaned = cleaned.replace(/\\b(H\\.?265|H\\.?264|X265|X264|HEVC|AVC|AV1)\\b/gi, ' ');
-  cleaned = cleaned.replace(/\\b(H|X)\\s*26[45]\\b/gi, ' ');
-  cleaned = cleaned.replace(/DD\\+/gi, ' ');
-  cleaned = cleaned.replace(/\\b(DDP|DD|DTS(?:-HD)?|TRUEHD|ATMOS|AAC|FLAC|PCM|OPUS|MP3|EAC3)\\b/gi, ' ');
-  cleaned = cleaned.replace(/\\b([1-7])\\s*0\\b/gi, ' ');
-  cleaned = cleaned.replace(/\\b([1-7])\\s*1\\b/gi, ' ');
-  cleaned = cleaned.replace(/\\b(HDR10\\+|HDR10PLUS|HDR10|HDR|DV|DOLBYVISION)\\b/gi, ' ');
+  cleaned = cleaned.replace(/\b\d\.\d\b/gi, ' ');
+  cleaned = cleaned.replace(/\b(H\.?265|H\.?264|X265|X264|HEVC|AVC|AV1)\b/gi, ' ');
+  cleaned = cleaned.replace(/\b(H|X)\s*26[45]\b/gi, ' ');
+  cleaned = cleaned.replace(/DD\+/gi, ' ');
+  cleaned = cleaned.replace(/\b(DDP|DD|DTS(?:-HD)?|TRUEHD|ATMOS|AAC|FLAC|PCM|OPUS|MP3|EAC3)\b/gi, ' ');
+  cleaned = cleaned.replace(/\b([1-7])\s*0\b/gi, ' ');
+  cleaned = cleaned.replace(/\b([1-7])\s*1\b/gi, ' ');
+  cleaned = cleaned.replace(/\b(HDR10\+|HDR10PLUS|HDR10|HDR|DV|DOLBYVISION)\b/gi, ' ');
   const uniqueTokens = [...new Set(tokensToRemove.filter(Boolean))];
   for (const token of uniqueTokens) {
     const escaped = escapeRegExp(token);
@@ -199,7 +199,7 @@ function cleanEpisodeTitle(raw, tokensToRemove) {
     cleaned = cleaned.replace(regex, ' ');
   }
   cleaned = cleaned.replace(/[._+-]+/g, ' ');
-  cleaned = cleaned.replace(/\\s+/g, ' ').trim();
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
   if (cleaned) {
     const tokens = cleaned.split(' ');
     const last = tokens[tokens.length - 1];

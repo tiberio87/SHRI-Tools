@@ -901,6 +901,10 @@ body.light .fetch-warning {
   text-decoration: underline;
 }
 
+#torrentGeneratorHint {
+  margin-top: 4px;
+}
+
 .settings-grid {
   align-items: start;
 }
@@ -1241,6 +1245,20 @@ body.light .fetch-warning {
   color: var(--muted);
   min-width: 42px;
   text-align: right;
+}
+
+.torrent-log {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-inline);
+  font-family: 'SF Mono', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 11px;
+  color: var(--text);
+  max-height: 110px;
+  overflow: auto;
+  white-space: pre-wrap;
 }
 
 @keyframes spin {

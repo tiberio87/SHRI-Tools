@@ -248,7 +248,7 @@
               <label for="tvdbInput">TVDB ID (fallback)</label>
               <input id="tvdbInput" type="text" placeholder="12345" />
             </div>
-            <div class="field">
+            <div class="field manual-field">
               <label for="typeSelect">Tipo</label>
               <select id="typeSelect">
                 <option value="movie">Film</option>
@@ -386,6 +386,15 @@
           <div class="input-with-action">
             <input id="settingsTorrentOutputInput" type="text" placeholder="Seleziona cartella" />
             <button id="browseTorrentOutputSettingsBtn" class="secondary small" type="button">Sfoglia</button>
+          </div>
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label for="settingsMkbrrPathInput">Percorso mkbrr (opzionale)</label>
+          <div class="input-with-action">
+            <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
+            <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
           </div>
         </div>
       </div>
@@ -737,6 +746,10 @@
                 <input id="autoTagDetectToggle" type="checkbox" checked />
                 Rilevazione autom. gruppi
               </label>
+              <label class="checkbox">
+                <input id="autoNoGroupTagToggle" type="checkbox" checked />
+                Aggiunta autom. tag -NoGroup
+              </label>
               <button id="openGroupDefaultsBtn" class="secondary small" type="button">Gruppi default</button>
             </div>
           </div>
@@ -934,10 +947,12 @@
               </div>
               <div id="torrentProgressStageText" class="progress-stage-text">Hashing...</div>
             </div>
+            <pre id="torrentLog" class="torrent-log hidden"></pre>
             <div class="confirm-actions">
               <button id="generateTorrentBtn" class="primary">Genera .torrent</button>
             </div>
             <div id="torrentHint" class="hint"></div>
+            <div id="torrentGeneratorHint" class="hint hidden"></div>
           </section>
           <section class="wizard-step wizard-step-upload" data-step="2">
             <div class="wizard-step-header">

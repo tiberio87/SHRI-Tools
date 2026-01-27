@@ -46,6 +46,10 @@ let mediaInfoTextInstance = null;
 let createTorrentModule = null;
 const transmissionSessions = new Map();
 
+function stripAnsi(text) {
+  return String(text || '').replace(/\x1b\[[0-9;]*m/g, '');
+}
+
 async function getMediaInfo() {
   if (!mediaInfoInstance) {
     mediaInfoInstance = await mediaInfoFactory({ format: 'object' });
@@ -879,6 +883,59 @@ async function createTorrentBuffer(targetPath, options) {
   });
 }
 
+async function runMkbrrCreate({ mkbrrPath, targetPath, announce, outputPath, isPrivate, onLine }) {
+  return new Promise((resolve, reject) => {
+    const args = ['create', targetPath, '-t', announce, '-o', outputPath];
+    if (isPrivate === false) {
+      args.push('--private=false');
+    }
+    const child = spawn(mkbrrPath, args, { windowsHide: true });
+    let stdoutBuffer = '';
+    let stdout = '';
+    let stderr = '';
+    const flushLines = (buffer) => {
+      const lines = buffer.split(/[\r\n]+/);
+      const tail = lines.pop() || '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (trimmed && onLine) {
+          onLine(trimmed);
+        }
+      }
+      return tail;
+    };
+    child.stdout.on('data', (data) => {
+      const chunk = data.toString();
+      stdout += chunk;
+      stdoutBuffer = flushLines(stdoutBuffer + chunk);
+    });
+    child.stderr.on('data', (data) => {
+      const chunk = data.toString();
+      stderr += chunk;
+      if (onLine) {
+        for (const line of chunk.split(/[\r\n]+/)) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            onLine(trimmed);
+          }
+        }
+      }
+    });
+    child.on('error', (error) => reject(error));
+    child.on('close', (code) => {
+      if (stdoutBuffer.trim() && onLine) {
+        onLine(stdoutBuffer.trim());
+      }
+      if (code === 0) {
+        resolve();
+        return;
+      }
+      const message = stderr.trim() || stdout.trim() || `mkbrr exited with code ${code}`;
+      reject(new Error(message));
+    });
+  });
+}
+
 async function pickMainVideo(videoFiles) {
   if (!videoFiles.length) {
     return null;
@@ -1521,8 +1578,9 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
     const outputDir = payload?.outputDir || '';
     const outputName = payload?.outputName || '';
     const isPrivate = payload?.private !== false;
+    const mkbrrPath = String(payload?.mkbrrPath || '').trim();
     const requestId = payload?.requestId || '';
-    const sendProgress = (progress, stage) => {
+    const sendProgress = (progress, stage, logLine, generator) => {
       if (_event?.sender) {
         const payload = { requestId };
         if (typeof progress === 'number') {
@@ -1530,6 +1588,12 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
         }
         if (stage) {
           payload.stage = stage;
+        }
+        if (logLine) {
+          payload.logLine = logLine;
+        }
+        if (generator) {
+          payload.generator = generator;
         }
         _event.sender.send('torrent-progress', payload);
       }
@@ -1564,6 +1628,75 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
     let pieceLength = null;
     let torrent = null;
     let warning = '';
+    let generator = 'node';
+
+    if (mkbrrPath) {
+      try {
+        sendProgress(0, 'hashing', null, 'mkbrr');
+        const handleMkbrrLine = (rawLine) => {
+          let line = stripAnsi(rawLine).replace(/\s+/g, ' ').trim();
+          if (!line) {
+            return;
+          }
+          if (line.startsWith('Hashing pieces')) {
+            if (line.includes('Hashing pieces', 1)) {
+              const parts = line.split('Hashing pieces').filter(Boolean);
+              const last = parts[parts.length - 1] || '';
+              line = `Hashing pieces${last}`;
+            }
+            line = line
+              .replace(/\[[= >]+\]/g, '')
+              .replace(/\[\d+s:\d+s\]/g, '')
+              .replace(/\s+/g, ' ')
+              .trim();
+            const percentMatch = line.match(/(\d{1,3})%/);
+            if (percentMatch) {
+              const percent = Math.min(100, parseInt(percentMatch[1], 10) || 0);
+              sendProgress(percent / 100, 'hashing', line, 'mkbrr');
+              return;
+            }
+            sendProgress(null, null, line, 'mkbrr');
+            return;
+          }
+          if (line.startsWith('Concurrency:') || line.startsWith('Files being hashed:')) {
+            sendProgress(null, null, line, 'mkbrr');
+            return;
+          }
+          if (/^[└├]─/.test(line) && !/\((?:\d+(?:\.\d+)?\s)?(GiB|MiB|KiB|GB|MB|KB)\)/.test(line)) {
+            sendProgress(null, null, line, 'mkbrr');
+            return;
+          }
+          if (line.startsWith('Wrote ')) {
+            sendProgress(null, null, line, 'mkbrr');
+          }
+        };
+        await runMkbrrCreate({
+          mkbrrPath,
+          targetPath,
+          announce,
+          outputPath,
+          isPrivate,
+          onLine: handleMkbrrLine
+        });
+        generator = 'mkbrr';
+        sendProgress(0.99, 'writing');
+        const stats = await fs.stat(outputPath);
+        if (stats.size > MAX_TORRENT_SIZE) {
+          warning = 'Il file .torrent supera 2MB. Aumenta la piece size.';
+        }
+        sendProgress(1, 'done');
+        return {
+          ok: true,
+          outputPath,
+          pieceLength: null,
+          warning,
+          generator
+        };
+      } catch {
+        generator = 'node';
+        sendProgress(null, 'hashing', 'mkbrr non disponibile, uso Node.', 'node');
+      }
+    }
 
     for (let attempt = 0; attempt < 6; attempt += 1) {
       sendProgress(0, 'hashing');
@@ -1606,7 +1739,8 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
       ok: true,
       outputPath,
       pieceLength,
-      warning
+      warning,
+      generator
     };
   } catch (error) {
     return { ok: false, error: String(error) };

@@ -210,7 +210,11 @@ export function createServiceTagTools({ ui, state, logDebug, metadataTools }) {
       state.tagSuggestion = '';
       return;
     }
-    state.tagSuggestion = metadataTools.extractGroupTagFromName(path, buildKnownGroupTags(settings));
+    state.tagSuggestion = metadataTools.extractGroupTagFromName(
+      path,
+      buildKnownGroupTags(settings),
+      { allowNoGroup: false }
+    );
     if (state.tagSuggestion !== state.lastTagSuggestion) {
       logDebug?.('tag suggestion', {
         path,

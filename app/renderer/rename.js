@@ -161,7 +161,8 @@ export function createRenameTools(deps) {
     }
 
     const tag = data.tag ? data.tag.replace(/^[\-\s]+/, '') : '';
-    if (tag && tokens.length) {
+    const allowNoGroupTag = data.allowNoGroupTag === true;
+    if (tag && tokens.length && (allowNoGroupTag || tag.toLowerCase() !== 'nogroup')) {
       tokens[tokens.length - 1] = `${tokens[tokens.length - 1]}-${tag}`;
     }
 

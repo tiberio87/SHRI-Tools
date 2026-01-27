@@ -23,6 +23,8 @@ let currentTorrentRequestId = null;
 let settingsSnapshot = '';
 let settingsDirty = false;
 let wizardStepIndex = 0;
+let torrentGenerator = 'node';
+const torrentLogLines = [];
 const WIZARD_STEP_COUNT = 3;
 const LANGUAGE_CODES_PATTERN = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
   .filter(Boolean)
@@ -644,6 +646,7 @@ function prepareTorrentStep() {
   }
 
   const settings = loadSettings();
+  const useMkbrr = Boolean(settings.torrentMkbrrPath);
   if (ui.torrentOutputInput) {
     ui.torrentOutputInput.value = settings.torrentOutputDir || '';
   }
@@ -658,6 +661,7 @@ function prepareTorrentStep() {
   }
 
   setHint(ui.torrentHint, '');
+  setTorrentGeneratorHint(useMkbrr ? 'mkbrr' : 'node');
   resetTorrentProgress();
 }
 
@@ -699,6 +703,61 @@ function setTorrentStage(stage) {
   ui.torrentProgressStage.classList.remove('hidden');
 }
 
+function setTorrentGeneratorHint(generator) {
+  if (!ui.torrentGeneratorHint) {
+    return;
+  }
+  ui.torrentGeneratorHint.innerHTML = '';
+  ui.torrentGeneratorHint.classList.toggle('hidden', !generator);
+  torrentGenerator = generator || 'node';
+  if (!generator) {
+    return;
+  }
+
+  if (generator === 'mkbrr') {
+    ui.torrentGeneratorHint.textContent = 'Generatore .torrent utilizzato: mkbrr (Veloce).';
+    return;
+  }
+
+  const prefix = document.createElement('span');
+  prefix.textContent =
+    "Generatore .torrent utilizzato: Node (Lento). Barra di progresso non affidabile. Puoi velocizzare scaricando l'exe di mkbrr ";
+  const link = document.createElement('a');
+  link.textContent = 'QUI';
+  link.href = 'https://github.com/autobrr/mkbrr/releases';
+  link.setAttribute('data-external', 'https://github.com/autobrr/mkbrr/releases');
+  ui.torrentGeneratorHint.append(prefix, link, document.createTextNode('.'));
+}
+
+function resetTorrentLog() {
+  torrentLogLines.length = 0;
+  if (ui.torrentLog) {
+    ui.torrentLog.textContent = '';
+    ui.torrentLog.classList.add('hidden');
+  }
+}
+
+function appendTorrentLog(line) {
+  if (!ui.torrentLog || !line) {
+    return;
+  }
+  if (line.startsWith('Hashing pieces') && torrentLogLines.length) {
+    const lastIndex = torrentLogLines.length - 1;
+    if (torrentLogLines[lastIndex].startsWith('Hashing pieces')) {
+      torrentLogLines[lastIndex] = line;
+    } else {
+      torrentLogLines.push(line);
+    }
+  } else {
+    torrentLogLines.push(line);
+  }
+  while (torrentLogLines.length > 8) {
+    torrentLogLines.shift();
+  }
+  ui.torrentLog.textContent = torrentLogLines.join('\n');
+  ui.torrentLog.classList.remove('hidden');
+}
+
 function resetTorrentProgress() {
   if (!ui.torrentProgressRow || !ui.torrentProgressFill || !ui.torrentProgressText) {
     return;
@@ -710,6 +769,7 @@ function resetTorrentProgress() {
     ui.torrentProgressStage.classList.remove('done');
     ui.torrentProgressStage.classList.add('hidden');
   }
+  resetTorrentLog();
 }
 
 function renderRulesContent() {
@@ -1565,6 +1625,7 @@ const uploadKit = createUploadKit({
   getMissingRenameRequirements: renameTools.getMissingRenameRequirements,
   getPathBaseName,
   loadSettings,
+  metadataTools,
   logDebug,
   openWizardStep: (step) => openUploadWizard(step),
   openConfirmModal,
@@ -1864,6 +1925,8 @@ if (ui.generateTorrentBtn) {
 
     setHint(ui.torrentHint, 'Generazione in corso...');
     currentTorrentRequestId = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    resetTorrentLog();
+    setTorrentGeneratorHint(settings.torrentMkbrrPath ? 'mkbrr' : 'node');
     setTorrentProgress(0);
     setTorrentStage('hashing');
     const payload = {
@@ -1872,7 +1935,8 @@ if (ui.generateTorrentBtn) {
       outputDir,
       outputName,
       private: isPrivate,
-      requestId: currentTorrentRequestId
+      requestId: currentTorrentRequestId,
+      mkbrrPath: settings.torrentMkbrrPath || ''
     };
     const result = await window.api.createTorrent(payload);
     logDebug('createTorrent result', result);
@@ -1892,6 +1956,7 @@ if (ui.generateTorrentBtn) {
         : 'Torrent creato.';
       showToast(toastMessage);
       setHint(ui.torrentHint, `Creato: ${result.outputPath}`);
+      setTorrentGeneratorHint(result.generator || (settings.torrentMkbrrPath ? 'mkbrr' : 'node'));
       setTorrentProgress(1);
       setTorrentStage('done');
     } else {
@@ -2040,6 +2105,15 @@ if (ui.browseFfmpegBtn) {
   });
 }
 
+if (ui.browseMkbrrPathBtn) {
+  ui.browseMkbrrPathBtn.addEventListener('click', async () => {
+    const filePath = await window.api.selectAnyFile?.();
+    if (filePath && ui.settingsMkbrrPathInput) {
+      ui.settingsMkbrrPathInput.value = filePath;
+    }
+  });
+}
+
 bindConfirmHandlers();
 
 if (window.api?.onTorrentProgress) {
@@ -2055,6 +2129,12 @@ if (window.api?.onTorrentProgress) {
     }
     if (data.stage) {
       setTorrentStage(data.stage);
+    }
+    if (data.generator) {
+      setTorrentGeneratorHint(data.generator);
+    }
+    if (data.logLine) {
+      appendTorrentLog(data.logLine);
     }
   });
 }
