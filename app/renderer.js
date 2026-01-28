@@ -6,7 +6,15 @@ import {
   LANG_MAP,
   RULES_SECTIONS
 } from './renderer/constants.js';
-import { normalizeLangTag } from './renderer/media-utils.js';
+import {
+  normalizeLangTag,
+  getGeneralTrack,
+  getAudioTracks,
+  getTrackLang,
+  getTrackValue,
+  getVideoTrack,
+  hasEncodingSignature
+} from './renderer/media-utils.js';
 import { createUploadKit } from './renderer/upload-kit.js';
 import { createMetadataTools } from './renderer/metadata.js';
 import { createRenameTools } from './renderer/rename.js';
@@ -24,8 +32,44 @@ let settingsSnapshot = '';
 let settingsDirty = false;
 let wizardStepIndex = 0;
 let torrentGenerator = 'node';
+let uaRunning = false;
+let uaLogBufferRaw = '';
+let uaLogBufferHtml = '';
+let uaUpdateRunning = false;
+let uaUpdateLogBufferRaw = '';
+let uaUpdateLogBufferHtml = '';
+let uaUpdateSummary = null;
 const torrentLogLines = [];
 const WIZARD_STEP_COUNT = 3;
+
+function applyUploadMode(mode, persist = false) {
+  const normalized = mode === 'ua' ? 'ua' : 'integrated';
+  document.body.dataset.uploadMode = normalized;
+  if (ui.uploadModeToggle) {
+    ui.uploadModeToggle.textContent =
+      normalized === 'ua' ? 'Modalita Upload Assistant' : 'Modalita Integrata';
+  }
+  if (ui.openUploadAssistantBtn) {
+    ui.openUploadAssistantBtn.classList.toggle('push-right', normalized === 'ua');
+  }
+  if (ui.reopenLastUploadBtn) {
+    ui.reopenLastUploadBtn.classList.toggle('push-right', normalized === 'integrated');
+  }
+  if (persist) {
+    const settings = loadSettings();
+    settings.uploadMode = normalized;
+    saveSettings(settings);
+    updateAppHealthStatus(settings);
+    updateSettingsVisibility(settings);
+  } else {
+    const settings = loadSettings();
+    updateAppHealthStatus(settings);
+    updateSettingsVisibility(settings);
+  }
+  if (normalized === 'ua') {
+    checkUaVersion();
+  }
+}
 const LANGUAGE_CODES_PATTERN = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
   .filter(Boolean)
   .map((value) => String(value).toUpperCase())
@@ -60,6 +104,206 @@ function updateRenameBadge(plan) {
 
 function setHint(target, text) {
   target.textContent = text || '';
+}
+
+function stripConfigLine(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) {
+    return '';
+  }
+  return line;
+}
+
+function extractConfigBlock(content, key) {
+  const marker = `"${key}"`;
+  const start = content.indexOf(marker);
+  if (start === -1) {
+    return '';
+  }
+  const braceStart = content.indexOf('{', start);
+  if (braceStart === -1) {
+    return '';
+  }
+  let depth = 0;
+  for (let i = braceStart; i < content.length; i += 1) {
+    const char = content[i];
+    if (char === '{') {
+      depth += 1;
+    } else if (char === '}') {
+      depth -= 1;
+      if (depth === 0) {
+        return content.slice(braceStart + 1, i);
+      }
+    }
+  }
+  return '';
+}
+
+function extractConfigValue(block, key) {
+  const regex = new RegExp(`"${key}"\\s*:\\s*([^,\\n]+)`);
+  const match = regex.exec(block);
+  if (!match) {
+    return '';
+  }
+  let value = match[1].trim().replace(/,$/, '');
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1);
+  }
+  if (/^(True|False)$/i.test(value)) {
+    return value.toLowerCase() === 'true';
+  }
+  return value;
+}
+
+function extractConfigList(block, key) {
+  const regex = new RegExp(`"${key}"\\s*:\\s*\\[([^\\]]*)\\]`);
+  const match = regex.exec(block);
+  if (!match) {
+    return [];
+  }
+  return match[1]
+    .split(',')
+    .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+}
+
+function isPlaceholderAnnounce(value) {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    return true;
+  }
+  const lower = raw.toLowerCase();
+  if (lower.includes('<') || lower.includes('>')) {
+    return true;
+  }
+  if (
+    lower.includes('customannounceurl') ||
+    lower.includes('custom_announce_url') ||
+    lower.includes('get from') ||
+    lower.includes('yourpasskey') ||
+    lower.includes('passkeyhere') ||
+    lower.includes('insertyourpasskeyhere')
+  ) {
+    return true;
+  }
+  const passkeyMatch = /passkey=([^&]+)/i.exec(raw);
+  if (passkeyMatch) {
+    const token = passkeyMatch[1];
+    if (!token || /passkey|your|insert|here/i.test(token) || token.length < 6) {
+      return true;
+    }
+    return false;
+  }
+  const pathToken = /\/([a-z0-9]{6,})\/announce/i.exec(raw);
+  if (pathToken) {
+    return false;
+  }
+  if (/\/announce\/?$/i.test(raw)) {
+    return true;
+  }
+  return false;
+}
+
+function isTrackerConfigured(entry) {
+  const apiKey = String(entry.api_key || '').trim();
+  if (apiKey) {
+    return true;
+  }
+  const announce = String(entry.announce_url || '').trim();
+  if (announce && !isPlaceholderAnnounce(announce)) {
+    return true;
+  }
+  return false;
+}
+
+function extractTrackerBlocks(section) {
+  const cleaned = section
+    .split('\n')
+    .map(stripConfigLine)
+    .filter(Boolean)
+    .join('\n');
+  const blocks = {};
+  const trackerRegex = /"([A-Za-z0-9_]+)"\s*:\s*\{/g;
+  let match = trackerRegex.exec(cleaned);
+  while (match) {
+    const name = match[1];
+    const braceStart = cleaned.indexOf('{', match.index);
+    let depth = 0;
+    let end = braceStart;
+    for (let i = braceStart; i < cleaned.length; i += 1) {
+      const char = cleaned[i];
+      if (char === '{') {
+        depth += 1;
+      } else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          end = i;
+          break;
+        }
+      }
+    }
+    blocks[name] = cleaned.slice(braceStart + 1, end);
+    match = trackerRegex.exec(cleaned);
+  }
+  return blocks;
+}
+
+function parseUploadAssistantConfig(content) {
+  const cleaned = content
+    .split('\n')
+    .map(stripConfigLine)
+    .filter(Boolean)
+    .join('\n');
+  const defaultsBlock = extractConfigBlock(cleaned, 'DEFAULT');
+  const trackersBlock = extractConfigBlock(cleaned, 'TRACKERS');
+  const clientsBlock = extractConfigBlock(cleaned, 'TORRENT_CLIENTS');
+  const trackerBlocks = trackersBlock ? extractTrackerBlocks(trackersBlock) : {};
+  const clientBlocks = clientsBlock ? extractTrackerBlocks(clientsBlock) : {};
+
+  return {
+    defaults: {
+      tmdb_api: extractConfigValue(defaultsBlock, 'tmdb_api'),
+      btn_api: extractConfigValue(defaultsBlock, 'btn_api'),
+      img_host_1: extractConfigValue(defaultsBlock, 'img_host_1'),
+      img_host_2: extractConfigValue(defaultsBlock, 'img_host_2'),
+      imgbb_api: extractConfigValue(defaultsBlock, 'imgbb_api'),
+      ptscreens_api: extractConfigValue(defaultsBlock, 'ptscreens_api'),
+      screens: extractConfigValue(defaultsBlock, 'screens'),
+      min_successful_image_uploads: extractConfigValue(defaultsBlock, 'min_successful_image_uploads'),
+      tone_map: extractConfigValue(defaultsBlock, 'tone_map'),
+      default_torrent_client: extractConfigValue(defaultsBlock, 'default_torrent_client'),
+      injecting_client_list: extractConfigList(defaultsBlock, 'injecting_client_list')
+    },
+    trackers: {
+      default_trackers: extractConfigValue(trackersBlock, 'default_trackers'),
+      entries: Object.entries(trackerBlocks).map(([name, block]) => ({
+        name,
+        api_key: extractConfigValue(block, 'api_key'),
+        announce_url:
+          extractConfigValue(block, 'announce_url') || extractConfigValue(block, 'my_announce_url'),
+        anon: extractConfigValue(block, 'anon'),
+        use_italian_title: extractConfigValue(block, 'use_italian_title')
+      }))
+    },
+    clients: {
+      names: Object.keys(clientBlocks),
+      default_client: extractConfigValue(defaultsBlock, 'default_torrent_client')
+    }
+  };
+}
+
+function formatMasked(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  if (text.length <= 6) {
+    return `${text[0]}***`;
+  }
+  return `${text.slice(0, 2)}***${text.slice(-3)}`;
 }
 
 function truncateMiddle(value, maxLength = 78) {
@@ -103,9 +347,11 @@ function setAutoFieldState(input, active) {
 }
 
 function setFetchBadge(mode, label) {
-  ui.fetchBadge.classList.remove('auto', 'manual', 'hidden');
+  ui.fetchBadge.classList.remove('auto', 'manual', 'error', 'hidden');
   if (mode === 'manual') {
     ui.fetchBadge.classList.add('manual');
+  } else if (mode === 'error') {
+    ui.fetchBadge.classList.add('error');
   } else {
     ui.fetchBadge.classList.add('auto');
   }
@@ -236,12 +482,6 @@ function resetAllInputs(options = {}) {
   if (ui.warningList) {
     ui.warningList.innerHTML = '';
   }
-  if (ui.folderNamePreview) {
-    ui.folderNamePreview.textContent = '-';
-  }
-  if (ui.fileNamePreview) {
-    ui.fileNamePreview.textContent = '-';
-  }
 
   if (ui.mediaInfoBadge) {
     setMediaInfoBadgeVisible(false);
@@ -287,6 +527,9 @@ function mapTypeLabel(value) {
   if (!normalized) {
     return '';
   }
+  if (normalized.includes('anime')) {
+    return 'Anime';
+  }
   if (normalized.includes('movie')) {
     return 'Film';
   }
@@ -301,7 +544,19 @@ function renderFetchStatus(payload, data) {
   const parts = [];
   const title = data.title || payload.title;
   const year = data.year || payload.year;
-  const typeLabel = mapTypeLabel(data.type || payload.typeHint || ui.typeSelect.value);
+  const typeLabel = data?.isAnime
+    ? 'Anime'
+    : mapTypeLabel(data.type || payload.typeHint || ui.typeSelect.value);
+  const formatToken = (value) => {
+    if (!value) {
+      return '';
+    }
+    const trimmed = String(value).trim();
+    if (!trimmed) {
+      return '';
+    }
+    return /^\d+$/.test(trimmed) ? trimmed.padStart(2, '0') : trimmed;
+  };
 
   if (title) {
     parts.push({ label: 'Titolo', value: title, highlight: true });
@@ -311,6 +566,14 @@ function renderFetchStatus(payload, data) {
   }
   if (typeLabel) {
     parts.push({ label: 'Tipo', value: typeLabel });
+  }
+  const seasonValue = formatToken(payload.season || ui.seasonInput.value);
+  const episodeValue = formatToken(payload.episode || ui.episodeInput.value);
+  if (seasonValue) {
+    parts.push({ label: 'Stagione', value: seasonValue });
+  }
+  if (episodeValue) {
+    parts.push({ label: 'Episodio', value: episodeValue });
   }
   if (data.originalLanguage) {
     parts.push({ label: 'Lingua originale', value: normalizeLangTag(data.originalLanguage) });
@@ -338,12 +601,6 @@ function renderFetchStatus(payload, data) {
       link: `https://www.themoviedb.org/${data.tmdbType}/${data.tmdbId}`
     });
   }
-  if (data.tvdbAttempted) {
-    const count = Array.isArray(data.episodes) ? data.episodes.length : 0;
-    const label = data.tmdbFallback ? 'Episodi TMDb' : 'Episodi TVDB';
-    parts.push({ label, value: String(count) });
-  }
-
   ui.fetchStatus.innerHTML = '';
   if (!parts.length) {
     setHint(ui.fetchStatus, `Rilevato ${targetLabel}: Nessun dato rilevato.`);
@@ -366,7 +623,7 @@ function renderFetchStatus(payload, data) {
     if (part.link) {
       const link = document.createElement('a');
       link.href = '#';
-      link.className = 'fetch-link';
+      link.className = 'fetch-link fetch-value';
       link.textContent = part.value;
       link.addEventListener('click', (event) => {
         event.preventDefault();
@@ -376,6 +633,7 @@ function renderFetchStatus(payload, data) {
     } else {
       const value = document.createElement('span');
       value.textContent = part.value;
+      value.classList.add('fetch-value');
       if (part.highlight) {
         value.classList.add('fetch-title');
       }
@@ -489,7 +747,7 @@ function openUploadWizard(step = 0) {
     return;
   }
   if (!state.targetPath) {
-    showToast('Carica un file o una cartella per avviare il wizard.');
+    showToast('Carica un file o una cartella per avviare il wizard.', 'warning');
     return;
   }
   ui.uploadWizardModal.classList.remove('hidden');
@@ -501,6 +759,838 @@ function closeUploadWizard() {
     return;
   }
   ui.uploadWizardModal.classList.add('hidden');
+}
+
+function openUploadAssistantModal() {
+  if (!ui.uploadAssistantModal) {
+    return;
+  }
+  if (!state.targetPath) {
+    showToast('Carica un file o una cartella prima di avviare Upload Assistant.', 'warning');
+    return;
+  }
+  const form = getFormState();
+  updateUaServiceOptions();
+  updateRulesCheckForTargets(form, {
+    folderBlock: ui.uaRulesFolderBlock,
+    folderLabel: ui.uaRulesFolderLabel,
+    folderPath: ui.uaRulesFolderPath,
+    folderBadges: ui.uaRulesFolderBadges,
+    folderHint: ui.uaRulesFolderHint,
+    fileBlock: ui.uaRulesFileBlock,
+    fileLabel: ui.uaRulesFileLabel,
+    filePath: ui.uaRulesFilePath,
+    fileBadges: ui.uaRulesFileBadges,
+    fileHint: ui.uaRulesFileHint,
+    fileNote: ui.uaRulesFileNote
+  });
+  if (ui.uaRulesFolderBlock) {
+    const showFolder = state.kind === 'dir';
+    ui.uaRulesFolderBlock.classList.toggle('hidden', !showFolder);
+  }
+  if (ui.uaConsoleLog) {
+    ui.uaConsoleLog.textContent = '';
+    uaLogBufferRaw = '';
+    uaLogBufferHtml = '';
+  }
+  if (ui.uaStatus) {
+    ui.uaStatus.textContent = '';
+  }
+  if (ui.uaInput) {
+    ui.uaInput.value = '';
+  }
+  ui.uploadAssistantModal.classList.remove('hidden');
+  updateUaControlsState();
+}
+
+function closeUploadAssistantModal() {
+  if (!ui.uploadAssistantModal) {
+    return;
+  }
+  ui.uploadAssistantModal.classList.add('hidden');
+}
+
+const UA_UPDATE_COMMANDS = [
+  'git fetch --all --tags',
+  'git pull',
+  'python -m pip install --user -U -r requirements.txt'
+];
+
+function buildUaUpdateCommands() {
+  return UA_UPDATE_COMMANDS.join('\n');
+}
+
+function resetUaUpdateSummary() {
+  uaUpdateSummary = {
+    git: { updated: false, noop: false, error: false },
+    pip: { updated: false, noop: false, error: false }
+  };
+}
+
+function updateUaUpdateSummaryFromLine(line) {
+  if (!uaUpdateSummary) {
+    resetUaUpdateSummary();
+  }
+  const raw = String(line || '').trim();
+  if (!raw) {
+    return;
+  }
+  const lower = raw.toLowerCase();
+
+  if (lower.includes('already up to date')) {
+    uaUpdateSummary.git.noop = true;
+  }
+  if (/^updating\s+[0-9a-f]+\.\.[0-9a-f]+/i.test(raw) || lower.includes('fast-forward')) {
+    uaUpdateSummary.git.updated = true;
+  }
+  if (lower.includes('files changed') || lower.includes('changed,') || lower.includes('insertion')) {
+    uaUpdateSummary.git.updated = true;
+  }
+  if (lower.startsWith('fatal:') || lower.includes('fatal:')) {
+    uaUpdateSummary.git.error = true;
+  }
+
+  if (lower.includes('requirement already satisfied')) {
+    uaUpdateSummary.pip.noop = true;
+  }
+  if (lower.includes('successfully installed')) {
+    uaUpdateSummary.pip.updated = true;
+  }
+  if (lower.startsWith('error:') || lower.includes('error:') || lower.includes('could not')) {
+    uaUpdateSummary.pip.error = true;
+  }
+}
+
+function openUaUpdateModal() {
+  if (!ui.uaUpdateModal) {
+    return;
+  }
+  if (ui.uaUpdateCommands) {
+    ui.uaUpdateCommands.textContent = buildUaUpdateCommands();
+  }
+  if (ui.uaUpdateConsole) {
+    ui.uaUpdateConsole.textContent = '';
+    uaUpdateLogBufferRaw = '';
+    uaUpdateLogBufferHtml = '';
+    resetUaUpdateSummary();
+  }
+  if (ui.uaUpdateStatus) {
+    ui.uaUpdateStatus.textContent = '';
+  }
+  if (ui.uaUpdateInput) {
+    ui.uaUpdateInput.value = '';
+  }
+  ui.uaUpdateModal.classList.remove('hidden');
+  updateUaUpdateControlsState();
+}
+
+function closeUaUpdateModal() {
+  if (!ui.uaUpdateModal) {
+    return;
+  }
+  ui.uaUpdateModal.classList.add('hidden');
+}
+
+async function startUaUpdate() {
+  if (!window.api?.uaUpdateStart) {
+    showToast('Aggiornamento UA non disponibile.', 'warning');
+    return;
+  }
+  const baseDir = String(loadSettings().uploadAssistantPath || '').trim();
+  if (!baseDir) {
+    showToast('Percorso Upload Assistant non impostato.', 'warning');
+    return;
+  }
+  if (ui.uaUpdateConsole) {
+    ui.uaUpdateConsole.textContent = '';
+    uaUpdateLogBufferRaw = '';
+    uaUpdateLogBufferHtml = '';
+    resetUaUpdateSummary();
+  }
+  uaUpdateRunning = true;
+  updateUaUpdateControlsState();
+  setUaUpdateStatus('Aggiornamento in corso...');
+  const result = await window.api.uaUpdateStart({
+    baseDir,
+    commands: [...UA_UPDATE_COMMANDS]
+  });
+  if (!result?.ok) {
+    uaUpdateRunning = false;
+    updateUaUpdateControlsState();
+    setUaUpdateStatus(result?.error || 'Avvio aggiornamento fallito.');
+    showToast(result?.error || 'Aggiornamento non avviato.', 'error');
+  }
+}
+
+async function sendUaUpdateInput() {
+  if (!window.api?.uaUpdateSendInput) {
+    return;
+  }
+  if (!uaUpdateRunning) {
+    return;
+  }
+  const text = ui.uaUpdateInput?.value.trim();
+  if (!text) {
+    return;
+  }
+  const result = await window.api.uaUpdateSendInput(text);
+  if (!result?.ok) {
+    showToast(result?.error || 'Input non inviato.', 'error');
+    return;
+  }
+  if (ui.uaUpdateInput) {
+    ui.uaUpdateInput.value = '';
+  }
+}
+
+async function openUaConfigGeneratorTerminal() {
+  if (!window.api?.uaOpenUpdateTerminal) {
+    return;
+  }
+  const baseDir = String(loadSettings().uploadAssistantPath || '').trim();
+  if (!baseDir) {
+    showToast('Percorso Upload Assistant non impostato.', 'warning');
+    return;
+  }
+  const result = await window.api.uaOpenUpdateTerminal({
+    baseDir,
+    command: 'python config-generator.py'
+  });
+  if (!result?.ok) {
+    showToast(result?.error || 'Impossibile aprire il terminale.', 'error');
+    return;
+  }
+  showToast('Terminale config-generator aperto.', 'success');
+}
+
+function makeUaHealthBadge(text, tone) {
+  const badge = document.createElement('span');
+  badge.className = `ua-health-badge ${tone || ''}`.trim();
+  badge.textContent = text;
+  return badge;
+}
+
+function addUaHealthRow(container, label, value) {
+  const row = document.createElement('div');
+  row.className = 'ua-health-row';
+  const name = document.createElement('span');
+  name.className = 'label';
+  name.textContent = label;
+  row.appendChild(name);
+  if (value instanceof HTMLElement) {
+    row.appendChild(value);
+  } else {
+    const val = document.createElement('span');
+    val.className = 'value';
+    val.textContent = value || '—';
+    row.appendChild(val);
+  }
+  container.appendChild(row);
+}
+
+function renderUaHealthCard(title, rows) {
+  const card = document.createElement('div');
+  card.className = 'ua-health-card';
+  const heading = document.createElement('h4');
+  heading.textContent = title;
+  card.appendChild(heading);
+  const list = document.createElement('div');
+  list.className = 'ua-health-list';
+  rows.forEach((row) => addUaHealthRow(list, row.label, row.value));
+  card.appendChild(list);
+  return card;
+}
+
+function renderUaHealthDetails(parsed) {
+  if (!ui.uaHealthContent) {
+    return;
+  }
+  ui.uaHealthContent.innerHTML = '';
+
+  const defaults = parsed.defaults || {};
+  const trackers = parsed.trackers || {};
+  const clientNames = parsed.clients?.names || [];
+
+  const trackersValue = trackers.default_trackers || '—';
+  const trackerEntries = Array.isArray(trackers.entries) ? trackers.entries : [];
+  const configuredTrackers = trackerEntries.filter((entry) => isTrackerConfigured(entry));
+  const trackerSummary = configuredTrackers.length
+    ? configuredTrackers.map((entry) => entry.name).join(', ')
+    : 'Nessun tracker configurato';
+
+  ui.uaHealthContent.appendChild(
+    renderUaHealthCard('Tracker', [
+      { label: 'Default', value: trackersValue },
+      { label: 'Configurati (API/announce)', value: trackerSummary }
+    ])
+  );
+
+  const trackerListCard = document.createElement('div');
+  trackerListCard.className = 'ua-health-card';
+  const trackerTitle = document.createElement('h4');
+  trackerTitle.textContent = 'Dettaglio tracker';
+  trackerListCard.appendChild(trackerTitle);
+  const trackerList = document.createElement('div');
+  trackerList.className = 'ua-health-list';
+  if (trackerEntries.length) {
+    trackerEntries.forEach((entry) => {
+      const rowLabel = `${entry.name} · API key`;
+      const hasKey = Boolean(entry.api_key);
+      const badge = makeUaHealthBadge(hasKey ? 'Presente' : 'Manca', hasKey ? 'ok' : 'bad');
+      addUaHealthRow(trackerList, rowLabel, badge);
+      const announce = entry.announce_url;
+      const announceOk = Boolean(announce && !isPlaceholderAnnounce(announce));
+      addUaHealthRow(
+        trackerList,
+        `${entry.name} · Announce`,
+        makeUaHealthBadge(announceOk ? 'Presente' : 'Manca', announceOk ? 'ok' : 'warn')
+      );
+      addUaHealthRow(
+        trackerList,
+        `${entry.name} · Anon`,
+        makeUaHealthBadge(entry.anon ? 'Attivo' : 'Off', entry.anon ? 'warn' : '')
+      );
+      addUaHealthRow(
+        trackerList,
+        `${entry.name} · Titolo ITA`,
+        makeUaHealthBadge(entry.use_italian_title ? 'Si' : 'No', entry.use_italian_title ? 'ok' : '')
+      );
+    });
+  } else {
+    addUaHealthRow(trackerList, '—', 'Nessun tracker');
+  }
+  trackerListCard.appendChild(trackerList);
+  ui.uaHealthContent.appendChild(trackerListCard);
+
+  ui.uaHealthContent.appendChild(
+    renderUaHealthCard('Metadata & immagini', [
+      {
+        label: 'TMDB API',
+        value: defaults.tmdb_api
+          ? makeUaHealthBadge(`OK (${formatMasked(defaults.tmdb_api)})`, 'ok')
+          : makeUaHealthBadge('Manca', 'bad')
+      },
+      {
+        label: 'BTN API',
+        value: defaults.btn_api
+          ? makeUaHealthBadge(`OK (${formatMasked(defaults.btn_api)})`, 'ok')
+          : makeUaHealthBadge('Non configurata', 'warn')
+      },
+      {
+        label: 'Image host',
+        value: [defaults.img_host_1, defaults.img_host_2].filter(Boolean).join(' · ') || '—'
+      },
+      {
+        label: 'IMGBB key',
+        value: defaults.imgbb_api
+          ? makeUaHealthBadge(`OK (${formatMasked(defaults.imgbb_api)})`, 'ok')
+          : makeUaHealthBadge('Manca', 'warn')
+      },
+      {
+        label: 'PTSscreens key',
+        value: defaults.ptscreens_api
+          ? makeUaHealthBadge(`OK (${formatMasked(defaults.ptscreens_api)})`, 'ok')
+          : makeUaHealthBadge('Manca', 'warn')
+      }
+    ])
+  );
+
+  ui.uaHealthContent.appendChild(
+    renderUaHealthCard('Screenshot', [
+      { label: 'Screens', value: defaults.screens || '—' },
+      {
+        label: 'Min success',
+        value: defaults.min_successful_image_uploads || '—'
+      },
+      {
+        label: 'Tonemap',
+        value: defaults.tone_map ? makeUaHealthBadge('Attivo', 'ok') : makeUaHealthBadge('Off', '')
+      }
+    ])
+  );
+
+  ui.uaHealthContent.appendChild(
+    renderUaHealthCard('Client torrent', [
+      { label: 'Default', value: defaults.default_torrent_client || '—' },
+      {
+        label: 'Inject list',
+        value: defaults.injecting_client_list?.length
+          ? defaults.injecting_client_list.join(', ')
+          : 'Usa default'
+      },
+      {
+        label: 'Client presenti',
+        value: clientNames.length ? clientNames.join(', ') : 'Nessuno'
+      }
+    ])
+  );
+}
+
+async function refreshUaHealthModal() {
+  if (!ui.uaHealthModal) {
+    return;
+  }
+  const settings = loadSettings();
+  const baseDir = String(settings.uploadAssistantPath || '').trim();
+  if (ui.uaHealthPath) {
+    ui.uaHealthPath.textContent = baseDir || 'Non configurato';
+    ui.uaHealthPath.dataset.path = baseDir || '';
+  }
+  if (ui.uaHealthConfigPath) {
+    ui.uaHealthConfigPath.textContent = baseDir ? `${baseDir}\\data\\config.py` : '-';
+    ui.uaHealthConfigPath.dataset.path = baseDir ? `${baseDir}\\data\\config.py` : '';
+  }
+  if (!baseDir) {
+    if (ui.uaHealthContent) {
+      ui.uaHealthContent.innerHTML = '';
+      ui.uaHealthContent.appendChild(
+        renderUaHealthCard('Config Upload Assistant', [
+          { label: 'Stato', value: makeUaHealthBadge('Percorso non configurato', 'warn') }
+        ])
+      );
+    }
+    return;
+  }
+  if (!window.api?.uaReadConfig) {
+    return;
+  }
+  const result = await window.api.uaReadConfig({ baseDir });
+  if (!result?.ok) {
+    if (ui.uaHealthContent) {
+      ui.uaHealthContent.innerHTML = '';
+      ui.uaHealthContent.appendChild(
+        renderUaHealthCard('Config Upload Assistant', [
+          {
+            label: 'Errore',
+            value: makeUaHealthBadge(result?.error || 'Impossibile leggere config.py.', 'bad')
+          }
+        ])
+      );
+    }
+    return;
+  }
+  if (ui.uaHealthConfigPath && result.configPath) {
+    ui.uaHealthConfigPath.textContent = result.configPath;
+  }
+  const parsed = parseUploadAssistantConfig(result.content || '');
+  renderUaHealthDetails(parsed);
+}
+
+function openUaHealthModal() {
+  if (!ui.uaHealthModal) {
+    return;
+  }
+  ui.uaHealthModal.classList.remove('hidden');
+  refreshUaHealthModal();
+}
+
+function closeUaHealthModal() {
+  if (!ui.uaHealthModal) {
+    return;
+  }
+  ui.uaHealthModal.classList.add('hidden');
+}
+
+function setUaUpdateAvailability(available) {
+  if (!ui.uaHealthUpdateBtn) {
+    return;
+  }
+  ui.uaHealthUpdateBtn.disabled = !available;
+  ui.uaHealthUpdateBtn.dataset.mode = available ? 'run' : 'disabled';
+  ui.uaHealthUpdateBtn.textContent = 'Avvia aggiornamento';
+  if (ui.uaHealthUpdateHint) {
+    ui.uaHealthUpdateHint.classList.toggle('hidden', Boolean(available));
+  }
+}
+
+async function checkUaVersion() {
+  if (!window.api?.uaCheckVersion) {
+    return;
+  }
+  const settings = loadSettings();
+  const baseDir = String(settings.uploadAssistantPath || '').trim();
+  if (!baseDir) {
+    if (ui.uaHealthVersion) {
+      ui.uaHealthVersion.textContent = 'Percorso Upload Assistant non configurato.';
+    }
+    setUaUpdateAvailability(false);
+    setUaUpdateAvailable(null);
+    updateAppHealthStatus(settings);
+    return;
+  }
+  if (ui.uaHealthVersion) {
+    ui.uaHealthVersion.textContent = 'Verifica aggiornamenti in corso...';
+  }
+  setUaUpdateAvailability(false);
+  setUaUpdateAvailable(null);
+  updateAppHealthStatus(settings);
+  const result = await window.api.uaCheckVersion({ baseDir });
+  if (!ui.uaHealthVersion) {
+    return;
+  }
+  if (!result?.ok) {
+    ui.uaHealthVersion.textContent = result?.error || 'Verifica non disponibile.';
+    setUaUpdateAvailability(false);
+    setUaUpdateAvailable(null);
+    updateAppHealthStatus(settings);
+    return;
+  }
+  const parts = [];
+  if (result.tag) {
+    parts.push(`Tag: ${result.tag}`);
+  }
+  if (result.branch) {
+    parts.push(`Branch: ${result.branch}`);
+  }
+  if (result.lastCommit) {
+    parts.push(`Ultimo commit: ${result.lastCommit}`);
+  }
+  if (typeof result.behindCount === 'number') {
+    parts.push(
+      result.behindCount > 0
+        ? `Aggiornamento disponibile (${result.behindCount} commit)`
+        : 'Aggiornato'
+    );
+    setUaUpdateAvailability(result.behindCount > 0);
+    setUaUpdateAvailable(result.behindCount > 0);
+    updateAppHealthStatus(settings);
+  } else if (result.fetchError) {
+    parts.push(`Fetch fallito: ${result.fetchError}`);
+    setUaUpdateAvailability(false);
+    setUaUpdateAvailable(null);
+    updateAppHealthStatus(settings);
+  }
+  ui.uaHealthVersion.textContent = parts.join(' · ') || 'Verifica completata.';
+}
+
+function getUploadAssistantTargetPath() {
+  if (state.kind === 'dir') {
+    return state.targetPath || '';
+  }
+  return state.mainVideo || state.targetPath || '';
+}
+
+function updateUaControlsState() {
+  if (ui.uaTagInput) {
+    ui.uaTagInput.disabled = !ui.uaTagToggle?.checked;
+  }
+  if (ui.uaScreensInput) {
+    ui.uaScreensInput.disabled = !ui.uaScreensToggle?.checked;
+  }
+  if (ui.uaServiceBtn) {
+    ui.uaServiceBtn.disabled = !ui.uaServiceToggle?.checked;
+  }
+  if (ui.uaInput) {
+    ui.uaInput.disabled = !uaRunning;
+  }
+  if (ui.uaSendBtn) {
+    ui.uaSendBtn.disabled = !uaRunning;
+  }
+  if (ui.uaStartBtn) {
+    ui.uaStartBtn.disabled = uaRunning;
+  }
+  if (ui.uaStopBtn) {
+    ui.uaStopBtn.disabled = !uaRunning;
+  }
+}
+
+function updateUaServiceOptions() {
+  if (!ui.uaServiceMenu || !ui.uaServiceBtn || !ui.uaServiceInput) {
+    return;
+  }
+  const settings = loadSettings();
+  const options = buildServiceOptions(settings);
+  const current = ui.uaServiceInput.value;
+  ui.uaServiceMenu.innerHTML = '';
+
+  const blank = document.createElement('button');
+  blank.type = 'button';
+  blank.className = 'dropdown-item';
+  blank.dataset.value = '';
+  blank.textContent = 'Seleziona servizio';
+  ui.uaServiceMenu.appendChild(blank);
+
+  for (const option of options) {
+    const item = document.createElement('button');
+    item.type = 'button';
+    item.className = 'dropdown-item';
+    item.dataset.value = option.code;
+    item.textContent = `${option.label} (${option.code})`;
+    ui.uaServiceMenu.appendChild(item);
+  }
+
+  const currentOption = options.find((option) => option.code === current);
+  if (currentOption) {
+    ui.uaServiceInput.value = current;
+    ui.uaServiceBtn.textContent = `${currentOption.label} (${currentOption.code})`;
+  } else {
+    ui.uaServiceInput.value = '';
+    ui.uaServiceBtn.textContent = 'Seleziona servizio';
+  }
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function highlightUaLine(line) {
+  const raw = String(line || '');
+  const trim = raw.trim();
+  const linkifyUrl = (url) => {
+    const safeUrl = escapeHtml(url);
+    return `<a class="ua-hl-link" href="${safeUrl}" target="_blank" rel="noreferrer">${safeUrl}</a>`;
+  };
+  const formatKeyNumber = (label, value) =>
+    `${escapeHtml(label)} <span class="ua-hl-info">${escapeHtml(value)}</span>`;
+  const formatKeyValue = (label, value, valueClass = 'ua-hl-success') =>
+    `${escapeHtml(label)} <span class="${valueClass}">${escapeHtml(value)}</span>`;
+
+  if (/^DEBUG:\s*True\s*-\s*Will not actually upload!/i.test(trim)) {
+    return `<span class="ua-hl-error">${escapeHtml(raw)}</span>`;
+  }
+  if (/^Upload process interrupted!/i.test(trim)) {
+    return `<span class="ua-hl-error">${escapeHtml(raw)}</span>`;
+  }
+  if (/^An unexpected error occurred:/i.test(trim)) {
+    return `<span class="ua-hl-error">${escapeHtml(raw)}</span>`;
+  }
+
+  const nameMatch = trim.match(/^Name:\s*(.+)$/i);
+  if (nameMatch) {
+    return formatKeyValue('Name:', nameMatch[1], 'ua-hl-warn');
+  }
+
+  if (/^Screenshots information:/i.test(trim)) {
+    return `<span class="ua-hl-info">${escapeHtml(raw)}</span>`;
+  }
+  const numberLineMatch =
+    trim.match(/^(Screenshots|Total Frames|Start frame|End frame|Usable frames|frame interval):\s*(\d+)$/i);
+  if (numberLineMatch) {
+    return formatKeyNumber(`${numberLineMatch[1]}:`, numberLineMatch[2]);
+  }
+  if (/^Chosen Frames$/i.test(trim)) {
+    return `<span class="ua-hl-info">${escapeHtml(raw)}</span>`;
+  }
+  if (/^\[\s*\d/.test(trim)) {
+    return escapeHtml(raw).replace(/\d+/g, (value) => `<span class="ua-hl-info">${value}</span>`);
+  }
+
+  const processingMatch = trim.match(/^Processing file:\s*(.+)$/i);
+  if (processingMatch) {
+    return formatKeyValue('Processing file:', processingMatch[1], 'ua-hl-info');
+  }
+  const ffmpegMatch = trim.match(/^FFmpeg command:\s*(.+)$/i);
+  if (ffmpegMatch) {
+    return formatKeyValue('FFmpeg command:', ffmpegMatch[1], 'ua-hl-warn');
+  }
+
+  const urlMatch = raw.match(/^(TMDB|IMDB|TVDB|TVMaze):\s*(https?:\/\/\S+)/i);
+  if (urlMatch) {
+    const label = escapeHtml(urlMatch[1].toUpperCase());
+    return `${label}: ${linkifyUrl(urlMatch[2])}`;
+  }
+  if (/^https?:\/\/\S+/i.test(raw)) {
+    return `<span class="ua-hl-success">${linkifyUrl(raw)}</span>`;
+  }
+  if (/is this correct\?\s*y\/n/i.test(raw)) {
+    return `<span class="ua-hl-success">${escapeHtml(raw)}</span>`;
+  }
+  if (/enter\s+'y'\s+to\s+upload/i.test(raw)) {
+    return `<span class="ua-hl-success">${escapeHtml(raw)}</span>`;
+  }
+  if (/all tracker uploads processed/i.test(raw)) {
+    return `<span class="ua-hl-success">${escapeHtml(raw)}</span>`;
+  }
+  if (/processing uploads to trackers/i.test(raw)) {
+    return `<span class="ua-hl-warn">${escapeHtml(raw)}</span>`;
+  }
+  if (/hashing/i.test(raw)) {
+    return `<span class="ua-hl-info">${escapeHtml(raw)}</span>`;
+  }
+  const escaped = escapeHtml(raw);
+  return escaped.replace(/https?:\/\/\S+/gi, (url) => linkifyUrl(url));
+}
+
+function highlightUaChunk(chunk) {
+  return String(chunk || '')
+    .split('\n')
+    .map((line) => highlightUaLine(line))
+    .join('\n');
+}
+
+function ansiToHtml(text) {
+  const ansiRegex = /\x1b\[([0-9;]*)m/g;
+  let result = '';
+  let lastIndex = 0;
+  let currentClass = '';
+  let match;
+
+  const applyCodes = (codeText) => {
+    if (!codeText) {
+      currentClass = '';
+      return;
+    }
+    const codes = codeText.split(';').map((value) => parseInt(value, 10)).filter(Number.isFinite);
+    if (!codes.length) {
+      currentClass = '';
+      return;
+    }
+    for (const code of codes) {
+      if (code === 0) {
+        currentClass = '';
+      } else if ((code >= 30 && code <= 37) || (code >= 90 && code <= 97)) {
+        currentClass = `ansi-fg-${code}`;
+      }
+    }
+  };
+
+  while ((match = ansiRegex.exec(text)) !== null) {
+    const chunk = text.slice(lastIndex, match.index);
+    if (chunk) {
+      const escaped = currentClass ? escapeHtml(chunk) : highlightUaChunk(chunk);
+      result += currentClass ? `<span class="${currentClass}">${escaped}</span>` : escaped;
+    }
+    applyCodes(match[1]);
+    lastIndex = ansiRegex.lastIndex;
+  }
+
+  const tail = text.slice(lastIndex);
+  if (tail) {
+    const escaped = currentClass ? escapeHtml(tail) : highlightUaChunk(tail);
+    result += currentClass ? `<span class="${currentClass}">${escaped}</span>` : escaped;
+  }
+  return result;
+}
+
+function appendUaLog(text) {
+  if (!ui.uaConsoleLog) {
+    return;
+  }
+  uaLogBufferRaw += text;
+  uaLogBufferHtml += ansiToHtml(text);
+  ui.uaConsoleLog.innerHTML = uaLogBufferHtml;
+  ui.uaConsoleLog.scrollTop = ui.uaConsoleLog.scrollHeight;
+}
+
+function appendUaUpdateLog(text) {
+  if (!ui.uaUpdateConsole) {
+    return;
+  }
+  String(text || '')
+    .split(/\r?\n/)
+    .forEach((line) => updateUaUpdateSummaryFromLine(line));
+  uaUpdateLogBufferRaw += text;
+  uaUpdateLogBufferHtml += ansiToHtml(text);
+  ui.uaUpdateConsole.innerHTML = uaUpdateLogBufferHtml;
+  ui.uaUpdateConsole.scrollTop = ui.uaUpdateConsole.scrollHeight;
+}
+
+function appendUaUpdateSystemLine(text, tone = 'info') {
+  if (!ui.uaUpdateConsole) {
+    return;
+  }
+  const className =
+    tone === 'success'
+      ? 'ua-hl-success'
+      : tone === 'warn'
+      ? 'ua-hl-warn'
+      : tone === 'error'
+      ? 'ua-hl-error'
+      : 'ua-hl-info';
+  const safe = escapeHtml(text);
+  uaUpdateLogBufferRaw += `${text}\n`;
+  uaUpdateLogBufferHtml += `<span class="${className}">${safe}</span>\n`;
+  ui.uaUpdateConsole.innerHTML = uaUpdateLogBufferHtml;
+  ui.uaUpdateConsole.scrollTop = ui.uaUpdateConsole.scrollHeight;
+}
+
+function setUaStatus(text) {
+  if (ui.uaStatus) {
+    ui.uaStatus.textContent = text || '';
+  }
+}
+
+function setUaUpdateStatus(text) {
+  if (ui.uaUpdateStatus) {
+    ui.uaUpdateStatus.textContent = text || '';
+  }
+}
+
+function updateUaUpdateControlsState() {
+  if (ui.uaUpdateInput) {
+    ui.uaUpdateInput.disabled = !uaUpdateRunning;
+  }
+  if (ui.uaUpdateSendBtn) {
+    ui.uaUpdateSendBtn.disabled = !uaUpdateRunning;
+  }
+  if (ui.uaUpdateRunBtn) {
+    ui.uaUpdateRunBtn.disabled = uaUpdateRunning;
+  }
+  if (ui.uaUpdateConfigBtn) {
+    ui.uaUpdateConfigBtn.disabled = uaUpdateRunning;
+  }
+}
+
+function buildUploadAssistantArgs() {
+  const settings = loadSettings();
+  const baseDir = String(settings.uploadAssistantPath || '').trim();
+  const targetPath = getUploadAssistantTargetPath();
+  const args = [];
+
+  if (!baseDir) {
+    return { error: 'Imposta il percorso di Upload Assistant nelle Impostazioni.' };
+  }
+  if (!targetPath) {
+    return { error: 'Nessun file/cartella selezionato.' };
+  }
+
+  args.push('upload.py', targetPath);
+
+  if (ui.uaUnattendedToggle?.checked) {
+    args.push('-ua');
+  }
+  if (ui.uaTrackerShriToggle?.checked) {
+    args.push('-tk', 'SHRI');
+  } else if (ui.uaTrackerTestingToggle?.checked) {
+    args.push('-tk', 'TESTING');
+  }
+  if (ui.uaPersonalToggle?.checked) {
+    args.push('-pr');
+  }
+  if (ui.uaAnonymousToggle?.checked) {
+    args.push('-a');
+  }
+  if (ui.uaWebdvToggle?.checked) {
+    args.push('-webdv');
+  }
+  if (ui.uaTagToggle?.checked) {
+    const tagValue = ui.uaTagInput?.value.trim();
+    if (tagValue) {
+      args.push('-g', tagValue);
+    }
+  }
+  if (ui.uaScreensToggle?.checked) {
+    const screensValue = Number(ui.uaScreensInput?.value || 0);
+    if (Number.isFinite(screensValue) && screensValue > 0) {
+      args.push('-s', String(Math.min(8, Math.max(1, screensValue))));
+    }
+  }
+  if (ui.uaServiceToggle?.checked) {
+    const serviceValue = ui.uaServiceInput?.value.trim();
+    if (serviceValue) {
+      args.push('-serv', serviceValue);
+    }
+  }
+  if (ui.uaDebugToggle?.checked) {
+    args.push('-debug');
+  }
+
+  return { baseDir, args };
 }
 
 function openAdvancedSettings() {
@@ -985,6 +2075,124 @@ function detectRepackFromName(name) {
   return '';
 }
 
+function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}) {
+  if (!mediaInfo || mediaInfo.error) {
+    return { value: '', reason: '' };
+  }
+  const videoTrack = getVideoTrack(mediaInfo);
+  const generalTrack = getGeneralTrack(mediaInfo);
+  if (!videoTrack && !generalTrack) {
+    return { value: '', reason: '' };
+  }
+
+  if (/\b(UNTOUCHED|VU1080|VU720|VU)\b/i.test(String(baseName || ''))) {
+    return { value: 'Remux', reason: 'Rilevato da parsing del nome file: marker UNTOUCHED/VU' };
+  }
+
+  const encodingSettings = String(
+    getTrackValue(videoTrack, [
+      'Encoded_Library_Settings',
+      'Encoded_Library_Settings/String',
+      'Encoding_Settings',
+      'Encoding_Settings/String'
+    ]) || ''
+  ).toLowerCase();
+  const encodedLibrary = String(
+    getTrackValue(videoTrack, [
+      'Encoded_Library',
+      'Encoded_Library/String',
+      'Encoded_Library_Name',
+      'Encoded_Library_Name/String'
+    ]) || ''
+  ).toLowerCase();
+  const generalApp = String(
+    getTrackValue(generalTrack, ['Encoded_Application', 'Writing_Application', 'Writing application']) || ''
+  ).toLowerCase();
+  const generalLibrary = String(
+    getTrackValue(generalTrack, ['Encoded_Library', 'Writing_Library', 'Writing library']) || ''
+  ).toLowerCase();
+  const generalFrontend = String(generalTrack?.extra?.Writing_frontend || '').toLowerCase();
+  const toolString = `${generalApp} ${generalFrontend}`.trim();
+  const hasEncodingTools = /(handbrake|staxrip|megatagger|x264|x265)/.test(toolString);
+  const hasEncodingSettings = Boolean(encodingSettings);
+  const hasEncodeSignature =
+    hasEncodingSignature(videoTrack) || hasEncodingSignature(generalTrack);
+  const hasEncode = hasEncodingSettings || hasEncodingTools || hasEncodeSignature;
+
+  if ((generalApp.includes('makemkv') || generalLibrary.includes('makemkv')) && !hasEncodingSettings) {
+    return { value: 'Remux', reason: 'Rilevato dal parsing MediaInfo: MakeMKV senza encoding' };
+  }
+
+  const hdrProfile = String(videoTrack?.HDR_Format_Profile || '').toLowerCase();
+  const hasStreamingDv =
+    hdrProfile.includes('dvhe.05') || hdrProfile.includes('dvhe.07') || hdrProfile.includes('dvhe.08');
+
+  const upperName = String(baseName || '').toUpperCase();
+  const nameHasWeb = /\bWEB\b/.test(upperName);
+  const serviceUpper = String(service || '').toUpperCase();
+  const sourceUpper = String(source || '').toUpperCase();
+  const sourceIsBluRay = sourceUpper.includes('BLURAY') || sourceUpper.includes('BLU-RAY');
+
+  if (hasStreamingDv && !hasEncodingTools && !hasEncodingSettings) {
+    return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: DV streaming profile' };
+  }
+  if (encodingSettings.includes('crf=')) {
+    return {
+      value: nameHasWeb || serviceUpper ? 'WEBRip' : 'Encode',
+      reason: 'Rilevato dal parsing MediaInfo: CRF rilevato'
+    };
+  }
+  if (serviceUpper === 'CR') {
+    if (encodedLibrary.includes('core 142')) {
+      return {
+        value: 'WEB-DL',
+        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core 142)'
+      };
+    }
+    const coreMatch = encodedLibrary.match(/core\s+(\d+)/);
+    if (coreMatch && Number(coreMatch[1]) >= 152) {
+      return {
+        value: 'WEBRip',
+        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core >= 152)'
+      };
+    }
+    if (encodingSettings.includes('bitrate=')) {
+      return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: Crunchyroll bitrate=' };
+    }
+  }
+  const formatProfile = String(videoTrack?.Format_Profile || '');
+  if (
+    formatProfile.includes('Main@L4.0') &&
+    encodingSettings.includes('rc=2pass') &&
+    (encodedLibrary.includes('core 118') || encodedLibrary.includes('core 148'))
+  ) {
+    return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: fingerprint Netflix' };
+  }
+  if (nameHasWeb) {
+    if (hasEncodingTools) {
+      return { value: 'WEBRip', reason: 'Rilevato dal parsing MediaInfo: tool encoding su sorgente WEB' };
+    }
+    if (!hasEncode) {
+      return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: WEB senza encoding' };
+    }
+  }
+  if (serviceUpper && !hasEncode) {
+    return {
+      value: 'WEB-DL',
+      reason: 'Rilevato dal parsing MediaInfo: servizio presente senza encoding'
+    };
+  }
+  if (sourceIsBluRay) {
+    return {
+      value: hasEncode ? 'Encode' : 'Remux',
+      reason: hasEncode
+        ? 'Rilevato dal parsing MediaInfo: BluRay con encoding'
+        : 'Rilevato dal parsing MediaInfo: BluRay senza encoding'
+    };
+  }
+  return { value: '', reason: '' };
+}
+
 function extractTokensPresent(name, tokens) {
   const matches = [];
   const safeName = String(name || '');
@@ -1006,8 +2214,8 @@ function updateFormatServiceSuggest() {
     return;
   }
   if (!state.targetPath) {
-    ui.formatSuggestRow.classList.add('is-empty');
-    ui.formatSuggestText.textContent = '';
+    ui.formatSuggestRow.classList.remove('is-empty');
+    ui.formatSuggestText.textContent = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
     return;
   }
   const basePath = state.mainVideo || state.videoFiles?.[0] || state.targetPath;
@@ -1018,17 +2226,25 @@ function updateFormatServiceSuggest() {
     return;
   }
   const settings = getSettings();
-  let format = detectFormatFromName(baseName);
+  const nameFormat = detectFormatFromName(baseName);
   const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
   const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
   const source = detectSourceFromName(baseName);
   const repack = detectRepackFromName(baseName);
+  const mediaInfoFormat = detectFormatFromMediaInfo(state.mediaInfo, baseName, { service, source });
+  let format = mediaInfoFormat.value || nameFormat;
+  let formatReason = mediaInfoFormat.value
+    ? mediaInfoFormat.reason
+    : format
+      ? 'Rilevato da parsing del nome file: token formato'
+      : '';
   if (!format && source) {
     format = 'Encode';
+    formatReason = 'Rilevato da parsing del nome file: sorgente rilevata (fallback Encode)';
   }
   if (!format && !service && !source && !repack) {
-    ui.formatSuggestRow.classList.add('is-empty');
-    ui.formatSuggestText.textContent = '';
+    ui.formatSuggestRow.classList.remove('is-empty');
+    ui.formatSuggestText.textContent = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
     if (ui.applyNameSuggestBtn) {
       ui.applyNameSuggestBtn.disabled = true;
       ui.applyNameSuggestBtn.dataset.format = '';
@@ -1040,26 +2256,81 @@ function updateFormatServiceSuggest() {
   }
   const parts = [];
   if (format) {
-    parts.push({ label: 'Formato:', value: format });
+    parts.push({ label: 'Formato:', value: format, reason: formatReason });
   }
   const serviceSourceParts = [];
   if (service) {
-    serviceSourceParts.push(service);
+    serviceSourceParts.push({
+      value: service,
+      reason: 'Rilevato da parsing del nome file: codice servizio'
+    });
   }
   if (source) {
     const sourceLabel = source === 'HDTV' ? 'HDTV (obsoleta)' : source;
-    serviceSourceParts.push(sourceLabel);
+    serviceSourceParts.push({
+      value: sourceLabel,
+      reason: 'Rilevato da parsing del nome file: token sorgente'
+    });
   }
   if (serviceSourceParts.length) {
-    parts.push({ label: 'Servizio/Sorgente:', value: serviceSourceParts.join(' / ') });
+    parts.push({
+      label: 'Servizio/Sorgente:',
+      value: serviceSourceParts.map((item) => item.value).join(' / '),
+      reason: serviceSourceParts.map((item) => item.reason).join(' | ')
+    });
   }
   if (repack) {
-    parts.push({ label: 'Repack:', value: repack });
+    parts.push({
+      label: 'Repack:',
+      value: repack,
+      reason: 'Rilevato da parsing del nome file: token repack'
+    });
+  }
+  const hasItalianSubsOnly = (() => {
+    if (!state.mediaInfo || state.mediaInfo.error) {
+      return false;
+    }
+    const audioTracks = getAudioTracks(state.mediaInfo);
+    const audioLangs = audioTracks
+      .map((track) => normalizeLangTag(getTrackLang(track)))
+      .filter(Boolean);
+    const hasItalianAudio = audioLangs.includes('ITA');
+    if (hasItalianAudio) {
+      return false;
+    }
+    const tracks = state.mediaInfo?.media?.track || [];
+    const textTracks = tracks.filter((track) => track['@type'] === 'Text');
+    const subLangs = textTracks
+      .map((track) => normalizeLangTag(getTrackLang(track)))
+      .filter(Boolean);
+    return subLangs.includes('ITA');
+  })();
+  if (hasItalianSubsOnly) {
+    parts.push({
+      label: 'Extra:',
+      value: 'SUBS',
+      reason: 'Rilevato dal parsing MediaInfo: sottotitoli ITA senza audio ITA'
+    });
+  }
+  if (!parts.length) {
+    ui.formatSuggestRow.classList.remove('is-empty');
+    ui.formatSuggestText.textContent = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    if (ui.applyNameSuggestBtn) {
+      ui.applyNameSuggestBtn.disabled = true;
+      ui.applyNameSuggestBtn.dataset.format = '';
+      ui.applyNameSuggestBtn.dataset.service = '';
+      ui.applyNameSuggestBtn.dataset.source = '';
+      ui.applyNameSuggestBtn.dataset.repack = '';
+    }
+    return;
   }
   const html = parts
-    .map((part) => `<span class="suggest-label">${part.label}</span> <span class="suggest-value">${part.value}</span>`)
+    .map((part) => {
+      const title = part.reason ? ` data-tooltip="${part.reason}"` : '';
+      return `<span class="suggest-label">${part.label}</span> <span class="suggest-value"${title}>${part.value}</span>`;
+    })
     .join(' · ');
-  ui.formatSuggestText.innerHTML = `Suggerimento del nome: ${html}`;
+  ui.formatSuggestText.innerHTML = `Suggerimento nome/MediaInfo: ${html}`;
   ui.formatSuggestRow.classList.remove('is-empty');
   if (ui.applyNameSuggestBtn) {
     ui.applyNameSuggestBtn.disabled = false;
@@ -1090,9 +2361,12 @@ const {
   getAnnounceUrlFromSettings,
   loadSettings,
   saveSettings,
+  updateAppHealthStatus,
+  setUaUpdateAvailable,
   updateFfmpegHint,
   updateQbitMappingHint,
   updateClientSections,
+  updateSettingsVisibility,
   applySettingsToUI,
   getSettings
 } = createSettingsTools({
@@ -1103,7 +2377,11 @@ const {
   updateServiceOptions,
   schedulePreview
 });
-const { clearWizardRulesCheck, updateWizardRulesCheck } = createRulesCheckTools({
+const {
+  clearWizardRulesCheck,
+  updateWizardRulesCheck,
+  updateRulesCheckForTargets
+} = createRulesCheckTools({
   ui,
   state,
   metadataTools,
@@ -1256,34 +2534,34 @@ async function updateRenamePlan() {
     }
   }
 
-  const infoPath = state.kind === 'dir' ? state.targetPath : getParentPath(state.targetPath);
-  const infoName = state.kind === 'dir'
-    ? (folderName || getPathBaseName(state.targetPath))
-    : getPathBaseName(infoPath || '');
-  if (infoName || folderOp) {
-    const folderLabel = document.createElement('div');
-    folderLabel.className = 'plan-label';
-    folderLabel.textContent = 'Cartella';
-    ui.renamePlanList.appendChild(folderLabel);
+  if (state.kind === 'dir') {
+    const infoPath = state.targetPath;
+    const infoName = folderName || getPathBaseName(state.targetPath);
+    if (infoName || folderOp) {
+      const folderLabel = document.createElement('div');
+      folderLabel.className = 'plan-label';
+      folderLabel.textContent = 'Cartella';
+      ui.renamePlanList.appendChild(folderLabel);
 
-    const info = document.createElement('div');
-    info.className = 'plan-info';
-    if (folderOp) {
-      const fromLine = document.createElement('div');
-      fromLine.className = 'plan-text old';
-      fromLine.textContent = getPathBaseName(folderOp.from);
-      const toLine = document.createElement('div');
-      toLine.className = 'plan-text new';
-      toLine.textContent = getPathBaseName(folderOp.to);
-      info.appendChild(fromLine);
-      info.appendChild(toLine);
-    } else {
-      info.textContent = `Cartella: ${infoName}`;
+      const info = document.createElement('div');
+      info.className = 'plan-info';
+      if (folderOp) {
+        const fromLine = document.createElement('div');
+        fromLine.className = 'plan-text old';
+        fromLine.textContent = getPathBaseName(folderOp.from);
+        const toLine = document.createElement('div');
+        toLine.className = 'plan-text new';
+        toLine.textContent = getPathBaseName(folderOp.to);
+        info.appendChild(fromLine);
+        info.appendChild(toLine);
+      } else {
+        info.textContent = `Cartella: ${infoName}`;
+      }
+      if (infoPath) {
+        info.title = infoPath;
+      }
+      ui.renamePlanList.appendChild(info);
     }
-    if (infoPath) {
-      info.title = infoPath;
-    }
-    ui.renamePlanList.appendChild(info);
   }
 
   const filesLabel = document.createElement('div');
@@ -1298,7 +2576,7 @@ async function updateRenamePlan() {
   if (filteredOps.length) {
     for (const op of filteredOps) {
       const item = document.createElement('div');
-      item.className = 'plan-item';
+      item.className = 'plan-item rename';
 
       const fromLine = document.createElement('div');
       fromLine.className = 'plan-text old';
@@ -1333,9 +2611,6 @@ async function updateRenamePlan() {
 
   updateWizardRulesCheck(form);
 
-  const extension = state.mainExtension;
-  ui.folderNamePreview.textContent = folderName || '-';
-  ui.fileNamePreview.textContent = baseName && extension ? `${baseName}${extension}` : '-';
 }
 
 async function refreshPreview() {
@@ -1355,18 +2630,19 @@ function schedulePreview() {
 
 async function fetchMetadataAuto(guess) {
   if (state.autoDetectRunning) {
-    return;
+    return { hasMatch: false, data: null };
   }
   const settings = loadSettings();
   if (!settings.omdbKey && !settings.tmdbKey && !settings.tvdbKey) {
     setHint(ui.fetchStatus, 'Imposta le API key nelle impostazioni.');
     logDebug('fetchMetadata: nessuna API key disponibile');
     ui.fetchBadge.classList.add('hidden');
-    return;
+    return { hasMatch: false, data: null };
   }
 
   state.autoDetectRunning = true;
   setHint(ui.fetchStatus, 'Ricerca in corso...');
+  ui.fetchBadge.classList.remove('error');
 
   try {
     const typeHint = guess.typeHint || ui.typeSelect.value;
@@ -1377,6 +2653,7 @@ async function fetchMetadataAuto(guess) {
       title: guess.title || ui.titleInput.value.trim(),
       year: guess.year || ui.yearInput.value.trim(),
       season: isTvType ? (guess.season || ui.seasonInput.value.trim()) : '',
+      episode: isTvType ? (guess.episode || ui.episodeInput.value.trim()) : '',
       typeHint,
       omdbKey: settings.omdbKey,
       tmdbKey: settings.tmdbKey,
@@ -1409,6 +2686,14 @@ async function fetchMetadataAuto(guess) {
       }
     }
     state.metadata = finalData;
+    if (finalData?.isAnime) {
+      const currentType = ui.typeSelect.value;
+      if (currentType === 'tv-episode') {
+        setIfAuto(ui.typeSelect, 'anime-episode');
+      } else if (currentType === 'tv-season') {
+        setIfAuto(ui.typeSelect, 'anime-season');
+      }
+    }
     if (finalData.title) {
       setIfAuto(ui.titleInput, finalData.title);
     }
@@ -1445,13 +2730,22 @@ async function fetchMetadataAuto(guess) {
       }
     }
 
-    const usedManualId = Boolean(payload.imdbId || payload.tvdbId);
-    const modeLabel = usedManualId ? 'Matching manuale' : 'Auto Matching';
-    setFetchBadge(usedManualId ? 'manual' : 'auto', modeLabel);
+    const finalHasMatch = Boolean(
+      finalData?.title || finalData?.tmdbId || finalData?.imdbId || finalData?.tvdbSeriesId
+    );
+    if (!finalHasMatch) {
+      setFetchBadge('error', 'Auto matching fallito');
+    } else {
+      const usedManualId = Boolean(payload.imdbId || payload.tvdbId);
+      const modeLabel = usedManualId ? 'Matching manuale' : 'Auto Matching';
+      setFetchBadge(usedManualId ? 'manual' : 'auto', modeLabel);
+    }
     renderFetchStatus(payload, finalData);
+    return { hasMatch: finalHasMatch, data: finalData };
   } catch (error) {
     ui.fetchBadge.classList.add('hidden');
     setHint(ui.fetchStatus, `Errore: ${error.message || error}`);
+    return { hasMatch: false, data: null, error };
   } finally {
     state.autoDetectRunning = false;
     schedulePreview();
@@ -1511,7 +2805,29 @@ async function autoDetectFromPath() {
 
   logDebug('autoDetect: guess', guess);
   updateVisibility();
-  await fetchMetadataAuto(guess);
+  const result = await fetchMetadataAuto(guess);
+  if (!result?.hasMatch && state.kind !== 'dir' && state.mainVideo) {
+    const parentPath = getParentPath(state.mainVideo);
+    const parentName = parentPath ? getPathBaseName(parentPath) : '';
+    const parentGuess = parentName ? metadataTools.guessMetadataFromName(parentName) : {};
+    const fallbackTitle = parentGuess.title || '';
+    const fallbackYear = parentGuess.year || '';
+    const fallbackSeason = parentGuess.season || guess.season;
+    const isEpisodeGuess = guess.typeHint === 'tv-episode' || guess.typeHint === 'anime-episode';
+    const shouldRetry = isEpisodeGuess && fallbackTitle && fallbackTitle !== guess.title;
+
+    if (shouldRetry) {
+      const fallback = {
+        ...guess,
+        title: fallbackTitle,
+        year: fallbackYear || guess.year,
+        season: fallbackSeason,
+        typeHint: 'tv-episode'
+      };
+      logDebug('autoDetect: fallback', { title: fallback.title, year: fallback.year, season: fallback.season });
+      await fetchMetadataAuto(fallback);
+    }
+  }
 }
 
 function updateAutoDetectControls() {
@@ -1782,7 +3098,7 @@ if (ui.sourceSection) {
       path: path || ''
     });
     if (!path) {
-      showToast('Drag & drop non disponibile, usa Seleziona file/cartella.');
+      showToast('Drag & drop non disponibile, usa Seleziona file/cartella.', 'warning');
       resetDrag();
       return;
     }
@@ -1882,7 +3198,7 @@ ui.applyRenameBtn.addEventListener('click', async () => {
   logDebug('applyRename result', result);
   if (result.ok) {
     setHint(ui.renameHint, 'Rinomina completata.');
-    showToast('Rinomina completata.');
+    showToast('Rinomina completata.', 'success');
     renameTools.applyRenameResults(result, payload);
   } else {
     const warning = result.warnings.length ? result.warnings.join(' | ') : 'Errore nella rinomina.';
@@ -1954,7 +3270,7 @@ if (ui.generateTorrentBtn) {
       const toastMessage = result.warning
         ? `Torrent creato. ${result.warning}`
         : 'Torrent creato.';
-      showToast(toastMessage);
+      showToast(toastMessage, 'warning');
       setHint(ui.torrentHint, `Creato: ${result.outputPath}`);
       setTorrentGeneratorHint(result.generator || (settings.torrentMkbrrPath ? 'mkbrr' : 'node'));
       setTorrentProgress(1);
@@ -1968,6 +3284,103 @@ if (ui.generateTorrentBtn) {
 
 ui.openSettingsBtn.addEventListener('click', openSettings);
 ui.closeSettingsBtn.addEventListener('click', requestCloseSettings);
+if (ui.appHealth) {
+  ui.appHealth.addEventListener('click', () => {
+    openUaHealthModal();
+  });
+}
+if (ui.closeUaHealthBtn) {
+  ui.closeUaHealthBtn.addEventListener('click', closeUaHealthModal);
+}
+if (ui.uaHealthModal) {
+  ui.uaHealthModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeUaHealthModal();
+    }
+  });
+}
+if (ui.uaUpdateModal) {
+  ui.uaUpdateModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeUaUpdateModal();
+    }
+  });
+}
+if (ui.closeUaUpdateBtn) {
+  ui.closeUaUpdateBtn.addEventListener('click', closeUaUpdateModal);
+}
+if (ui.uaUpdateRunBtn) {
+  ui.uaUpdateRunBtn.addEventListener('click', startUaUpdate);
+}
+if (ui.uaUpdateSendBtn) {
+  ui.uaUpdateSendBtn.addEventListener('click', sendUaUpdateInput);
+}
+if (ui.uaUpdateInput) {
+  ui.uaUpdateInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sendUaUpdateInput();
+    }
+  });
+}
+if (ui.uaUpdateConfigBtn) {
+  ui.uaUpdateConfigBtn.addEventListener('click', openUaConfigGeneratorTerminal);
+}
+if (ui.uaHealthUpdateBtn) {
+  ui.uaHealthUpdateBtn.addEventListener('click', async () => {
+    const mode = ui.uaHealthUpdateBtn.dataset.mode || 'terminal';
+    if (ui.uaHealthUpdateBtn.disabled || mode === 'disabled') {
+      return;
+    }
+    if (mode === 'run') {
+      openUaUpdateModal();
+      return;
+    }
+    const baseDir = String(loadSettings().uploadAssistantPath || '').trim();
+    if (!baseDir) {
+      showToast('Percorso Upload Assistant non impostato.', 'warning');
+      return;
+    }
+    const result = await window.api?.uaOpenUpdateTerminal?.({ baseDir });
+    if (!result?.ok) {
+      showToast(result?.error || 'Impossibile aprire il terminale.', 'error');
+      return;
+    }
+    showToast('Terminale aggiornamento aperto.', 'success');
+  });
+}
+if (ui.uaHealthOpenPathBtn) {
+  ui.uaHealthOpenPathBtn.addEventListener('click', async () => {
+    const targetPath = ui.uaHealthPath?.dataset.path || '';
+    if (!targetPath) {
+      showToast('Percorso Upload Assistant non impostato.', 'warning');
+      return;
+    }
+    const result = await window.api?.openPath?.(targetPath);
+    if (!result?.ok) {
+      showToast(result?.error || 'Impossibile aprire il percorso.', 'error');
+    }
+  });
+}
+if (ui.uaHealthOpenConfigBtn) {
+  ui.uaHealthOpenConfigBtn.addEventListener('click', async () => {
+    const targetPath = ui.uaHealthConfigPath?.dataset.path || '';
+    if (!targetPath) {
+      showToast('Config Upload Assistant non disponibile.', 'error');
+      return;
+    }
+    const result = await window.api?.openPath?.(targetPath);
+    if (!result?.ok) {
+      showToast(result?.error || 'Impossibile aprire il file.', 'error');
+    }
+  });
+}
+if (ui.openUaHealthFromSettingsBtn) {
+  ui.openUaHealthFromSettingsBtn.addEventListener('click', () => {
+    closeSettings();
+    openUaHealthModal();
+  });
+}
 if (ui.openAdvancedSettingsBtn) {
   ui.openAdvancedSettingsBtn.addEventListener('click', openAdvancedSettings);
 }
@@ -2014,13 +3427,26 @@ if (ui.advancedSettingsModal) {
 if (ui.openUploadWizardBtn) {
   ui.openUploadWizardBtn.addEventListener('click', openUploadWizard);
 }
+if (ui.openUploadAssistantBtn) {
+  ui.openUploadAssistantBtn.addEventListener('click', openUploadAssistantModal);
+}
 if (ui.closeUploadWizardBtn) {
   ui.closeUploadWizardBtn.addEventListener('click', closeUploadWizard);
+}
+if (ui.closeUploadAssistantBtn) {
+  ui.closeUploadAssistantBtn.addEventListener('click', closeUploadAssistantModal);
 }
 if (ui.uploadWizardModal) {
   ui.uploadWizardModal.addEventListener('click', (event) => {
     if (event.target.classList.contains('modal-backdrop')) {
       closeUploadWizard();
+    }
+  });
+}
+if (ui.uploadAssistantModal) {
+  ui.uploadAssistantModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      closeUploadAssistantModal();
     }
   });
 }
@@ -2048,11 +3474,211 @@ if (ui.wizardNextBtn) {
   });
 }
 
+if (ui.uaTagToggle) {
+  ui.uaTagToggle.addEventListener('change', updateUaControlsState);
+}
+if (ui.uaScreensToggle) {
+  ui.uaScreensToggle.addEventListener('change', updateUaControlsState);
+}
+if (ui.uaServiceToggle) {
+  ui.uaServiceToggle.addEventListener('change', updateUaControlsState);
+}
+if (ui.uaTrackerTestingToggle) {
+  ui.uaTrackerTestingToggle.addEventListener('change', () => {
+    if (ui.uaTrackerTestingToggle.checked && ui.uaTrackerShriToggle) {
+      ui.uaTrackerShriToggle.checked = false;
+    }
+  });
+}
+if (ui.uaTrackerShriToggle) {
+  ui.uaTrackerShriToggle.addEventListener('change', () => {
+    if (ui.uaTrackerShriToggle.checked && ui.uaTrackerTestingToggle) {
+      ui.uaTrackerTestingToggle.checked = false;
+    }
+  });
+}
+if (ui.uaTrackerTestingToggle) {
+  ui.uaTrackerTestingToggle.addEventListener('change', updateUaControlsState);
+}
+if (ui.uaTrackerShriToggle) {
+  ui.uaTrackerShriToggle.addEventListener('change', updateUaControlsState);
+}
+if (ui.uaServiceDropdown && ui.uaServiceBtn && ui.uaServiceInput && ui.uaServiceMenu) {
+  setupDropdown(ui.uaServiceDropdown, ui.uaServiceBtn, ui.uaServiceInput, ui.uaServiceMenu);
+}
+if (ui.uaScreensInput) {
+  ui.uaScreensInput.addEventListener('wheel', (event) => {
+    event.preventDefault();
+    const delta = event.deltaY > 0 ? -1 : 1;
+    const current = Number(ui.uaScreensInput.value || 0);
+    const next = Math.min(8, Math.max(1, (Number.isFinite(current) ? current : 6) + delta));
+    ui.uaScreensInput.value = String(next);
+  });
+}
+if (ui.uaStartBtn) {
+  ui.uaStartBtn.addEventListener('click', async () => {
+    const { baseDir, args, error } = buildUploadAssistantArgs();
+    if (error) {
+      showToast(error, 'error');
+      return;
+    }
+    if (!window.api?.uaStart) {
+      showToast('Upload Assistant non disponibile.', 'error');
+      return;
+    }
+    uaRunning = true;
+    updateUaControlsState();
+    setUaStatus('Avvio in corso...');
+    if (ui.uaInput) {
+      ui.uaInput.focus();
+    }
+    appendUaLog(`> python ${args.map((part) => `"${part}"`).join(' ')}\n`);
+    const result = await window.api.uaStart({ baseDir, args });
+    if (!result?.ok) {
+      uaRunning = false;
+      updateUaControlsState();
+      setUaStatus(result?.error || 'Avvio fallito.');
+    }
+  });
+}
+if (ui.uaStopBtn) {
+  ui.uaStopBtn.addEventListener('click', async () => {
+    if (!window.api?.uaStop) {
+      return;
+    }
+    await window.api.uaStop();
+    uaRunning = false;
+    updateUaControlsState();
+    setUaStatus('Interrotto.');
+  });
+}
+if (ui.uaSendBtn && ui.uaInput) {
+  const sendInput = async () => {
+    const text = ui.uaInput.value;
+    if (!text || !uaRunning) {
+      return;
+    }
+    if (!window.api?.uaSendInput) {
+      return;
+    }
+    appendUaLog(`> ${text}\n`);
+    ui.uaInput.value = '';
+    await window.api.uaSendInput(text);
+  };
+  ui.uaSendBtn.addEventListener('click', sendInput);
+  ui.uaInput.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      sendInput();
+    }
+  });
+}
+if (ui.uaCopyLogBtn) {
+  ui.uaCopyLogBtn.addEventListener('click', async () => {
+    if (!uaLogBufferRaw) {
+      return;
+    }
+    await navigator.clipboard.writeText(uaLogBufferRaw);
+    showToast('Log copiato.', 'success');
+  });
+}
+if (ui.uaOpenFolderBtn) {
+  ui.uaOpenFolderBtn.addEventListener('click', () => {
+    const baseDir = String(loadSettings().uploadAssistantPath || '').trim();
+    if (baseDir) {
+      window.api.openPath?.(baseDir);
+    } else {
+      showToast('Percorso Upload Assistant non impostato.', 'warning');
+    }
+  });
+}
+if (window.api?.onUaOutput) {
+  window.api.onUaOutput((data) => {
+    if (!data?.text) {
+      return;
+    }
+    appendUaLog(data.text);
+  });
+}
+if (window.api?.onUaExit) {
+  window.api.onUaExit((data) => {
+    uaRunning = false;
+    updateUaControlsState();
+    const code = data?.code;
+    const label = code === 0 ? 'Completato.' : `Terminato (code ${code ?? 'n/d'}).`;
+    setUaStatus(label);
+  });
+}
+if (window.api?.onUaUpdateOutput) {
+  window.api.onUaUpdateOutput((data) => {
+    if (!data?.text) {
+      return;
+    }
+    appendUaUpdateLog(data.text);
+  });
+}
+if (window.api?.onUaUpdateExit) {
+  window.api.onUaUpdateExit((data) => {
+    uaUpdateRunning = false;
+    updateUaUpdateControlsState();
+    const code = data?.code;
+    const label =
+      code === 0
+        ? 'Aggiornamento completato.'
+        : `Aggiornamento terminato (code ${code ?? 'n/d'}).`;
+    setUaUpdateStatus(label);
+    if (code === 0) {
+      appendUaUpdateSystemLine('Aggiornamento completato.', 'success');
+      if (uaUpdateSummary?.git) {
+        const gitStatus = uaUpdateSummary.git.error
+          ? 'Errore durante git pull.'
+          : uaUpdateSummary.git.updated
+          ? 'Git: aggiornato.'
+          : uaUpdateSummary.git.noop
+          ? 'Git: nessun aggiornamento.'
+          : '';
+        if (gitStatus) {
+          appendUaUpdateSystemLine(
+            gitStatus,
+            uaUpdateSummary.git.error ? 'error' : 'info'
+          );
+        }
+      }
+      if (uaUpdateSummary?.pip) {
+        const pipStatus = uaUpdateSummary.pip.error
+          ? 'Pip: errore durante installazione dipendenze.'
+          : uaUpdateSummary.pip.updated
+          ? 'Pip: dipendenze aggiornate.'
+          : uaUpdateSummary.pip.noop
+          ? 'Pip: dipendenze gia presenti.'
+          : '';
+        if (pipStatus) {
+          appendUaUpdateSystemLine(
+            pipStatus,
+            uaUpdateSummary.pip.error ? 'error' : 'info'
+          );
+        }
+      }
+    } else {
+      appendUaUpdateSystemLine('Aggiornamento fallito.', 'error');
+    }
+    checkUaVersion();
+  });
+}
+
 if (ui.themeToggle) {
   ui.themeToggle.addEventListener('click', () => {
     const nextTheme = document.body.classList.contains('light') ? 'dark' : 'light';
     applyTheme(nextTheme);
     saveTheme(nextTheme);
+  });
+}
+
+if (ui.uploadModeToggle) {
+  ui.uploadModeToggle.addEventListener('click', () => {
+    const current = document.body.dataset.uploadMode === 'ua' ? 'ua' : 'integrated';
+    const next = current === 'ua' ? 'integrated' : 'ua';
+    applyUploadMode(next, true);
   });
 }
 
@@ -2110,6 +3736,15 @@ if (ui.browseMkbrrPathBtn) {
     const filePath = await window.api.selectAnyFile?.();
     if (filePath && ui.settingsMkbrrPathInput) {
       ui.settingsMkbrrPathInput.value = filePath;
+    }
+  });
+}
+
+if (ui.browseUploadAssistantPathBtn) {
+  ui.browseUploadAssistantPathBtn.addEventListener('click', async () => {
+    const dir = await window.api.selectFolder();
+    if (dir && ui.settingsUploadAssistantPathInput) {
+      ui.settingsUploadAssistantPathInput.value = dir;
     }
   });
 }
@@ -2245,8 +3880,12 @@ ui.saveSettingsBtn.addEventListener('click', () => {
   saveSettings(settings);
   applySettingsToUI(settings);
   setHint(ui.settingsHint, 'Impostazioni salvate.');
-  showToast('Impostazioni salvate.');
+  showToast('Impostazioni salvate.', 'success');
+  updateUaServiceOptions();
   refreshSettingsSnapshot();
+  if (settings.uploadMode === 'ua') {
+    checkUaVersion();
+  }
 });
 
 if (ui.qbitTestBtn) {
@@ -2254,11 +3893,11 @@ if (ui.qbitTestBtn) {
     const settings = getSettings();
     if (!settings.qbitHost || !settings.qbitUsername || !settings.qbitPassword) {
       setHint(ui.qbitTestHint, 'Completa host, username e password.');
-      showToast('Configura qBittorrent prima del test.');
+      showToast('Configura qBittorrent prima del test.', 'warning');
       return;
     }
     if (!window.api?.qbitTest) {
-      showToast('Test qBittorrent non disponibile.');
+      showToast('Test qBittorrent non disponibile.', 'warning');
       return;
     }
     ui.qbitTestBtn.disabled = true;
@@ -2274,11 +3913,11 @@ if (ui.qbitTestBtn) {
       if (result?.ok) {
         const version = result.version ? ` (v${result.version})` : '';
         setHint(ui.qbitTestHint, `Connessione OK${version}.`);
-        showToast(`qBittorrent OK${version}`);
+        showToast(`qBittorrent OK${version}`, 'success');
       } else {
         const error = result?.error || 'Errore connessione.';
         setHint(ui.qbitTestHint, error);
-        showToast(error);
+        showToast(error, 'error');
       }
     } finally {
       ui.qbitTestBtn.disabled = false;
@@ -2291,11 +3930,11 @@ if (ui.transmissionTestBtn) {
     const settings = getSettings();
     if (!settings.transmissionHost) {
       setHint(ui.transmissionTestHint, 'Completa host e porta.');
-      showToast('Configura Transmission prima del test.');
+      showToast('Configura Transmission prima del test.', 'warning');
       return;
     }
     if (!window.api?.transmissionTest) {
-      showToast('Test Transmission non disponibile.');
+      showToast('Test Transmission non disponibile.', 'warning');
       return;
     }
     ui.transmissionTestBtn.disabled = true;
@@ -2311,11 +3950,11 @@ if (ui.transmissionTestBtn) {
       if (result?.ok) {
         const version = result.version ? ` (v${result.version})` : '';
         setHint(ui.transmissionTestHint, `Connessione OK${version}.`);
-        showToast(`Transmission OK${version}`);
+        showToast(`Transmission OK${version}`, 'success');
       } else {
         const error = result?.error || 'Errore connessione.';
         setHint(ui.transmissionTestHint, error);
-        showToast(error);
+        showToast(error, 'error');
       }
     } finally {
       ui.transmissionTestBtn.disabled = false;
@@ -2415,9 +4054,11 @@ if (ui.torrentClientSelect) {
 const initialSettings = loadSettings();
 applySettingsToUI(initialSettings);
 applyTheme(loadTheme());
+applyUploadMode(initialSettings.uploadMode || 'integrated');
 updateAutoDetectControls();
 updateVisibility();
 refreshPreview();
 updateAppVersionLabel();
+updateUaControlsState();
 
 logDebug('Renderer loaded');

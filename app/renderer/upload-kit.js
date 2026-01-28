@@ -402,7 +402,7 @@ export function createUploadKit(deps) {
     const last = readLastUpload();
     if (!last) {
       reopenMode = false;
-      showToast('Nessun upload recente.');
+      showToast('Nessun upload recente.', 'info');
       updateReopenUploadButton();
       return;
     }
@@ -443,19 +443,19 @@ export function createUploadKit(deps) {
     const apiKey = settings.unit3dApiKey || '';
     const outputDir = buildTrackerOutputDir(settings);
     if (!baseUrl || !apiKey) {
-      showToast('Imposta Base URL e API key UNIT3D.');
+      showToast('Imposta Base URL e API key UNIT3D.', 'warning');
       return;
     }
     if (!outputDir) {
-      showToast('Imposta la cartella output .torrent.');
+      showToast('Imposta la cartella output .torrent.', 'warning');
       return;
     }
     if (!lastUploadDownloadUrl) {
-      showToast('URL di download non disponibile.');
+      showToast('URL di download non disponibile.', 'warning');
       return;
     }
     if (!window.api?.unit3dDownloadTorrent) {
-      showToast('Download .torrent non disponibile.');
+      showToast('Download .torrent non disponibile.', 'error');
       return;
     }
     if (ui.downloadTrackerTorrentBtn) {
@@ -472,7 +472,7 @@ export function createUploadKit(deps) {
       });
       if (result?.ok) {
         lastTrackerTorrentPath = result.outputPath || '';
-        showToast('Torrent scaricato.');
+        showToast('Torrent scaricato.', 'success');
         setPostUploadHint(`Salvato in: ${result.outputPath || outputDir}`);
         const last = readLastUpload() || {};
         writeLastUpload({
@@ -486,7 +486,7 @@ export function createUploadKit(deps) {
           ui.sendToClientBtn.disabled = !canSendToClient(settings);
         }
       } else {
-        showToast(result?.error || 'Errore download.');
+        showToast(result?.error || 'Errore download.', 'error');
         setPostUploadHint(result?.error || 'Errore download.');
       }
     } finally {
@@ -500,37 +500,37 @@ export function createUploadKit(deps) {
     const settings = loadSettings();
     const outputDir = buildTrackerOutputDir(settings);
     if (!outputDir) {
-      showToast('Imposta la cartella output .torrent.');
+      showToast('Imposta la cartella output .torrent.', 'warning');
       return;
     }
     if (!window.api?.openPath) {
-      showToast('Apertura cartella non disponibile.');
+      showToast('Apertura cartella non disponibile.', 'error');
       return;
     }
     const result = await window.api.openPath(outputDir);
     if (!result?.ok) {
-      showToast(result?.error || 'Errore apertura cartella.');
+      showToast(result?.error || 'Errore apertura cartella.', 'error');
     }
   }
 
   async function sendToTorrentClient() {
     const settings = loadSettings();
     if (!lastTrackerTorrentPath) {
-      showToast('Scarica prima il .torrent del tracker.');
+      showToast('Scarica prima il .torrent del tracker.', 'warning');
       return;
     }
     const client = settings?.torrentClient || 'qbit';
     const isTransmission = client === 'transmission';
     if (!isTransmission && (!settings.qbitHost || !settings.qbitUsername || !settings.qbitPassword)) {
-      showToast('Configura qBittorrent nelle Impostazioni.');
+      showToast('Configura qBittorrent nelle Impostazioni.', 'warning');
       return;
     }
     if (isTransmission && !settings.transmissionHost) {
-      showToast('Configura Transmission nelle Impostazioni.');
+      showToast('Configura Transmission nelle Impostazioni.', 'warning');
       return;
     }
     if (reopenMode && !hasClientSavePath(settings)) {
-      showToast('Imposta un Save path nelle impostazioni per riaprire l\'ultimo upload.');
+      showToast('Imposta un Save path nelle impostazioni per riaprire l\'ultimo upload.', 'warning');
       return;
     }
     const mapLocal = isTransmission ? settings.transmissionPathMapLocal : settings.qbitPathMapLocal;
@@ -539,25 +539,25 @@ export function createUploadKit(deps) {
       isTransmission ? settings.transmissionSavePath : settings.qbitSavePath
     );
     if (!hasSavePathSetting && ((mapLocal && !mapRemote) || (!mapLocal && mapRemote))) {
-      showToast('Completa il mapping locale/remoto (entrambi i campi).');
+      showToast('Completa il mapping locale/remoto (entrambi i campi).', 'warning');
       return;
     }
     const baseUrl = isTransmission ? buildTransmissionBaseUrl(settings) : buildQbitBaseUrl(settings);
     if (!baseUrl) {
-      showToast(isTransmission ? 'Host Transmission non valido.' : 'Host qBittorrent non valido.');
+      showToast(isTransmission ? 'Host Transmission non valido.' : 'Host qBittorrent non valido.', 'error');
       return;
     }
     const savePath = resolveClientSavePath(settings, client);
     if (!savePath) {
-      showToast('Percorso dati non valido.');
+      showToast('Percorso dati non valido.', 'error');
       return;
     }
     if (isTransmission && !window.api?.transmissionAddTorrent) {
-      showToast('Invio al client non disponibile.');
+      showToast('Invio al client non disponibile.', 'error');
       return;
     }
     if (!isTransmission && !window.api?.qbitAddTorrent) {
-      showToast('Invio al client non disponibile.');
+      showToast('Invio al client non disponibile.', 'error');
       return;
     }
     if (ui.sendToClientBtn) {
@@ -599,10 +599,10 @@ export function createUploadKit(deps) {
         logDebug?.('qbit add response', result);
       }
       if (result?.ok) {
-        showToast('Torrent inviato al client.');
+        showToast('Torrent inviato al client.', 'success');
         setPostUploadHint(`Inviato al client: ${result?.message || 'OK'}`);
       } else {
-        showToast(result?.error || 'Errore invio al client.');
+        showToast(result?.error || 'Errore invio al client.', 'error');
         setPostUploadHint(result?.error || 'Errore invio al client.');
       }
     } finally {
@@ -1183,18 +1183,18 @@ ${downloadBlock}
 
   async function submitUnit3dUpload() {
     if (!state.lastTorrentPath) {
-      showToast('Genera prima il .torrent.');
+      showToast('Genera prima il .torrent.', 'warning');
       return;
     }
     const settings = loadSettings();
     const baseUrl = settings.unit3dBaseUrl || '';
     const apiKey = settings.unit3dApiKey || '';
     if (!baseUrl || !apiKey) {
-      showToast('Imposta Base URL e API key UNIT3D nelle impostazioni.');
+      showToast('Imposta Base URL e API key UNIT3D nelle impostazioni.', 'warning');
       return;
     }
     if (!window.api?.unit3dUpload) {
-      showToast('Upload UNIT3D non disponibile.');
+      showToast('Upload UNIT3D non disponibile.', 'error');
       return;
     }
     const form = getFormState();
@@ -1242,7 +1242,7 @@ ${downloadBlock}
         raw: result?.raw ? String(result.raw).slice(0, 2000) : ''
       });
       if (result?.ok) {
-        showToast(result?.message || 'Upload completato.');
+        showToast(result?.message || 'Upload completato.', 'success');
         setHint(ui.uploadTitleHint, 'Upload completato.');
         const snapshot = {
           title: ui.uploadTitleInput?.value || '',
@@ -1257,7 +1257,7 @@ ${downloadBlock}
         const error = result?.error || result?.message || 'Errore upload.';
         const details = result?.details ? `\n${result.details}` : '';
         const followup = result?.details || result?.raw ? '' : '\nApri il log per dettagli.';
-        showToast(error);
+        showToast(error, 'error');
         setHint(ui.uploadTitleHint, `${error}${details}${followup}`);
       }
     } finally {
@@ -1601,7 +1601,7 @@ ${downloadBlock}
     if (ui.copyUploadIdsBtn) {
       ui.copyUploadIdsBtn.addEventListener('click', () => {
         if (!uploadIdsText) {
-          showToast?.('Nessun ID disponibile.');
+          showToast?.('Nessun ID disponibile.', 'warning');
           return;
         }
         copyToClipboard(uploadIdsText, 'ID copiati.');
@@ -1699,7 +1699,7 @@ ${downloadBlock}
     if (ui.copyScreensBbcodeBtn) {
       ui.copyScreensBbcodeBtn.addEventListener('click', () => {
         if (!state.screenshots.length) {
-          showToast?.('Nessuno screenshot disponibile.');
+          showToast?.('Nessuno screenshot disponibile.', 'warning');
           return;
         }
         const bbcode = buildScreensBbcode();

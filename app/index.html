@@ -20,8 +20,12 @@
       <div class="header-actions">
         <div id="appHealth" class="app-health" data-status="red" aria-label="Stato app">
           <span class="app-health-dot" aria-hidden="true"></span>
+          <span class="app-health-label">Health Check</span>
           <div id="appHealthTooltip" class="app-health-tooltip"></div>
         </div>
+        <button id="uploadModeToggle" class="upload-mode-toggle secondary small" type="button">
+          Modalita Integrata
+        </button>
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
         <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -318,21 +322,10 @@
           <div class="action-row">
             <button id="applyRenameBtn" class="primary">Applica rinomina</button>
             <button id="reopenLastUploadBtn" class="secondary small hidden push-right" type="button">Riapri ultimo upload</button>
+            <button id="openUploadAssistantBtn" class="success torrent-button" type="button">Carica con Upload Assistant</button>
             <button id="openUploadWizardBtn" class="success torrent-button" type="button">Upload Wizard</button>
           </div>
           <div id="renameHint" class="hint"></div>
-        </section>
-
-        <section class="section">
-          <h2>Anteprima</h2>
-          <div class="preview-block">
-            <div class="label">Nome cartella</div>
-            <div id="folderNamePreview" class="preview">-</div>
-          </div>
-          <div class="preview-block">
-            <div class="label">Esempio file</div>
-            <div id="fileNamePreview" class="preview">-</div>
-          </div>
         </section>
 
         <section class="section plan-section">
@@ -356,226 +349,252 @@
         </div>
       </div>
       <div class="settings-body">
-      <h3 class="settings-title">Lingua</h3>
-      <div class="row">
-        <div class="field">
-          <label for="preferredLanguageSelect">Lingua preferita per i titoli da rinominare</label>
-          <select id="preferredLanguageSelect">
-            <option value="it-IT">Italiano</option>
-            <option value="en-US">Inglese</option>
-            <option value="">Originale</option>
-          </select>
-        </div>
-      </div>
-      <h3 class="settings-title">Torrent</h3>
-      <div class="row">
-        <div class="field">
-          <label for="settingsAnnounceInput">PID announce (SHRI)</label>
-          <div class="input-with-action">
-            <input id="settingsAnnounceInput" type="password" placeholder="ILTUOPID" />
-            <button class="icon-button" type="button" data-target="settingsAnnounceInput" aria-label="Mostra announce URL">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="field">
-          <label for="settingsTorrentOutputInput">Cartella output .torrent</label>
-          <div class="input-with-action">
-            <input id="settingsTorrentOutputInput" type="text" placeholder="Seleziona cartella" />
-            <button id="browseTorrentOutputSettingsBtn" class="secondary small" type="button">Sfoglia</button>
+      <div class="settings-block" data-settings-scope="all">
+        <h3 class="settings-title">Lingua</h3>
+        <div class="row">
+          <div class="field">
+            <label for="preferredLanguageSelect">Lingua preferita per i titoli da rinominare</label>
+            <select id="preferredLanguageSelect">
+              <option value="it-IT">Italiano</option>
+              <option value="en-US">Inglese</option>
+              <option value="">Originale</option>
+            </select>
           </div>
         </div>
       </div>
-      <div class="row">
-        <div class="field">
-          <label for="settingsMkbrrPathInput">Percorso mkbrr (opzionale)</label>
-          <div class="input-with-action">
-            <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
-            <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
+      <div class="settings-block" data-settings-scope="ua">
+        <h3 class="settings-title">Upload Assistant</h3>
+        <div class="row">
+          <div class="field">
+            <label for="settingsUploadAssistantPathInput">Percorso Upload Assistant</label>
+            <div class="input-with-action">
+              <input id="settingsUploadAssistantPathInput" type="text" placeholder="Seleziona cartella Upload-Assistant" />
+              <button id="browseUploadAssistantPathBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+          </div>
+        </div>
+        <div class="settings-row">
+          <button id="openUaHealthFromSettingsBtn" class="secondary small" type="button">Apri Health Check</button>
+        </div>
+      </div>
+      <div class="settings-block" data-settings-scope="integrated">
+        <h3 class="settings-title">Torrent</h3>
+        <div class="row">
+          <div class="field">
+            <label for="settingsAnnounceInput">PID announce (SHRI)</label>
+            <div class="input-with-action">
+              <input id="settingsAnnounceInput" type="password" placeholder="ILTUOPID" />
+              <button class="icon-button" type="button" data-target="settingsAnnounceInput" aria-label="Mostra announce URL">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="settingsTorrentOutputInput">Cartella output .torrent</label>
+            <div class="input-with-action">
+              <input id="settingsTorrentOutputInput" type="text" placeholder="Seleziona cartella" />
+              <button id="browseTorrentOutputSettingsBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="settingsMkbrrPathInput">Percorso mkbrr (opzionale)</label>
+            <div class="input-with-action">
+              <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
+              <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+          </div>
+        </div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="settingsTorrentPrivateToggle" type="checkbox" checked />
+            Torrent privato (default)
+          </label>
+        </div>
+      </div>
+      <div class="settings-block" data-settings-scope="integrated">
+        <h3 class="settings-title">Metadata API</h3>
+        <div class="row">
+          <div class="field">
+            <label for="omdbKeyInput">OMDb API Key</label>
+            <div class="input-with-icon">
+              <input id="omdbKeyInput" type="password" placeholder="Chiave OMDb" />
+              <button class="icon-button key-verify" type="button" data-service="omdb" data-input="omdbKeyInput" aria-label="Verifica chiave OMDb">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="omdbKeyInput" aria-label="Mostra chiave OMDb">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="tmdbKeyInput">TMDb API Key</label>
+            <div class="input-with-icon">
+              <input id="tmdbKeyInput" type="password" placeholder="Chiave TMDb" />
+              <button class="icon-button key-verify" type="button" data-service="tmdb" data-input="tmdbKeyInput" aria-label="Verifica chiave TMDb">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="tmdbKeyInput" aria-label="Mostra chiave TMDb">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="tvdbKeyInput">TVDB API Key</label>
+            <div class="input-with-icon">
+              <input id="tvdbKeyInput" type="password" placeholder="Chiave TVDB" />
+              <button class="icon-button key-verify" type="button" data-service="tvdb" data-input="tvdbKeyInput" aria-label="Verifica chiave TVDB">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="tvdbKeyInput" aria-label="Mostra chiave TVDB">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-      <div class="row">
-        <label class="checkbox">
-          <input id="settingsTorrentPrivateToggle" type="checkbox" checked />
-          Torrent privato (default)
-        </label>
-      </div>
-      <h3 class="settings-title">Metadata API</h3>
-      <div class="row">
-        <div class="field">
-          <label for="omdbKeyInput">OMDb API Key</label>
-          <div class="input-with-icon">
-            <input id="omdbKeyInput" type="password" placeholder="Chiave OMDb" />
-            <button class="icon-button key-verify" type="button" data-service="omdb" data-input="omdbKeyInput" aria-label="Verifica chiave OMDb">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12l4 4 10-10"></path>
-              </svg>
-            </button>
-            <button class="icon-button" type="button" data-target="omdbKeyInput" aria-label="Mostra chiave OMDb">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
+      <div class="settings-block" data-settings-scope="integrated">
+        <h3 class="settings-title">Screenshot & Image Host</h3>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="ffmpegPathInput">Percorso FFmpeg</label>
+            <div class="input-with-action">
+              <input id="ffmpegPathInput" type="text" placeholder="Seleziona ffmpeg.exe" />
+              <button id="browseFfmpegBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+            <div id="ffmpegHint" class="hint"></div>
+          </div>
+          <div class="field">
+            <label for="screenshotsCountInput">Numero screenshot</label>
+            <input id="screenshotsCountInput" type="number" min="3" max="12" step="1" placeholder="6" />
           </div>
         </div>
-        <div class="field">
-          <label for="tmdbKeyInput">TMDb API Key</label>
-          <div class="input-with-icon">
-            <input id="tmdbKeyInput" type="password" placeholder="Chiave TMDb" />
-            <button class="icon-button key-verify" type="button" data-service="tmdb" data-input="tmdbKeyInput" aria-label="Verifica chiave TMDb">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12l4 4 10-10"></path>
-              </svg>
-            </button>
-            <button class="icon-button" type="button" data-target="tmdbKeyInput" aria-label="Mostra chiave TMDb">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="imageHostPrimarySelect">Host immagini preferito</label>
+            <select id="imageHostPrimarySelect">
+              <option value="imgbb">imgBB</option>
+              <option value="ptscreens">PTScreens</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="imageHostFallbackSelect">Host fallback</label>
+            <select id="imageHostFallbackSelect">
+              <option value="ptscreens">PTScreens</option>
+              <option value="imgbb">imgBB</option>
+            </select>
           </div>
         </div>
-        <div class="field">
-          <label for="tvdbKeyInput">TVDB API Key</label>
-          <div class="input-with-icon">
-            <input id="tvdbKeyInput" type="password" placeholder="Chiave TVDB" />
-            <button class="icon-button key-verify" type="button" data-service="tvdb" data-input="tvdbKeyInput" aria-label="Verifica chiave TVDB">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12l4 4 10-10"></path>
-              </svg>
-            </button>
-            <button class="icon-button" type="button" data-target="tvdbKeyInput" aria-label="Mostra chiave TVDB">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
+        <div class="row">
+          <div class="field">
+            <label for="imgbbKeyInput">imgBB API Key</label>
+            <div class="input-with-icon">
+              <input id="imgbbKeyInput" type="password" placeholder="Chiave imgBB" />
+              <button class="icon-button key-verify" type="button" data-service="imgbb" data-input="imgbbKeyInput" aria-label="Verifica chiave imgBB">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="imgbbKeyInput" aria-label="Mostra chiave imgBB">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
           </div>
-        </div>
-      </div>
-      <h3 class="settings-title">Screenshot & Image Host</h3>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="ffmpegPathInput">Percorso FFmpeg</label>
-          <div class="input-with-action">
-            <input id="ffmpegPathInput" type="text" placeholder="Seleziona ffmpeg.exe" />
-            <button id="browseFfmpegBtn" class="secondary small" type="button">Sfoglia</button>
-          </div>
-          <div id="ffmpegHint" class="hint"></div>
-        </div>
-        <div class="field">
-          <label for="screenshotsCountInput">Numero screenshot</label>
-          <input id="screenshotsCountInput" type="number" min="3" max="12" step="1" placeholder="6" />
-        </div>
-      </div>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="imageHostPrimarySelect">Host immagini preferito</label>
-          <select id="imageHostPrimarySelect">
-            <option value="imgbb">imgBB</option>
-            <option value="ptscreens">PTScreens</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="imageHostFallbackSelect">Host fallback</label>
-          <select id="imageHostFallbackSelect">
-            <option value="ptscreens">PTScreens</option>
-            <option value="imgbb">imgBB</option>
-          </select>
-        </div>
-      </div>
-      <div class="row">
-        <div class="field">
-          <label for="imgbbKeyInput">imgBB API Key</label>
-          <div class="input-with-icon">
-            <input id="imgbbKeyInput" type="password" placeholder="Chiave imgBB" />
-            <button class="icon-button key-verify" type="button" data-service="imgbb" data-input="imgbbKeyInput" aria-label="Verifica chiave imgBB">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12l4 4 10-10"></path>
-              </svg>
-            </button>
-            <button class="icon-button" type="button" data-target="imgbbKeyInput" aria-label="Mostra chiave imgBB">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
-          </div>
-        </div>
-        <div class="field">
-          <label for="ptscreensKeyInput">PTScreens API Key</label>
-          <div class="input-with-icon">
-            <input id="ptscreensKeyInput" type="password" placeholder="Chiave PTScreens" />
-            <button class="icon-button key-verify" type="button" data-service="ptscreens" data-input="ptscreensKeyInput" aria-label="Verifica chiave PTScreens">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12l4 4 10-10"></path>
-              </svg>
-            </button>
-            <button class="icon-button" type="button" data-target="ptscreensKeyInput" aria-label="Mostra chiave PTScreens">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
+          <div class="field">
+            <label for="ptscreensKeyInput">PTScreens API Key</label>
+            <div class="input-with-icon">
+              <input id="ptscreensKeyInput" type="password" placeholder="Chiave PTScreens" />
+              <button class="icon-button key-verify" type="button" data-service="ptscreens" data-input="ptscreensKeyInput" aria-label="Verifica chiave PTScreens">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="ptscreensKeyInput" aria-label="Mostra chiave PTScreens">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
       </div>
-      <h3 class="settings-title">Upload API (UNIT3D)</h3>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="unit3dBaseUrlInput">Base URL</label>
-          <input id="unit3dBaseUrlInput" type="text" placeholder="https://shareisland.org" />
-        </div>
-        <div class="field">
-          <label for="unit3dApiKeyInput">API Key</label>
-          <div class="input-with-icon">
-            <input id="unit3dApiKeyInput" type="password" placeholder="API key UNIT3D" />
-            <button class="icon-button key-verify" type="button" data-service="unit3d" data-input="unit3dApiKeyInput" data-base="unit3dBaseUrlInput" aria-label="Verifica chiave UNIT3D">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M5 12l4 4 10-10"></path>
-              </svg>
-            </button>
-            <button class="icon-button" type="button" data-target="unit3dApiKeyInput" aria-label="Mostra chiave UNIT3D">
-              <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                <circle cx="12" cy="12" r="3.5"></circle>
-              </svg>
-            </button>
+      <div class="settings-block" data-settings-scope="integrated">
+        <h3 class="settings-title">Upload API (UNIT3D)</h3>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="unit3dBaseUrlInput">Base URL</label>
+            <input id="unit3dBaseUrlInput" type="text" placeholder="https://shareisland.org" />
+          </div>
+          <div class="field">
+            <label for="unit3dApiKeyInput">API Key</label>
+            <div class="input-with-icon">
+              <input id="unit3dApiKeyInput" type="password" placeholder="API key UNIT3D" />
+              <button class="icon-button key-verify" type="button" data-service="unit3d" data-input="unit3dApiKeyInput" data-base="unit3dBaseUrlInput" aria-label="Verifica chiave UNIT3D">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="unit3dApiKeyInput" aria-label="Mostra chiave UNIT3D">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      <div class="row settings-row">
-        <label class="checkbox">
-          <input id="unit3dAnonymousToggle" type="checkbox" />
-          Upload anonimo
-        </label>
-        <label class="checkbox">
-          <input id="unit3dPersonalReleaseToggle" type="checkbox" />
-          Personal release
-        </label>
-        <label class="checkbox">
-          <input id="unit3dModQueueToggle" type="checkbox" />
-          Coda moderazione
-        </label>
-      </div>
-      <div class="row">
-        <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
-      </div>
-      <h3 class="settings-title">Client torrent</h3>
-      <div class="row settings-grid">
-        <div class="field">
-          <label for="torrentClientSelect">Client</label>
-          <select id="torrentClientSelect">
-            <option value="qbit">qBittorrent</option>
-            <option value="transmission">Transmission</option>
-          </select>
+        <div class="row settings-row">
+          <label class="checkbox">
+            <input id="unit3dAnonymousToggle" type="checkbox" />
+            Upload anonimo
+          </label>
+          <label class="checkbox">
+            <input id="unit3dPersonalReleaseToggle" type="checkbox" />
+            Personal release
+          </label>
+          <label class="checkbox">
+            <input id="unit3dModQueueToggle" type="checkbox" />
+            Coda moderazione
+          </label>
+        </div>
+        <div class="row">
+          <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
         </div>
       </div>
+      <div class="settings-block" data-settings-scope="integrated">
+        <h3 class="settings-title">Client torrent</h3>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="torrentClientSelect">Client</label>
+            <select id="torrentClientSelect">
+              <option value="qbit">qBittorrent</option>
+              <option value="transmission">Transmission</option>
+            </select>
+          </div>
+        </div>
 
       <div id="qbitSettingsSection" class="client-section">
         <div class="row settings-grid">
@@ -708,6 +727,7 @@
           <div id="transmissionTestHint" class="hint"></div>
         </div>
       </div>
+      </div>
       <div class="settings-footer">
         <div class="settings-footer-left">
           <div id="settingsHint" class="hint"></div>
@@ -730,7 +750,7 @@
           <button id="closeAdvancedSettingsBtn" class="secondary small">Chiudi</button>
         </div>
       </div>
-      <div class="advanced-settings-body">
+      <div class="advanced-settings-body" data-settings-scope="integrated">
         <p class="hint">Usa questi override solo se l'istanza UNIT3D ha ID diversi da quelli di SHRI.</p>
         <h3 class="settings-title">Rinomina</h3>
         <div class="row settings-grid">
@@ -1056,6 +1076,199 @@
         <div class="wizard-actions">
           <button id="wizardPrevBtn" class="secondary small" type="button">Indietro</button>
           <button id="wizardNextBtn" class="primary small" type="button">Avanti</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="uploadAssistantModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content ua-modal">
+      <div class="modal-header">
+        <h2>Upload Assistant</h2>
+        <div class="modal-actions">
+          <button id="closeUploadAssistantBtn" class="secondary small">Chiudi</button>
+        </div>
+      </div>
+      <div class="ua-body">
+        <div class="ua-rules">
+          <div class="ua-rules-header">
+            <h3>Rules check</h3>
+            <div class="hint">Controllo rapido prima di avviare l'upload.</div>
+          </div>
+          <div class="wizard-rules-summary ua-rules-summary">
+            <div id="uaRulesFolderBlock" class="wizard-rules-block hidden">
+              <div class="wizard-rules-path">
+                <div id="uaRulesFolderLabel" class="label">Cartella</div>
+                <div id="uaRulesFolderPath" class="preview">-</div>
+              </div>
+              <div id="uaRulesFolderBadges" class="wizard-rules-badges"></div>
+              <div id="uaRulesFolderHint" class="wizard-rules-hint hidden"></div>
+            </div>
+            <div id="uaRulesFileBlock" class="wizard-rules-block">
+              <div class="wizard-rules-path">
+                <div id="uaRulesFileLabel" class="label">File</div>
+                <div id="uaRulesFilePath" class="preview">-</div>
+              </div>
+              <div id="uaRulesFileBadges" class="wizard-rules-badges"></div>
+              <div id="uaRulesFileHint" class="wizard-rules-hint hidden"></div>
+              <div id="uaRulesFileNote" class="wizard-rules-note hidden"></div>
+            </div>
+          </div>
+        </div>
+
+        <pre id="uaConsoleLog" class="ua-console"></pre>
+
+        <div class="ua-controls">
+          <button id="uaStartBtn" class="primary">Avvia upload</button>
+          <div class="ua-input">
+            <span class="ua-prompt">&gt;</span>
+            <input id="uaInput" type="text" placeholder="Rispondi ai prompt di Upload Assistant..." />
+            <button id="uaSendBtn" class="secondary small" type="button">Invia</button>
+          </div>
+        </div>
+
+        <div class="ua-args">
+          <label class="ua-arg-btn" data-tooltip="-ua: Modalita unattended.">
+            <input id="uaUnattendedToggle" type="checkbox" />
+            <span>Unattended</span>
+          </label>
+          <label class="ua-arg-btn" data-tooltip="-tk TESTING: Upload su TESTING.">
+            <input id="uaTrackerTestingToggle" type="checkbox" />
+            <span>TESTING</span>
+          </label>
+          <label class="ua-arg-btn" data-tooltip="-tk SHRI: Upload su SHRI.">
+            <input id="uaTrackerShriToggle" type="checkbox" />
+            <span>SHRI</span>
+          </label>
+          <label class="ua-arg-btn" data-tooltip="-pr: Release personale.">
+            <input id="uaPersonalToggle" type="checkbox" />
+            <span>Personal</span>
+          </label>
+          <label class="ua-arg-btn" data-tooltip="-a: Upload anonimo.">
+            <input id="uaAnonymousToggle" type="checkbox" />
+            <span>Anonym</span>
+          </label>
+          <label class="ua-arg-btn" data-tooltip="-webdv: Hybrid (Dolby Vision layer converted using dovi_tool).">
+            <input id="uaWebdvToggle" type="checkbox" />
+            <span>Hybrid</span>
+          </label>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-g: Tag gruppo forzato.">
+              <input id="uaTagToggle" type="checkbox" />
+              <span>Tag gruppo</span>
+            </label>
+            <input id="uaTagInput" class="ua-arg-input" type="text" placeholder="Tag gruppo" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-s: Screens (override numero).">
+              <input id="uaScreensToggle" type="checkbox" />
+              <span>Screens</span>
+            </label>
+            <input id="uaScreensInput" class="ua-arg-input ua-arg-input-short" type="number" min="1" max="8" step="1" value="6" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-serv: Servizio.">
+              <input id="uaServiceToggle" type="checkbox" />
+              <span>Servizio</span>
+            </label>
+            <div id="uaServiceDropdown" class="dropdown ua-arg-dropdown">
+              <button id="uaServiceBtn" class="dropdown-trigger" type="button">Seleziona servizio</button>
+              <div id="uaServiceMenu" class="dropdown-menu"></div>
+              <input id="uaServiceInput" type="hidden" value="" />
+            </div>
+          </div>
+          <label class="ua-arg-btn" data-tooltip="-debug: Debug dettagliato.">
+            <input id="uaDebugToggle" type="checkbox" />
+            <span>Debug</span>
+          </label>
+        </div>
+
+        <div class="ua-footer">
+          <div id="uaStatus" class="hint"></div>
+          <div class="ua-footer-actions">
+            <button id="uaStopBtn" class="secondary small" type="button">Interrompi</button>
+            <button id="uaCopyLogBtn" class="secondary small" type="button">Copia log</button>
+            <button id="uaOpenFolderBtn" class="secondary small" type="button">Apri cartella UA</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="uaHealthModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content ua-health-modal">
+      <div class="modal-header">
+        <h2>Upload Assistant · Config</h2>
+        <div class="modal-actions">
+          <button id="closeUaHealthBtn" class="secondary small" type="button">Chiudi</button>
+        </div>
+      </div>
+      <div class="ua-health-body">
+        <div class="ua-health-summary">
+          <div class="ua-health-item">
+            <div class="label">Percorso UA</div>
+            <div class="ua-health-path">
+              <div id="uaHealthPath" class="preview">-</div>
+              <button id="uaHealthOpenPathBtn" class="secondary small" type="button">Apri</button>
+            </div>
+          </div>
+          <div class="ua-health-item">
+            <div class="label">Config</div>
+            <div class="ua-health-path">
+              <div id="uaHealthConfigPath" class="preview">-</div>
+              <button id="uaHealthOpenConfigBtn" class="secondary small" type="button">Apri</button>
+            </div>
+          </div>
+        </div>
+        <div id="uaHealthContent" class="ua-health-grid"></div>
+        <div class="ua-health-update">
+          <div class="ua-health-update-header">
+            <div class="label">Aggiornamento</div>
+            <div id="uaHealthVersion" class="hint">-</div>
+          </div>
+          <div class="ua-health-update-actions">
+            <button id="uaHealthUpdateBtn" class="secondary small" type="button">Apri terminale update</button>
+            <span id="uaHealthUpdateHint" class="hint">Nessun aggiornamento da installare.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="uaUpdateModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content ua-update-modal">
+      <div class="modal-header">
+        <h2>Aggiornamento Upload Assistant</h2>
+        <div class="modal-actions">
+          <button id="closeUaUpdateBtn" class="secondary small" type="button">Chiudi</button>
+        </div>
+      </div>
+      <div class="ua-update-body">
+        <p class="ua-update-desc">
+          Questo tasto eseguira i seguenti comandi nel percorso U.A. impostato:
+        </p>
+        <pre id="uaUpdateCommands" class="ua-update-commands"></pre>
+        <div class="ua-controls">
+          <button id="uaUpdateRunBtn" class="primary" type="button">Esegui aggiornamento</button>
+          <div class="ua-input">
+            <span class="ua-prompt">&gt;</span>
+            <input id="uaUpdateInput" type="text" placeholder="Rispondi ai prompt di aggiornamento..." />
+          </div>
+          <button id="uaUpdateSendBtn" class="secondary small" type="button">Invia</button>
+        </div>
+        <div id="uaUpdateStatus" class="hint"></div>
+        <div id="uaUpdateConsole" class="ua-console" aria-live="polite"></div>
+        <div class="ua-update-external">
+          <button id="uaUpdateConfigBtn" class="secondary small" type="button">
+            Riesegui Config-generator
+          </button>
+          <span class="hint">
+            (Questo pulsante eseguira il comando "python config-generator.py" su un terminale
+            esterno all'app.)
+          </span>
         </div>
       </div>
     </div>

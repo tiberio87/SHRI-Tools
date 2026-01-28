@@ -621,6 +621,162 @@ export function createRulesCheckTools({
     }
   }
 
+  function clearRulesCheckForTargets(targets) {
+    if (!targets) {
+      return;
+    }
+    const {
+      folderBadges,
+      folderHint,
+      folderPath,
+      folderBlock,
+      fileBadges,
+      fileHint,
+      filePath,
+      fileLabel,
+      fileNote,
+      fileBlock
+    } = targets;
+
+    if (folderBadges) {
+      folderBadges.innerHTML = '';
+    }
+    if (folderHint) {
+      folderHint.textContent = '';
+      folderHint.classList.add('hidden');
+    }
+    if (folderPath) {
+      folderPath.textContent = '-';
+      folderPath.removeAttribute('title');
+    }
+    if (folderBlock) {
+      folderBlock.classList.add('hidden');
+    }
+    if (fileBadges) {
+      fileBadges.innerHTML = '';
+    }
+    if (fileHint) {
+      fileHint.textContent = '';
+      fileHint.classList.add('hidden');
+    }
+    if (filePath) {
+      filePath.textContent = '-';
+      filePath.removeAttribute('title');
+    }
+    if (fileLabel) {
+      fileLabel.textContent = 'File';
+    }
+    if (fileNote) {
+      fileNote.textContent = '';
+      fileNote.classList.add('hidden');
+    }
+    if (fileBlock) {
+      fileBlock.classList.add('hidden');
+    }
+  }
+
+  function updateRulesCheckForTargets(form, targets) {
+    if (!targets?.fileBadges || !targets?.fileHint || !targets?.filePath) {
+      return;
+    }
+    if (!state.targetPath) {
+      clearRulesCheckForTargets(targets);
+      return;
+    }
+
+    const settings = loadSettings();
+    const isDir = state.kind === 'dir';
+    const fileCount = state.videoFiles.length;
+    const filePath = state.mainVideo || state.videoFiles[0] || '';
+
+    if (isDir) {
+      const folderName = getPathBaseName(state.targetPath);
+      const folderData = buildRulesCheckSummary({
+        namePath: state.targetPath,
+        baseName: folderName,
+        form,
+        settings,
+        typeOverride: form.type.includes('episode') ? 'tv-season' : form.type
+      });
+      renderRulesCheckSection(
+        {
+          block: targets.folderBlock,
+          label: targets.folderLabel,
+          path: targets.folderPath,
+          badges: targets.folderBadges,
+          hint: targets.folderHint
+        },
+        folderData,
+        'Cartella'
+      );
+
+      const fileBase = filePath ? stripExtension(getPathBaseName(filePath)) : '';
+      const fileData = buildRulesCheckSummary({
+        namePath: filePath,
+        baseName: fileBase,
+        form,
+        settings,
+        typeOverride: form.type
+      });
+      if (fileData && filePath) {
+        fileData.displayName = getPathBaseName(filePath);
+      }
+      renderRulesCheckSection(
+        {
+          block: targets.fileBlock,
+          label: targets.fileLabel,
+          path: targets.filePath,
+          badges: targets.fileBadges,
+          hint: targets.fileHint,
+          note: targets.fileNote
+        },
+        fileData,
+        `File (${fileCount || 0})`
+      );
+      if (targets.fileNote) {
+        if (fileCount > 1) {
+          targets.fileNote.textContent = 'Verifica basata sul primo file: altri episodi potrebbero differire.';
+          targets.fileNote.classList.remove('hidden');
+        } else {
+          targets.fileNote.textContent = '';
+          targets.fileNote.classList.add('hidden');
+        }
+      }
+    } else {
+      if (targets.folderBlock) {
+        targets.folderBlock.classList.add('hidden');
+      }
+      const namePath = state.mainVideo || state.targetPath;
+      const baseName = stripExtension(getPathBaseName(namePath));
+      const fileData = buildRulesCheckSummary({
+        namePath,
+        baseName,
+        form,
+        settings,
+        typeOverride: form.type
+      });
+      if (fileData) {
+        fileData.displayName = getPathBaseName(namePath);
+      }
+      renderRulesCheckSection(
+        {
+          block: targets.fileBlock,
+          label: targets.fileLabel,
+          path: targets.filePath,
+          badges: targets.fileBadges,
+          hint: targets.fileHint,
+          note: targets.fileNote
+        },
+        fileData,
+        'File'
+      );
+      if (targets.fileNote) {
+        targets.fileNote.textContent = '';
+        targets.fileNote.classList.add('hidden');
+      }
+    }
+  }
+
   function updateWizardRulesCheck(form) {
     if (!ui.wizardRulesFileBadges || !ui.wizardRulesFileHint || !ui.wizardRulesFilePath) {
       return;
@@ -725,6 +881,8 @@ export function createRulesCheckTools({
 
   return {
     clearWizardRulesCheck,
-    updateWizardRulesCheck
+    updateWizardRulesCheck,
+    clearRulesCheckForTargets,
+    updateRulesCheckForTargets
   };
 }

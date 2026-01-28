@@ -3,10 +3,13 @@ export function createFeedbackTools({ ui }) {
   let toastHideTimer = null;
   let confirmResolver = null;
 
-  function showToast(message) {
+  function showToast(message, tone = 'info') {
     if (!ui.toast) {
       return;
     }
+
+    const allowedTones = new Set(['info', 'success', 'warning', 'error']);
+    const safeTone = allowedTones.has(tone) ? tone : 'info';
 
     if (toastTimer) {
       clearTimeout(toastTimer);
@@ -16,6 +19,8 @@ export function createFeedbackTools({ ui }) {
     }
 
     ui.toast.textContent = message;
+    ui.toast.classList.remove('toast-info', 'toast-success', 'toast-warning', 'toast-error');
+    ui.toast.classList.add(`toast-${safeTone}`);
     ui.toast.classList.remove('hidden');
     requestAnimationFrame(() => {
       ui.toast.classList.add('show');
@@ -35,7 +40,7 @@ export function createFeedbackTools({ ui }) {
     }
     try {
       await navigator.clipboard.writeText(text);
-      showToast(successMessage || 'Copiato negli appunti.');
+      showToast(successMessage || 'Copiato negli appunti.', 'success');
     } catch {
       const area = document.createElement('textarea');
       area.value = text;
@@ -43,7 +48,7 @@ export function createFeedbackTools({ ui }) {
       area.select();
       document.execCommand('copy');
       document.body.removeChild(area);
-      showToast(successMessage || 'Copiato negli appunti.');
+      showToast(successMessage || 'Copiato negli appunti.', 'success');
     }
   }
 

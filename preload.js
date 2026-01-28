@@ -22,6 +22,15 @@ contextBridge.exposeInMainWorld('api', {
   transmissionTest: (payload) => ipcRenderer.invoke('transmission-test', payload),
   generateScreenshots: (payload) => ipcRenderer.invoke('generate-screenshots', payload),
   getAppVersion: () => ipcRenderer.invoke('app-version'),
+  uaStart: (payload) => ipcRenderer.invoke('ua-start', payload),
+  uaSendInput: (text) => ipcRenderer.invoke('ua-input', text),
+  uaStop: () => ipcRenderer.invoke('ua-stop'),
+  uaReadConfig: (payload) => ipcRenderer.invoke('ua-read-config', payload),
+  uaCheckVersion: (payload) => ipcRenderer.invoke('ua-check-version', payload),
+  uaOpenUpdateTerminal: (payload) => ipcRenderer.invoke('ua-open-update-terminal', payload),
+  uaUpdateStart: (payload) => ipcRenderer.invoke('ua-update-start', payload),
+  uaUpdateSendInput: (text) => ipcRenderer.invoke('ua-update-input', text),
+  uaUpdateStop: () => ipcRenderer.invoke('ua-update-stop'),
   onTorrentProgress: (handler) => {
     const listener = (_event, data) => handler(data);
     ipcRenderer.on('torrent-progress', listener);
@@ -31,5 +40,25 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_event, data) => handler(data);
     ipcRenderer.on('screens-progress', listener);
     return () => ipcRenderer.removeListener('screens-progress', listener);
+  },
+  onUaOutput: (handler) => {
+    const listener = (_event, data) => handler(data);
+    ipcRenderer.on('ua-output', listener);
+    return () => ipcRenderer.removeListener('ua-output', listener);
+  },
+  onUaExit: (handler) => {
+    const listener = (_event, data) => handler(data);
+    ipcRenderer.on('ua-exit', listener);
+    return () => ipcRenderer.removeListener('ua-exit', listener);
+  },
+  onUaUpdateOutput: (handler) => {
+    const listener = (_event, data) => handler(data);
+    ipcRenderer.on('ua-update-output', listener);
+    return () => ipcRenderer.removeListener('ua-update-output', listener);
+  },
+  onUaUpdateExit: (handler) => {
+    const listener = (_event, data) => handler(data);
+    ipcRenderer.on('ua-update-exit', listener);
+    return () => ipcRenderer.removeListener('ua-update-exit', listener);
   }
 });

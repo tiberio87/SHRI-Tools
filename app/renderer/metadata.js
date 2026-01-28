@@ -33,6 +33,7 @@ const CLEAN_TITLE_TOKENS = new Set([
   'BLURAY',
   'BDRIP',
   'BRRIP',
+  'BD',
   'BDREMUX',
   'REMUX',
   'H264',
@@ -50,9 +51,11 @@ const CLEAN_TITLE_TOKENS = new Set([
   'DD',
   'DDP',
   'DTS',
+  'FLAC',
   'EAC3',
   'TRUEHD',
   'ATMOS',
+  'MAIN10',
   'SUBS',
   'SUBBED',
   '10BIT',
@@ -333,6 +336,20 @@ export function createMetadataTools(deps) {
     return { season: '', index: -1 };
   }
 
+  function parseBareEpisode(text) {
+    if (!text) {
+      return { episode: '', index: -1 };
+    }
+    const cleaned = String(text);
+    const episodeMatch =
+      cleaned.match(/\b(?:EP|E|Episode)\s*[-_.]?\s*(\d{1,3})(?:v\d+)?\b/i) ||
+      cleaned.match(/\s[-–—]\s*(\d{1,3})(?:v\d+)?\b/);
+    if (episodeMatch) {
+      return { episode: episodeMatch[1], index: episodeMatch.index };
+    }
+    return { episode: '', index: -1 };
+  }
+
   function isEpisodeNoiseToken(token) {
     const raw = String(token || '').replace(/[()[\]{}]/g, '').trim();
     if (!raw) {
@@ -425,11 +442,19 @@ export function createMetadataTools(deps) {
       return year ? ` ${year[0]} ` : ' ';
     });
     cleaned = cleaned.replace(/[_\.]/g, ' ');
+    cleaned = cleaned.replace(/\b(?:stagione|stag|season)\s*\d+(?:\s*[.\-]\s*\d+)*\b/gi, ' ');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
     const seasonEpisode = parseSeasonEpisode(cleaned);
+    const bareEpisode = parseBareEpisode(cleaned);
     let cutIndex = cleaned.length;
+    const hasFansubMarkers =
+      /^\s*\[[^\]]+\]/.test(rawName) ||
+      /\[[A-F0-9]{8}\]/i.test(rawName) ||
+      /\b(?:BD|FLAC|MAIN10|X265|H\.?265|HEVC|AVC)\b/i.test(rawName);
     if (seasonEpisode.index !== -1) {
       cutIndex = seasonEpisode.index;
+    } else if (bareEpisode.index !== -1 && bareEpisode.episode && hasFansubMarkers) {
+      cutIndex = bareEpisode.index;
     } else {
       const seasonOnly = parseSeasonOnly(cleaned);
       if (seasonOnly.index !== -1) {
@@ -495,10 +520,16 @@ export function createMetadataTools(deps) {
     const base = getPathBaseName(filePath);
     const cleaned = stripExtension(base);
     const seasonEpisode = parseSeasonEpisode(cleaned);
+    const bareEpisode = seasonEpisode.episode ? { episode: '', index: -1 } : parseBareEpisode(cleaned);
     const seasonOnly = seasonEpisode.episode ? { season: '', index: -1 } : parseSeasonOnly(cleaned);
     const year = extractYear(cleaned);
     let title = guessTitleFromName(cleaned);
     let episodeTitle = parseEpisodeTitleFromName(cleaned);
+    const hasFansubMarkers =
+      /^\s*\[[^\]]+\]/.test(base) ||
+      /\[[A-F0-9]{8}\]/i.test(base) ||
+      /\b(?:BD|FLAC|MAIN10|X265|H\.?265|HEVC|AVC)\b/i.test(base);
+    const useBareEpisode = Boolean(bareEpisode.episode && hasFansubMarkers);
 
     const bracketed = (() => {
       const match = cleaned.match(/^\s*\[\s*(S[.\s_-]*\d{1,2}[.\s_-]*E[.\s_-]*\d{1,2}|\d{1,2}\s*[xX]\s*\d{1,2})\s*\]\s*/);
@@ -552,8 +583,8 @@ export function createMetadataTools(deps) {
     return {
       title,
       year,
-      season: seasonEpisode.season || seasonOnly.season,
-      episode: seasonEpisode.episode,
+      season: seasonEpisode.season || seasonOnly.season || (useBareEpisode ? '01' : ''),
+      episode: seasonEpisode.episode || (useBareEpisode ? bareEpisode.episode : ''),
       episodeTitle
     };
   }
