@@ -692,63 +692,266 @@ export function createMetadataTools(deps) {
     const general = getGeneralTrack(state.mediaInfo) || {};
     const video = getVideoTrack(state.mediaInfo) || {};
     const audioTracks = getAudioTracks(state.mediaInfo);
+    const textTracks = (state.mediaInfo?.media?.track || []).filter((track) => track['@type'] === 'Text');
+    const resolveLangName = (track) =>
+      String(
+        getTrackValue(track, [
+          'Language/String',
+          'Language_String',
+          'Language/String3',
+          'Language_String3',
+          'Language'
+        ]) || ''
+      ).trim();
+    const formatMaybeBytes = (raw) => {
+      const cleaned = String(raw || '').trim();
+      if (!cleaned) {
+        return '';
+      }
+      if (/[A-Za-z]/.test(cleaned)) {
+        return cleaned;
+      }
+      const numeric = Number(cleaned);
+      return Number.isFinite(numeric) ? formatBytes(numeric) : cleaned;
+    };
+    const formatMaybeDuration = (raw) => {
+      const cleaned = String(raw || '').trim();
+      if (!cleaned) {
+        return '';
+      }
+      if (/[A-Za-z]/.test(cleaned) || cleaned.includes(':')) {
+        return cleaned;
+      }
+      const numeric = Number(cleaned);
+      return Number.isFinite(numeric) ? formatDuration(numeric) : cleaned;
+    };
+    const formatMaybeBitrate = (raw) => {
+      const cleaned = String(raw || '').trim();
+      if (!cleaned) {
+        return '';
+      }
+      if (/[A-Za-z]/.test(cleaned)) {
+        return cleaned;
+      }
+      const numeric = Number(cleaned);
+      if (!Number.isFinite(numeric)) {
+        return cleaned;
+      }
+      const mbps = numeric / 1_000_000;
+      return `${mbps.toFixed(2)} Mb/s`;
+    };
+    const simplifyWritingLibrary = (raw) => {
+      const cleaned = String(raw || '').trim();
+      if (!cleaned) {
+        return '';
+      }
+      return cleaned.split(/[\s/]+/)[0] || cleaned;
+    };
 
     const lines = [];
     lines.push('General');
-    const fileSize = getTrackValue(general, ['FileSize_String', 'FileSize/String', 'FileSize']);
+    const fileSize = getTrackValue(general, ['FileSize/String', 'FileSize_String', 'FileSize']);
     const duration = getTrackValue(general, ['Duration/String3', 'Duration/String2', 'Duration/String', 'Duration']);
+    const bitrate = getTrackValue(general, [
+      'OverallBitRate/String',
+      'OverallBitRate_String',
+      'OverallBitRate'
+    ]);
     if (fileSize) {
-      lines.push(`Dimensione      : ${Number.isFinite(Number(fileSize)) ? formatBytes(fileSize) : fileSize}`);
+      lines.push(`File size       : ${formatMaybeBytes(fileSize)}`);
     }
     if (duration) {
-      lines.push(`Durata          : ${Number.isFinite(Number(duration)) ? formatDuration(duration) : duration}`);
+      lines.push(`Durata          : ${formatMaybeDuration(duration)}`);
+    }
+    if (bitrate) {
+      lines.push(`Bitrate         : ${formatMaybeBitrate(bitrate)}`);
     }
 
     if (video && Object.keys(video).length) {
       lines.push('');
       lines.push('Video');
-      const codec = mapVideoCodec(video, ui.formatSelect.value);
+      const format = getTrackValue(video, ['Format', 'Format/String']);
       const width = getTrackValue(video, ['Width']);
       const height = getTrackValue(video, ['Height']);
       const bitDepth = getTrackValue(video, ['BitDepth', 'Bit_depth']);
-      const frameRate = getTrackValue(video, ['FrameRate', 'FrameRate/String', 'FrameRate_String']);
-      if (codec) {
-        lines.push(`Codec           : ${codec}`);
+      const hdrSources = [
+        video?.HDR_Format_String,
+        video?.['HDR format string'],
+        video?.HDR_Format,
+        video?.['HDR format'],
+        video?.HDR_Format_Compatibility,
+        video?.['HDR format compatibility']
+      ]
+        .map((value) => String(value || '').trim())
+        .filter(Boolean);
+      const hdrTextRaw = hdrSources.join(' | ');
+      const hdrTokensSet = new Set();
+      const addHdrToken = (token) => {
+        if (!token) {
+          return;
+        }
+        hdrTokensSet.add(token);
+      };
+      const hasHdr10 = /hdr10/i.test(hdrTextRaw);
+      const hasHdr10Plus = /hdr10\+/i.test(hdrTextRaw);
+      const hasSmpte = /smpte\s*st\s*2086/i.test(hdrTextRaw);
+      const hasHlg = /hlg/i.test(hdrTextRaw);
+      if (hasHdr10Plus) {
+        addHdrToken('HDR10+');
+      } else if (hasHdr10) {
+        addHdrToken('HDR10');
+      }
+      if (hasSmpte) {
+        addHdrToken('SMPTE ST 2086');
+      }
+      if (hasHlg) {
+        addHdrToken('HLG');
+      }
+      const writingLibrary = simplifyWritingLibrary(
+        getTrackValue(video, [
+          'Writing_library',
+          'Writing library',
+          'Encoded_Library',
+          'Encoded_Library/String',
+          'Encoded_Library_Name',
+          'Encoded_Library_Name/String'
+        ])
+      );
+      const hdrDetailSources = [hdrTextRaw];
+      const addHdrDetail = (sourceTrack) => {
+        if (!sourceTrack) {
+          return;
+        }
+        for (const [key, value] of Object.entries(sourceTrack)) {
+          const raw = String(value || '').trim();
+          if (!raw) {
+            continue;
+          }
+          if (/hdr/i.test(key) || /dolby\s*vision|dvhe/i.test(raw)) {
+            hdrDetailSources.push(raw);
+          }
+        }
+      };
+      addHdrDetail(video);
+      addHdrDetail(general);
+      const hdrDetailRaw = hdrDetailSources.join(' | ');
+      const dvProfileValue =
+        getTrackValue(video, ['HDR_Format_Profile', 'HDR_Format_Profile/String', 'HDR_Format_Profile_String']) ||
+        getTrackValue(general, ['HDR_Format_Profile', 'HDR_Format_Profile/String', 'HDR_Format_Profile_String']);
+      const dvLevelValue =
+        getTrackValue(video, [
+          'HDR_Format_Level',
+          'HDR_Format_Level/String',
+          'HDR_Format_Profile_Level',
+          'HDR_Format_Profile_Level/String',
+          'HDR_Format_Profile_Level_String'
+        ]) ||
+        getTrackValue(general, [
+          'HDR_Format_Level',
+          'HDR_Format_Level/String',
+          'HDR_Format_Profile_Level',
+          'HDR_Format_Profile_Level/String',
+          'HDR_Format_Profile_Level_String'
+        ]);
+      const dvProfileMatch = hdrDetailRaw.match(/Profile\s*([0-9.]+)/i);
+      let dvProfile = dvProfileMatch ? dvProfileMatch[1] : '';
+      if (!dvProfile && dvProfileValue) {
+        const match = String(dvProfileValue).match(/([0-9]+(?:\.[0-9]+)?)/);
+        dvProfile = match ? match[1] : '';
+      }
+      const dvheMatch = hdrDetailRaw.match(/dvhe\.\d{2}\.\d{2}/i);
+      let dvhe = dvheMatch ? dvheMatch[0] : '';
+      if (!dvhe && dvProfileValue) {
+        const match = String(dvProfileValue).match(/dvhe\.\d{2}\.\d{2}/i);
+        dvhe = match ? match[0] : '';
+      }
+      if (!dvhe && dvProfile && dvLevelValue) {
+        const profileDigits = String(dvProfile).replace(/[^\d]/g, '');
+        const levelDigitsMatch = String(dvLevelValue).match(/(\d{2})/);
+        const levelDigits = levelDigitsMatch ? levelDigitsMatch[1] : '';
+        if (profileDigits && levelDigits) {
+          const normalizedProfile = profileDigits.padStart(2, '0').slice(-2);
+          dvhe = `dvhe.${normalizedProfile}.${levelDigits}`;
+        }
+      }
+      if (dvhe) {
+        if (!dvProfile || !dvProfile.includes('.')) {
+          if (/dvhe\.08\.06/i.test(dvhe)) {
+            dvProfile = '8.1';
+          } else if (/dvhe\.08\.07/i.test(dvhe)) {
+            dvProfile = '8.2';
+          } else if (/dvhe\.08\.04/i.test(dvhe)) {
+            dvProfile = '8.4';
+          }
+        }
+      }
+      const hasDV =
+        /dolby\s*vision/i.test(hdrDetailRaw) || Boolean(dvProfile) || Boolean(dvhe);
+      let hdrText = '';
+      if (hasDV) {
+        const dvParts = [];
+        if (dvProfile) {
+          dvParts.push(`Profile ${dvProfile}`);
+        }
+        if (dvhe) {
+          dvParts.push(dvhe);
+        }
+        const dvLabel = dvParts.length ? `Dolby Vision (${dvParts.join(', ')})` : 'Dolby Vision';
+        const ordered = [...hdrTokensSet];
+        ordered.push(dvLabel);
+        hdrText = ordered.filter(Boolean).join(' | ');
+      } else {
+        hdrText = [...hdrTokensSet].filter(Boolean).join(' | ');
+      }
+
+      if (format) {
+        lines.push(`Format          : ${format}`);
       }
       if (width && height) {
         lines.push(`Risoluzione     : ${width}x${height}`);
       }
       if (bitDepth) {
-        lines.push(`Bit depth       : ${bitDepth} bit`);
+        lines.push(`Bit depth       : ${bitDepth}`);
       }
-      if (frameRate) {
-        lines.push(`Frame rate      : ${frameRate}`);
+      if (hdrText) {
+        lines.push(`HDR/DV          : ${hdrText}`);
       }
-      const hdrTokens = getHdrTokens(video);
-      if (hdrTokens.length) {
-        lines.push(`HDR             : ${hdrTokens.join(' ')}`);
-      }
+      lines.push(`Writing library : ${writingLibrary || 'Non presente'}`);
     }
 
     if (audioTracks.length) {
       lines.push('');
       lines.push('Audio');
-      audioTracks.slice(0, 4).forEach((track, index) => {
-        const codec = mapAudioCodec(track);
-        const channels = parseChannels(track.Channels || track['Channel(s)'] || '');
-        const lang = normalizeLangTag(getTrackLang(track));
+      audioTracks.forEach((track, index) => {
+        const format = getTrackValue(track, ['Format', 'Format/String', 'Format_Commercial', 'Format_Commercial_IfAny']);
+        const lang = resolveLangName(track);
+        const title = getTrackValue(track, ['Title', 'Title/String']) || '';
         const labelParts = [];
-        if (codec) {
-          labelParts.push(codec);
-        }
-        if (channels) {
-          labelParts.push(channels);
-        }
         if (lang) {
           labelParts.push(lang);
         }
-        lines.push(`#${index + 1}            : ${labelParts.join(' ') || 'Traccia audio'}`);
+        if (format) {
+          labelParts.unshift(format);
+        }
+        const detail = title ? ` | Title: ${title}` : '';
+        lines.push(`#${index + 1}            : ${labelParts.join(' / ') || 'Traccia audio'}${detail}`);
       });
+    }
+
+    if (textTracks.length) {
+      lines.push('');
+      lines.push('Sottotitoli');
+      const visibleSubs = textTracks.slice(0, 5);
+      visibleSubs.forEach((track, index) => {
+        const lang = resolveLangName(track);
+        const title = getTrackValue(track, ['Title', 'Title/String']) || '';
+        const detail = title ? ` | Title: ${title}` : '';
+        lines.push(`#${index + 1}            : ${lang || 'Sottotitolo'}${detail}`);
+      });
+      if (textTracks.length > visibleSubs.length) {
+        const remaining = textTracks.length - visibleSubs.length;
+        lines.push(`Altri ${remaining} sottotitoli presenti e non mostrati`);
+      }
     }
 
     return lines.join('\n').trim() || 'MediaInfo non disponibile.';

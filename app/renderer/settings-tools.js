@@ -298,10 +298,7 @@ export function createSettingsTools({
       block.classList.toggle('hidden', !isVisible);
     });
     if (ui.openAdvancedSettingsBtn) {
-      ui.openAdvancedSettingsBtn.classList.toggle('hidden', mode === 'ua');
-    }
-    if (ui.advancedSettingsModal && mode === 'ua') {
-      ui.advancedSettingsModal.classList.add('hidden');
+      ui.openAdvancedSettingsBtn.classList.remove('hidden');
     }
   }
 

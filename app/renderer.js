@@ -2599,6 +2599,35 @@ async function updateRenamePlan() {
     itemsContainer.appendChild(empty);
   }
 
+  if (state.kind === 'file' && state.mainVideo) {
+    const infoHeader = document.createElement('div');
+    infoHeader.className = 'plan-label-row';
+
+    const infoLabel = document.createElement('div');
+    infoLabel.className = 'plan-label';
+    infoLabel.textContent = 'MediaInfo (sintetico)';
+
+    const infoBtn = document.createElement('button');
+    infoBtn.className = 'secondary small';
+    infoBtn.textContent = 'Apri mediainfo completo';
+    infoBtn.addEventListener('click', async () => {
+      if (!state.mainVideo) {
+        showToast('MediaInfo non disponibile.', 'warning');
+        return;
+      }
+      await showMediaInfoReport();
+    });
+
+    infoHeader.appendChild(infoLabel);
+    infoHeader.appendChild(infoBtn);
+    ui.renamePlanList.appendChild(infoHeader);
+
+    const info = document.createElement('pre');
+    info.className = 'plan-mediainfo';
+    info.textContent = metadataTools.buildMediaInfoShort();
+    ui.renamePlanList.appendChild(info);
+  }
+
   const allWarnings = [...warnings, ...planWarnings];
   if (allWarnings.length) {
     for (const warning of allWarnings) {
