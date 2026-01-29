@@ -280,13 +280,15 @@ body.light {
 }
 
 .suggest-value[data-tooltip],
-.ua-arg-btn[data-tooltip] {
+.ua-arg-btn[data-tooltip],
+.suggest-apply[data-tooltip] {
   position: relative;
   cursor: help;
 }
 
 .suggest-value[data-tooltip]::after,
-.ua-arg-btn[data-tooltip]::after {
+.ua-arg-btn[data-tooltip]::after,
+.suggest-apply[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
   left: 50%;
@@ -309,7 +311,8 @@ body.light {
 }
 
 .suggest-value[data-tooltip]::before,
-.ua-arg-btn[data-tooltip]::before {
+.ua-arg-btn[data-tooltip]::before,
+.suggest-apply[data-tooltip]::before {
   content: '';
   position: absolute;
   left: 50%;
@@ -325,7 +328,9 @@ body.light {
 .suggest-value[data-tooltip]:hover::after,
 .suggest-value[data-tooltip]:hover::before,
 .ua-arg-btn[data-tooltip]:hover::after,
-.ua-arg-btn[data-tooltip]:hover::before {
+.ua-arg-btn[data-tooltip]:hover::before,
+.suggest-apply[data-tooltip]:hover::after,
+.suggest-apply[data-tooltip]:hover::before {
   opacity: 1;
 }
 

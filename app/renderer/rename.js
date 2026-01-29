@@ -83,7 +83,10 @@ export function createRenameTools(deps) {
       tokens.push(data.region);
     }
     if (data.uhd) {
-      tokens.push('UHD');
+      const sourceHasUhd = typeof data.source === 'string' && /\bUHD\b/i.test(data.source);
+      if (!sourceHasUhd) {
+        tokens.push('UHD');
+      }
     }
 
     const hdrTokens = data.hdrTokens || [];
@@ -108,7 +111,7 @@ export function createRenameTools(deps) {
       }
     } else if (format === 'Encode') {
       if (data.source) {
-        tokens.push(data.source);
+        tokens.push(data.source === 'DVD' ? 'DVDRip' : data.source);
       }
       if (data.audioCodec) {
         tokens.push(data.audioCodec);
@@ -203,42 +206,67 @@ export function createRenameTools(deps) {
     const isSeason = isDir || form.type.includes('season');
     const seasonType = form.type.includes('anime') ? 'anime-season' : 'tv-season';
     const episodeType = form.type.includes('anime') ? 'anime-episode' : 'tv-episode';
+    const useLangFolders = form.languageTagInFolders !== false;
+    const useLangFiles = form.languageTagInFiles !== false;
+    const isDiscStructure =
+      isDir &&
+      state.videoFiles.some((filePath) => /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(filePath || ''));
 
-    const folderName = isDir ? computeBaseName(form, { type: seasonType, separatorStyle: 'dots' }) : '';
+    const folderName = isDir
+      ? computeBaseName(form, {
+          type: seasonType,
+          separatorStyle: 'dots',
+          languageTag: useLangFolders ? form.languageTag : ''
+        })
+      : '';
 
     const fileRenames = [];
 
     if (isDir) {
-      const seasonValue = form.season;
-      for (const filePath of state.videoFiles) {
-        const guess = guessMetadataFromName(filePath);
-        const season = guess.season || seasonValue;
-        const episode = guess.episode;
-        const key = episodeKey(season, episode);
-        const episodeTitle = key && state.episodeMap[key] ? state.episodeMap[key] : guess.episodeTitle;
-        const baseName = computeBaseName(form, {
-          type: episodeType,
-          separatorStyle: 'dots',
-          season,
-          episode,
-          episodeTitle: episodeTitle || form.episodeTitle
-        });
-        if (!episode || !season) {
-          warnings.push(`Stagione/episodio mancante per ${getPathBaseName(filePath)}`);
+      if (!isDiscStructure) {
+        const seasonValue = form.season;
+        for (const filePath of state.videoFiles) {
+          const guess = guessMetadataFromName(filePath);
+          const season = guess.season || seasonValue;
+          const episode = guess.episode;
+          const key = episodeKey(season, episode);
+          const episodeTitle = key && state.episodeMap[key] ? state.episodeMap[key] : guess.episodeTitle;
+          const baseName = computeBaseName(form, {
+            type: episodeType,
+            separatorStyle: 'dots',
+            season,
+            episode,
+            episodeTitle: episodeTitle || form.episodeTitle,
+            languageTag: useLangFiles ? form.languageTag : ''
+          });
+          if (!episode || !season) {
+            warnings.push(`Stagione/episodio mancante per ${getPathBaseName(filePath)}`);
+          }
+          fileRenames.push({ path: filePath, baseName });
         }
-        fileRenames.push({ path: filePath, baseName });
       }
     } else {
-      let baseName = computeBaseName(form, { separatorStyle: 'dots' });
+      let baseName = computeBaseName(form, {
+        separatorStyle: 'dots',
+        languageTag: useLangFiles ? form.languageTag : ''
+      });
       if (form.type === 'tv-episode' || form.type === 'anime-episode') {
         const key = episodeKey(form.season, form.episode);
         const mappedTitle = key && state.episodeMap[key] ? state.episodeMap[key] : '';
         if (mappedTitle) {
-          baseName = computeBaseName(form, { separatorStyle: 'dots', episodeTitle: mappedTitle });
+          baseName = computeBaseName(form, {
+            separatorStyle: 'dots',
+            episodeTitle: mappedTitle,
+            languageTag: useLangFiles ? form.languageTag : ''
+          });
         } else if (!form.episodeTitle) {
           const guess = state.mainVideo ? guessMetadataFromName(state.mainVideo) : null;
           if (guess?.episodeTitle) {
-            baseName = computeBaseName(form, { separatorStyle: 'dots', episodeTitle: guess.episodeTitle });
+            baseName = computeBaseName(form, {
+              separatorStyle: 'dots',
+              episodeTitle: guess.episodeTitle,
+              languageTag: useLangFiles ? form.languageTag : ''
+            });
           }
         }
       }

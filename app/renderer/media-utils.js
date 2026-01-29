@@ -126,21 +126,23 @@ export function hasEncodingSignature(track) {
   if (!track) {
     return false;
   }
-  const keys = [
+  const directKeys = [
     'Encoded_Library',
     'Encoded_Library_Name',
     'Encoded_Library_Settings',
     'Encoding_Settings',
-    'Writing_library',
-    'Writing_Application',
     'Encoded_Library/String',
     'Encoded_Library_Name/String',
     'Encoded_Library_Settings/String',
-    'Encoding_Settings/String',
-    'Writing library',
-    'Writing application'
+    'Encoding_Settings/String'
   ];
-  return keys.some((key) => String(track[key] || '').trim());
+  if (directKeys.some((key) => String(track[key] || '').trim())) {
+    return true;
+  }
+
+  const encoderPattern = /(x264|x265|libx264|libx265|ffmpeg|handbrake|staxrip|megui|nvenc|nvencc|qsv|svt|av1|ripbot)/i;
+  const writingKeys = ['Writing_library', 'Writing_Application', 'Writing library', 'Writing application'];
+  return writingKeys.some((key) => encoderPattern.test(String(track[key] || '')));
 }
 
 export function suggestFormatFromMediaInfo(mediaInfo) {

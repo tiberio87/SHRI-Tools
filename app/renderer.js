@@ -534,6 +534,41 @@ function mapTypeLabel(value) {
   return '';
 }
 
+function isDiscStructure() {
+  if (state.kind !== 'dir' || !Array.isArray(state.videoFiles) || !state.videoFiles.length) {
+    return false;
+  }
+  return state.videoFiles.some((filePath) =>
+    /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(filePath || '')
+  );
+}
+
+function getDiscSourceHint(width, height) {
+  const files = Array.isArray(state.videoFiles) ? state.videoFiles : [];
+  const hasVideoTs = files.some((filePath) => /[\\\/]VIDEO_TS[\\\/]/i.test(filePath || ''));
+  if (hasVideoTs) {
+    return {
+      source: 'DVD',
+      sourceReason: 'Rilevato da struttura disco: VIDEO_TS'
+    };
+  }
+  const isUhd = width >= 3800 || height >= 2100;
+  const isHd = width >= 1800 || height >= 1000;
+  if (isUhd) {
+    return {
+      source: 'UHD BluRay',
+      sourceReason: 'Rilevato da struttura disco: BDMV + risoluzione UHD'
+    };
+  }
+  if (isHd) {
+    return {
+      source: 'BluRay',
+      sourceReason: 'Rilevato da struttura disco: BDMV + risoluzione HD'
+    };
+  }
+  return { source: '', sourceReason: '' };
+}
+
 function renderFetchStatus(payload, data) {
   const targetLabel = state.kind === 'dir' ? 'Serie TV' : 'File';
   const parts = [];
@@ -1189,6 +1224,9 @@ function applyFormatSuggestion(suggested) {
 
 function detectFormatFromName(name) {
   const upper = String(name || '').toUpperCase();
+  if (/\bDVD[-.\s]?RIP\b/.test(upper) || /\bDVDRIP\b/.test(upper)) {
+    return 'Encode';
+  }
   if (/\bWEB[-.\s]?DL\b/.test(upper) || /\bWEBDL\b/.test(upper)) {
     return 'WEB-DL';
   }
@@ -1211,6 +1249,9 @@ function detectSourceFromName(name) {
   const upper = String(name || '').toUpperCase();
   if (/\bHDTV\b/.test(upper)) {
     return 'HDTV';
+  }
+  if (/\bDVD[-.\s]?RIP\b/.test(upper) || /\bDVDRIP\b/.test(upper)) {
+    return 'DVD';
   }
   if (/\bUHD\b/.test(upper) && /(\bBLU[-\s]?RAY\b|\bBLURAY\b)/.test(upper)) {
     return 'UHD BluRay';
@@ -1238,18 +1279,155 @@ function detectRepackFromName(name) {
   return '';
 }
 
+function detectOriginalSourceMedium(mediaInfo, { width = 0, height = 0 } = {}) {
+  const sourceKeys = [
+    'Original source medium',
+    'Original source medium/String',
+    'Original_source_medium',
+    'Original_source_medium/String',
+    'OriginalSourceMedium',
+    'Original_Source_Medium',
+    'Original_Source_Medium/String'
+  ];
+  const resolveSource = (raw) => {
+    if (!raw) {
+      return '';
+    }
+    const upper = String(raw).toUpperCase();
+    if (upper.includes('BLU-RAY') || upper.includes('BLURAY')) {
+      if (width >= 3800 || height >= 2100) {
+        return 'UHD BluRay';
+      }
+      return 'BluRay';
+    }
+    if (upper.includes('HD DVD') || upper.includes('HDDVD')) {
+      return 'HD DVD';
+    }
+    if (upper.includes('DVD')) {
+      return 'DVD';
+    }
+    return '';
+  };
+
+  const audioTracks = getAudioTracks(mediaInfo);
+  for (const track of audioTracks) {
+    const raw =
+      getTrackValue(track, sourceKeys) ||
+      getTrackValue(track?.extra || {}, sourceKeys);
+    const resolved = resolveSource(raw);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  const textTracks = (mediaInfo?.media?.track || []).filter((track) => track['@type'] === 'Text');
+  for (const track of textTracks) {
+    const raw =
+      getTrackValue(track, sourceKeys) ||
+      getTrackValue(track?.extra || {}, sourceKeys);
+    const resolved = resolveSource(raw);
+    if (resolved) {
+      return resolved;
+    }
+  }
+  return '';
+}
+
+function normalizeNumber(raw) {
+  const cleaned = String(raw || '').replace(/[^0-9]/g, '');
+  if (!cleaned) {
+    return 0;
+  }
+  return Number.parseInt(cleaned, 10) || 0;
+}
+
+function shortenDebugValue(value, limit = 220) {
+  if (!value) {
+    return '';
+  }
+  const text = String(value);
+  if (text.length <= limit) {
+    return text;
+  }
+  return `${text.slice(0, limit)}…`;
+}
+
+function hasLosslessAudio(mediaInfo) {
+  const audioTracks = getAudioTracks(mediaInfo);
+  const losslessPattern = /\b(TRUEHD|MLP\s*FBA|DTS[-\s]?HD\s*MA|DTS:X|FLAC|PCM|LPCM)\b/i;
+  return audioTracks.some((track) => {
+    const combined = `${track?.Format || ''} ${track?.Format_Commercial_IfAny || ''} ${track?.Title || ''}`.trim();
+    return losslessPattern.test(combined);
+  });
+}
+
 function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}) {
   if (!mediaInfo || mediaInfo.error) {
-    return { value: '', reason: '' };
+    return {
+      value: '',
+      reason: '',
+      source: '',
+      sourceReason: '',
+      debug: { error: 'mediaInfo missing or error' }
+    };
   }
   const videoTrack = getVideoTrack(mediaInfo);
   const generalTrack = getGeneralTrack(mediaInfo);
   if (!videoTrack && !generalTrack) {
-    return { value: '', reason: '' };
+    return {
+      value: '',
+      reason: '',
+      source: '',
+      sourceReason: '',
+      debug: { error: 'no video/general tracks' }
+    };
+  }
+
+  const width = normalizeNumber(getTrackValue(videoTrack, ['Width', 'Width/String', 'Width_Original', 'Width_Original/String']));
+  const height = normalizeNumber(
+    getTrackValue(videoTrack, ['Height', 'Height/String', 'Height_Original', 'Height_Original/String'])
+  );
+  const isUhd = width >= 3800 || height >= 2100;
+  const isHd = width >= 1800 || height >= 1000;
+  const sourceGuess = isUhd ? 'UHD BluRay' : isHd ? 'BluRay' : '';
+  const originalSource = detectOriginalSourceMedium(mediaInfo, { width, height });
+  const sourceHint = originalSource || sourceGuess;
+  const sourceHintReason = originalSource
+    ? 'Rilevato dal parsing MediaInfo: original source medium'
+    : (sourceGuess ? 'Rilevato dal parsing MediaInfo: risoluzione disco' : '');
+
+  const debugInfo = {
+    width,
+    height,
+    isUhd,
+    isHd,
+    isDiscStructure: isDiscStructure(),
+    sourceGuess,
+    originalSource,
+    sourceHint,
+    sourceHintReason,
+    service: String(service || ''),
+    source: String(source || '')
+  };
+  const withDebug = (result) => ({ ...result, debug: debugInfo });
+
+  if (isDiscStructure()) {
+    const discHint = getDiscSourceHint(width, height);
+    return withDebug({
+      value: 'Full Disc',
+      reason: 'Rilevato da struttura disco: BDMV/VIDEO_TS',
+      source: discHint.source || sourceGuess,
+      sourceReason: discHint.sourceReason || (sourceGuess ? 'Rilevato da struttura disco: risoluzione' : '')
+    });
   }
 
   if (/\b(UNTOUCHED|VU1080|VU720|VU)\b/i.test(String(baseName || ''))) {
-    return { value: 'Remux', reason: 'Rilevato da parsing del nome file: marker UNTOUCHED/VU' };
+    return withDebug({
+      value: 'Remux',
+      reason: 'Rilevato da parsing del nome file: marker UNTOUCHED/VU',
+      source: '',
+      sourceReason: ''
+    });
   }
 
   const encodingSettings = String(
@@ -1276,84 +1454,208 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
   ).toLowerCase();
   const generalFrontend = String(generalTrack?.extra?.Writing_frontend || '').toLowerCase();
   const toolString = `${generalApp} ${generalFrontend}`.trim();
-  const hasEncodingTools = /(handbrake|staxrip|megatagger|x264|x265)/.test(toolString);
+  const encoderSignature = `${encodingSettings} ${encodedLibrary} ${generalApp} ${generalFrontend} ${generalLibrary}`.trim();
+  const fingerprintLibrary = `${encodedLibrary} ${generalLibrary}`.trim();
+  const hasEncodingTools = /(handbrake|staxrip|megui|megatagger|x264|x265)/.test(toolString);
+  const hasEncoderTool = /(x264|x265|libx264|libx265|nvenc|nvencc|qsv|svt|av1|ffmpeg|handbrake|staxrip|megui)/.test(
+    encoderSignature
+  );
   const hasEncodingSettings = Boolean(encodingSettings);
   const hasEncodeSignature =
     hasEncodingSignature(videoTrack) || hasEncodingSignature(generalTrack);
   const hasEncode = hasEncodingSettings || hasEncodingTools || hasEncodeSignature;
+  const isHandbrake = toolString.includes('handbrake') || generalApp.includes('handbrake') || generalLibrary.includes('handbrake');
 
   if ((generalApp.includes('makemkv') || generalLibrary.includes('makemkv')) && !hasEncodingSettings) {
-    return { value: 'Remux', reason: 'Rilevato dal parsing MediaInfo: MakeMKV senza encoding' };
+    return withDebug({
+      value: 'Remux',
+      reason: 'Rilevato dal parsing MediaInfo: MakeMKV senza encoding',
+      source: '',
+      sourceReason: ''
+    });
   }
 
   const hdrProfile = String(videoTrack?.HDR_Format_Profile || '').toLowerCase();
-  const hasStreamingDv =
-    hdrProfile.includes('dvhe.05') || hdrProfile.includes('dvhe.07') || hdrProfile.includes('dvhe.08');
+  const hasStreamingDv = hdrProfile.includes('dvhe.05') || hdrProfile.includes('dvhe.08');
 
   const upperName = String(baseName || '').toUpperCase();
   const nameHasWeb = /\bWEB\b/.test(upperName);
   const serviceUpper = String(service || '').toUpperCase();
   const sourceUpper = String(source || '').toUpperCase();
   const sourceIsBluRay = sourceUpper.includes('BLURAY') || sourceUpper.includes('BLU-RAY');
+  const losslessAudio = hasLosslessAudio(mediaInfo);
+  const videoFormatRaw = String(videoTrack?.Format || '').toUpperCase();
+  const isHevc = videoFormatRaw.includes('HEVC') || videoFormatRaw.includes('H.265') || videoFormatRaw.includes('X265');
 
-  if (hasStreamingDv && !hasEncodingTools && !hasEncodingSettings) {
-    return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: DV streaming profile' };
+  Object.assign(debugInfo, {
+    nameHasWeb,
+    serviceUpper,
+    sourceUpper,
+    sourceIsBluRay,
+    losslessAudio,
+    hasEncodingSettings,
+    hasEncodingTools,
+    hasEncoderTool,
+    hasEncodeSignature,
+    hasEncode,
+    isHandbrake,
+    hasStreamingDv,
+    hdrProfile: hdrProfile || '',
+    isHevc,
+    encodedLibrary: shortenDebugValue(encodedLibrary),
+    generalLibrary: shortenDebugValue(generalLibrary),
+    generalApp: shortenDebugValue(generalApp),
+    generalFrontend: shortenDebugValue(generalFrontend),
+    encodingSettings: shortenDebugValue(encodingSettings),
+    encodingSettingsLength: encodingSettings.length,
+    fingerprintLibrary: shortenDebugValue(fingerprintLibrary)
+  });
+
+  if (/\bREMUX\b/.test(upperName) && sourceIsBluRay && losslessAudio) {
+    return withDebug({
+      value: 'Remux',
+      reason: 'Rilevato dal parsing del nome file: REMUX con audio lossless',
+      source: '',
+      sourceReason: ''
+    });
+  }
+
+  if (!serviceUpper && !nameHasWeb && !sourceIsBluRay && sourceHint && losslessAudio) {
+    if (!isUhd && isHevc) {
+      return withDebug({
+        value: 'Encode',
+        reason: 'Rilevato dal parsing MediaInfo: HEVC 1080p senza marker disco',
+        source: '',
+        sourceReason: ''
+      });
+    }
+    if (hasEncoderTool) {
+      return withDebug({
+        value: 'Encode',
+        reason: 'Rilevato dal parsing MediaInfo: audio lossless con encoding',
+        source: sourceHint,
+        sourceReason: sourceHintReason
+      });
+    }
+    return withDebug({
+      value: 'Remux',
+      reason: 'Rilevato dal parsing MediaInfo: audio lossless senza encoding',
+      source: sourceHint,
+      sourceReason: sourceHintReason
+    });
+  }
+
+  if (hasStreamingDv && !hasEncodingTools && !hasEncodingSettings && !sourceIsBluRay) {
+    return withDebug({
+      value: 'WEB-DL',
+      reason: 'Rilevato dal parsing MediaInfo: DV streaming profile',
+      source: '',
+      sourceReason: ''
+    });
   }
   if (encodingSettings.includes('crf=')) {
-    return {
+    return withDebug({
       value: nameHasWeb || serviceUpper ? 'WEBRip' : 'Encode',
-      reason: 'Rilevato dal parsing MediaInfo: CRF rilevato'
-    };
+      reason: 'Rilevato dal parsing MediaInfo: CRF rilevato',
+      source: '',
+      sourceReason: ''
+    });
   }
   if (serviceUpper === 'CR') {
-    if (encodedLibrary.includes('core 142')) {
-      return {
+    if (fingerprintLibrary.includes('core 142')) {
+      return withDebug({
         value: 'WEB-DL',
-        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core 142)'
-      };
+        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core 142)',
+        source: '',
+        sourceReason: ''
+      });
     }
-    const coreMatch = encodedLibrary.match(/core\s+(\d+)/);
+    const coreMatch = fingerprintLibrary.match(/core\s+(\d+)/);
     if (coreMatch && Number(coreMatch[1]) >= 152) {
-      return {
+      return withDebug({
         value: 'WEBRip',
-        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core >= 152)'
-      };
+        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core >= 152)',
+        source: '',
+        sourceReason: ''
+      });
     }
     if (encodingSettings.includes('bitrate=')) {
-      return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: Crunchyroll bitrate=' };
+      return withDebug({
+        value: 'WEB-DL',
+        reason: 'Rilevato dal parsing MediaInfo: Crunchyroll bitrate=',
+        source: '',
+        sourceReason: ''
+      });
     }
   }
   const formatProfile = String(videoTrack?.Format_Profile || '');
   if (
     formatProfile.includes('Main@L4.0') &&
     encodingSettings.includes('rc=2pass') &&
-    (encodedLibrary.includes('core 118') || encodedLibrary.includes('core 148'))
+    (fingerprintLibrary.includes('core 118') || fingerprintLibrary.includes('core 148'))
   ) {
-    return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: fingerprint Netflix' };
+    return withDebug({
+      value: 'WEB-DL',
+      reason: 'Rilevato dal parsing MediaInfo: fingerprint Netflix',
+      source: '',
+      sourceReason: ''
+    });
   }
   if (nameHasWeb) {
     if (hasEncodingTools) {
-      return { value: 'WEBRip', reason: 'Rilevato dal parsing MediaInfo: tool encoding su sorgente WEB' };
+      return withDebug({
+        value: 'WEBRip',
+        reason: 'Rilevato dal parsing MediaInfo: tool encoding su sorgente WEB',
+        source: '',
+        sourceReason: ''
+      });
     }
     if (!hasEncode) {
-      return { value: 'WEB-DL', reason: 'Rilevato dal parsing MediaInfo: WEB senza encoding' };
+      return withDebug({
+        value: 'WEB-DL',
+        reason: 'Rilevato dal parsing MediaInfo: WEB senza encoding',
+        source: '',
+        sourceReason: ''
+      });
     }
   }
   if (serviceUpper && !hasEncode) {
-    return {
+    return withDebug({
       value: 'WEB-DL',
-      reason: 'Rilevato dal parsing MediaInfo: servizio presente senza encoding'
-    };
+      reason: 'Rilevato dal parsing MediaInfo: servizio presente senza encoding',
+      source: '',
+      sourceReason: ''
+    });
+  }
+  if (originalSource && !nameHasWeb && !serviceUpper && !sourceIsBluRay) {
+    return withDebug({
+      value: hasEncode ? 'Encode' : 'Remux',
+      reason: hasEncode
+        ? 'Rilevato dal parsing MediaInfo: encoding rilevato'
+        : 'Rilevato dal parsing MediaInfo: source disco senza encoding',
+      source: originalSource,
+      sourceReason: sourceHintReason
+    });
+  }
+  if (isHandbrake && !nameHasWeb && !serviceUpper && !sourceIsBluRay) {
+    return withDebug({
+      value: 'Encode',
+      reason: 'Rilevato dal parsing MediaInfo: HandBrake indica encode',
+      source: '',
+      sourceReason: ''
+    });
   }
   if (sourceIsBluRay) {
-    return {
+    return withDebug({
       value: hasEncode ? 'Encode' : 'Remux',
       reason: hasEncode
         ? 'Rilevato dal parsing MediaInfo: BluRay con encoding'
-        : 'Rilevato dal parsing MediaInfo: BluRay senza encoding'
-    };
+        : 'Rilevato dal parsing MediaInfo: BluRay senza encoding',
+      source: '',
+      sourceReason: ''
+    });
   }
-  return { value: '', reason: '' };
+  return withDebug({ value: '', reason: '', source: '', sourceReason: '' });
 }
 
 function extractTokensPresent(name, tokens) {
@@ -1372,27 +1674,64 @@ function extractTokensPresent(name, tokens) {
   return matches;
 }
 
+function applyNameSuggestions(format, service, source, repack, settingsOverride) {
+  const settings = settingsOverride || getSettings();
+  const serviceOptions = buildServiceOptions(settings);
+
+  if (format) {
+    setDropdownValue(ui.formatSelect, ui.formatSelectBtn, format, format);
+  }
+  if (source) {
+    setDropdownValue(ui.sourceInput, ui.sourceInputBtn, source, source);
+  }
+  if (service) {
+    const option = serviceOptions.find((item) => item.code === service);
+    if (option) {
+      setDropdownValue(ui.serviceInput, ui.serviceInputBtn, service, `${option.label} (${option.code})`);
+    }
+  }
+  if (repack) {
+    setDropdownValue(ui.repackSelect, ui.repackSelectBtn, repack, repack);
+  }
+  schedulePreview();
+}
+
 function updateFormatServiceSuggest() {
   if (!ui.formatSuggestRow || !ui.formatSuggestText) {
     return;
   }
+  const settings = getSettings();
+  if (ui.applyNameSuggestBtn) {
+    if (settings.autoApplyNameSuggestions) {
+      ui.applyNameSuggestBtn.dataset.tooltip = 'Inserimento suggerimenti automatico ATTIVO';
+    } else {
+      ui.applyNameSuggestBtn.removeAttribute('data-tooltip');
+    }
+  }
   if (!state.targetPath) {
     ui.formatSuggestRow.classList.remove('is-empty');
-    ui.formatSuggestText.textContent = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    const emptyText = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    if (ui.formatSuggestText.dataset.lastHtml !== emptyText) {
+      ui.formatSuggestText.textContent = emptyText;
+      ui.formatSuggestText.dataset.lastHtml = emptyText;
+    }
     return;
   }
   const basePath = state.mainVideo || state.videoFiles?.[0] || state.targetPath;
   const baseName = basePath ? stripExtension(getPathBaseName(basePath)) : '';
   if (!baseName) {
     ui.formatSuggestRow.classList.add('is-empty');
-    ui.formatSuggestText.textContent = '';
+    if (ui.formatSuggestText.dataset.lastHtml !== '') {
+      ui.formatSuggestText.textContent = '';
+      ui.formatSuggestText.dataset.lastHtml = '';
+    }
     return;
   }
-  const settings = getSettings();
   const nameFormat = detectFormatFromName(baseName);
   const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
   const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
-  const source = detectSourceFromName(baseName);
+  const sourceFromName = detectSourceFromName(baseName);
+  let source = sourceFromName;
   const repack = detectRepackFromName(baseName);
   const mediaInfoFormat = detectFormatFromMediaInfo(state.mediaInfo, baseName, { service, source });
   let format = mediaInfoFormat.value || nameFormat;
@@ -1401,13 +1740,73 @@ function updateFormatServiceSuggest() {
     : format
       ? 'Rilevato da parsing del nome file: token formato'
       : '';
+  let sourceReason = '';
+  if (!source && mediaInfoFormat.source) {
+    source = mediaInfoFormat.source;
+    sourceReason = mediaInfoFormat.sourceReason;
+  } else if (source) {
+    sourceReason = 'Rilevato da parsing del nome file: token sorgente';
+  }
   if (!format && source) {
     format = 'Encode';
     formatReason = 'Rilevato da parsing del nome file: sorgente rilevata (fallback Encode)';
   }
-  if (!format && !service && !source && !repack) {
+  if (format === 'Encode') {
+    const webHint =
+      nameFormat === 'WEBRip' ||
+      nameFormat === 'WEB-DL' ||
+      Boolean(service) ||
+      Boolean(mediaInfoFormat.value && mediaInfoFormat.value !== 'Encode');
+    if (webHint) {
+      const webFormat = mediaInfoFormat.value && mediaInfoFormat.value !== 'Encode' ? mediaInfoFormat.value : 'WEBRip';
+      format = webFormat;
+      formatReason = mediaInfoFormat.reason
+        ? `${mediaInfoFormat.reason} (fallback WEB)`
+        : 'Rilevato da parsing del nome file: token WEB/servizio';
+    }
+  }
+  const hasItalianSubsOnly = (() => {
+    if (!state.mediaInfo || state.mediaInfo.error) {
+      return false;
+    }
+    const audioTracks = getAudioTracks(state.mediaInfo);
+    const audioLangs = audioTracks
+      .map((track) => normalizeLangTag(getTrackLang(track)))
+      .filter(Boolean);
+    const hasItalianAudio = audioLangs.includes('ITA');
+    if (hasItalianAudio) {
+      return false;
+    }
+    const tracks = state.mediaInfo?.media?.track || [];
+    const textTracks = tracks.filter((track) => track['@type'] === 'Text');
+    const subLangs = textTracks
+      .map((track) => normalizeLangTag(getTrackLang(track)))
+      .filter(Boolean);
+    return subLangs.includes('ITA');
+  })();
+
+  logDebug('suggest: decision', {
+    baseName,
+    nameFormat,
+    mediaInfoFormat,
+    mediaInfoSignals: mediaInfoFormat.debug || {},
+    serviceFromName: service,
+    sourceFromName,
+    repack,
+    finalFormat: format || '',
+    formatReason,
+    finalSource: source || '',
+    sourceReason,
+    extraSubs: hasItalianSubsOnly
+  });
+
+  if (!format && !service && !source && !repack && !hasItalianSubsOnly) {
     ui.formatSuggestRow.classList.remove('is-empty');
-    ui.formatSuggestText.textContent = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    const emptyText = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    if (ui.formatSuggestText.dataset.lastHtml !== emptyText) {
+      ui.formatSuggestText.textContent = emptyText;
+      ui.formatSuggestText.dataset.lastHtml = emptyText;
+    }
     if (ui.applyNameSuggestBtn) {
       ui.applyNameSuggestBtn.disabled = true;
       ui.applyNameSuggestBtn.dataset.format = '';
@@ -1432,7 +1831,7 @@ function updateFormatServiceSuggest() {
     const sourceLabel = source === 'HDTV' ? 'HDTV (obsoleta)' : source;
     serviceSourceParts.push({
       value: sourceLabel,
-      reason: 'Rilevato da parsing del nome file: token sorgente'
+      reason: sourceReason || 'Rilevato da parsing del nome file: token sorgente'
     });
   }
   if (serviceSourceParts.length) {
@@ -1449,25 +1848,6 @@ function updateFormatServiceSuggest() {
       reason: 'Rilevato da parsing del nome file: token repack'
     });
   }
-  const hasItalianSubsOnly = (() => {
-    if (!state.mediaInfo || state.mediaInfo.error) {
-      return false;
-    }
-    const audioTracks = getAudioTracks(state.mediaInfo);
-    const audioLangs = audioTracks
-      .map((track) => normalizeLangTag(getTrackLang(track)))
-      .filter(Boolean);
-    const hasItalianAudio = audioLangs.includes('ITA');
-    if (hasItalianAudio) {
-      return false;
-    }
-    const tracks = state.mediaInfo?.media?.track || [];
-    const textTracks = tracks.filter((track) => track['@type'] === 'Text');
-    const subLangs = textTracks
-      .map((track) => normalizeLangTag(getTrackLang(track)))
-      .filter(Boolean);
-    return subLangs.includes('ITA');
-  })();
   if (hasItalianSubsOnly) {
     parts.push({
       label: 'Extra:',
@@ -1477,7 +1857,11 @@ function updateFormatServiceSuggest() {
   }
   if (!parts.length) {
     ui.formatSuggestRow.classList.remove('is-empty');
-    ui.formatSuggestText.textContent = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    const emptyText = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
+    if (ui.formatSuggestText.dataset.lastHtml !== emptyText) {
+      ui.formatSuggestText.textContent = emptyText;
+      ui.formatSuggestText.dataset.lastHtml = emptyText;
+    }
     if (ui.applyNameSuggestBtn) {
       ui.applyNameSuggestBtn.disabled = true;
       ui.applyNameSuggestBtn.dataset.format = '';
@@ -1493,7 +1877,11 @@ function updateFormatServiceSuggest() {
       return `<span class="suggest-label">${part.label}</span> <span class="suggest-value"${title}>${part.value}</span>`;
     })
     .join(' · ');
-  ui.formatSuggestText.innerHTML = `Suggerimento nome/MediaInfo: ${html}`;
+  const fullHtml = `Suggerimento nome/MediaInfo: ${html}`;
+  if (ui.formatSuggestText.dataset.lastHtml !== fullHtml) {
+    ui.formatSuggestText.innerHTML = fullHtml;
+    ui.formatSuggestText.dataset.lastHtml = fullHtml;
+  }
   ui.formatSuggestRow.classList.remove('is-empty');
   if (ui.applyNameSuggestBtn) {
     ui.applyNameSuggestBtn.disabled = false;
@@ -1501,6 +1889,26 @@ function updateFormatServiceSuggest() {
     ui.applyNameSuggestBtn.dataset.service = service || '';
     ui.applyNameSuggestBtn.dataset.source = source || '';
     ui.applyNameSuggestBtn.dataset.repack = repack || '';
+  }
+  if (settings.autoApplyNameSuggestions) {
+    const autoKey = JSON.stringify({
+      target: state.targetPath || '',
+      format,
+      service,
+      source,
+      repack
+    });
+    if (autoKey && state.lastAutoSuggestKey !== autoKey) {
+      state.lastAutoSuggestKey = autoKey;
+      logDebug('suggest: auto-apply', {
+        format: format || '',
+        service: service || '',
+        source: source || '',
+        repack: repack || '',
+        autoKey
+      });
+      applyNameSuggestions(format, service, source, repack, settings);
+    }
   }
 }
 
@@ -1616,6 +2024,9 @@ function getFormState() {
   } else if (ui.hdrCheckbox.checked) {
     hdrTokens.push('HDR');
   }
+  const settings = loadSettings();
+  const languageTagInFolders = settings.renameLangInFolders !== false;
+  const languageTagInFiles = settings.renameLangInFiles !== false;
 
   return {
     type: ui.typeSelect.value,
@@ -1628,6 +2039,8 @@ function getFormState() {
     episodeTitle: ui.episodeTitleInput.value.trim(),
     part: ui.partInput.value.trim(),
     languageTag: ui.languageTagInput.value.trim(),
+    languageTagInFolders,
+    languageTagInFiles,
     edition: ui.editionInput.value.trim(),
     hybrid: ui.hybridCheckbox.checked,
     repack: ui.repackSelect.value,
@@ -1691,9 +2104,10 @@ async function updateRenamePlan() {
 
   const form = getFormState();
   const { folderName, baseName, fileRenames, warnings } = renameTools.buildRenameTargets();
+  const discStructure = isDiscStructure();
   const plan = await window.api.previewRename({
     targetPath: state.targetPath,
-    renameFiles: ui.renameFileCheckbox.checked,
+    renameFiles: ui.renameFileCheckbox.checked && !discStructure,
     renameFolder: state.kind === 'dir' && ui.renameFolderCheckbox.checked,
     folderName: state.kind === 'dir' ? folderName : '',
     fileRenames
@@ -1974,16 +2388,17 @@ async function autoDetectFromPath() {
     const folderName = getPathBaseName(state.targetPath);
     const folderGuess = metadataTools.guessMetadataFromName(folderName);
     const firstFileGuess = state.videoFiles.length ? metadataTools.guessMetadataFromName(state.videoFiles[0]) : {};
+    const discStructure = isDiscStructure();
 
     guess.title = folderGuess.title || firstFileGuess.title || '';
     guess.year = folderGuess.year || firstFileGuess.year || '';
     guess.season = folderGuess.season || firstFileGuess.season || '';
-    guess.typeHint = 'tv-season';
+    guess.typeHint = discStructure && !guess.season ? 'movie' : 'tv-season';
 
-    setIfAuto(ui.typeSelect, 'tv-season');
+    setIfAuto(ui.typeSelect, guess.typeHint);
     setIfAuto(ui.titleInput, guess.title);
     setIfAuto(ui.yearInput, guess.year);
-    if (guess.season) {
+    if (guess.season && guess.typeHint === 'tv-season') {
       setIfAuto(ui.seasonInput, guess.season);
     }
   } else if (state.mainVideo) {
@@ -2119,6 +2534,20 @@ async function loadPath(targetPath) {
     ui.renameFolderCheckbox.disabled = true;
   }
 
+  if (ui.renameFileCheckbox) {
+    if (scan.kind === 'dir') {
+      const discStructure = isDiscStructure();
+      ui.renameFileCheckbox.disabled = discStructure;
+      if (discStructure) {
+        ui.renameFileCheckbox.checked = false;
+      } else if (!ui.renameFileCheckbox.checked) {
+        ui.renameFileCheckbox.checked = true;
+      }
+    } else {
+      ui.renameFileCheckbox.disabled = false;
+    }
+  }
+
   if (scan.kind === 'dir') {
     ui.typeSelect.value = ui.typeSelect.value.includes('anime') ? 'anime-season' : 'tv-season';
   }
@@ -2244,33 +2673,10 @@ if (ui.sourceSection) {
     const items = event.dataTransfer?.items;
     const firstFile = files?.length ? files[0] : null;
     const firstItem = items?.length ? items[0] : null;
-    logDebug?.('dragdrop: document drop', {
-      files: files?.length || 0,
-      items: items?.length || 0,
-      types: event.dataTransfer?.types || [],
-      fileInfo: firstFile
-        ? {
-            name: firstFile.name || '',
-            path: firstFile.path || '',
-            webkitRelativePath: firstFile.webkitRelativePath || '',
-            size: Number.isFinite(firstFile.size) ? firstFile.size : null,
-            type: firstFile.type || ''
-          }
-        : null,
-      itemInfo: firstItem
-        ? {
-            kind: firstItem.kind || '',
-            type: firstItem.type || ''
-          }
-        : null,
-      uriList: event.dataTransfer?.getData?.('text/uri-list') || '',
-      text: event.dataTransfer?.getData?.('text/plain') || ''
-    });
   });
 
   ui.sourceSection.addEventListener('dragenter', (event) => {
     event.preventDefault();
-    logDebug?.('dragdrop: enter source');
     dragDepth += 1;
     ui.sourceSection.classList.add('drag-active');
   });
@@ -2293,27 +2699,6 @@ if (ui.sourceSection) {
     const firstFile = files?.length ? files[0] : null;
     const firstItem = items?.length ? items[0] : null;
     const path = await getDropPath(event);
-    logDebug?.('dragdrop: drop source', {
-      files: files?.length || 0,
-      items: items?.length || 0,
-      types: event.dataTransfer?.types || [],
-      fileInfo: firstFile
-        ? {
-            name: firstFile.name || '',
-            path: firstFile.path || '',
-            webkitRelativePath: firstFile.webkitRelativePath || '',
-            size: Number.isFinite(firstFile.size) ? firstFile.size : null,
-            type: firstFile.type || ''
-          }
-        : null,
-      itemInfo: firstItem
-        ? {
-            kind: firstItem.kind || '',
-            type: firstItem.type || ''
-          }
-        : null,
-      path: path || ''
-    });
     if (!path) {
       showToast('Drag & drop non disponibile, usa Seleziona file/cartella.', 'warning');
       resetDrag();
@@ -2330,25 +2715,7 @@ if (ui.applyNameSuggestBtn) {
     const service = ui.applyNameSuggestBtn.dataset.service || '';
     const source = ui.applyNameSuggestBtn.dataset.source || '';
     const repack = ui.applyNameSuggestBtn.dataset.repack || '';
-    const settings = getSettings();
-    const serviceOptions = buildServiceOptions(settings);
-
-    if (format) {
-      setDropdownValue(ui.formatSelect, ui.formatSelectBtn, format, format);
-    }
-    if (source) {
-      setDropdownValue(ui.sourceInput, ui.sourceInputBtn, source, source);
-    }
-    if (service) {
-      const option = serviceOptions.find((item) => item.code === service);
-      if (option) {
-        setDropdownValue(ui.serviceInput, ui.serviceInputBtn, service, `${option.label} (${option.code})`);
-      }
-    }
-    if (repack) {
-      setDropdownValue(ui.repackSelect, ui.repackSelectBtn, repack, repack);
-    }
-    schedulePreview();
+    applyNameSuggestions(format, service, source, repack);
   });
 }
 
@@ -2384,7 +2751,7 @@ ui.applyRenameBtn.addEventListener('click', async () => {
     return;
   }
 
-  const renameFiles = ui.renameFileCheckbox.checked;
+  const renameFiles = ui.renameFileCheckbox.checked && !isDiscStructure();
   const renameFolder = state.kind === 'dir' && ui.renameFolderCheckbox.checked;
   const fileCount = renameFiles ? fileRenames.length : 0;
   const folderCount = renameFolder && folderName ? 1 : 0;

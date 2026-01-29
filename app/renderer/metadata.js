@@ -223,7 +223,12 @@ export function createMetadataTools(deps) {
   }
 
   function extractYear(raw) {
-    const match = String(raw || '').match(/\b(19|20)\d{2}\b/);
+    const text = String(raw || '');
+    const parenMatch = text.match(/\((19\d{2}|20\d{2})\)/);
+    if (parenMatch) {
+      return parenMatch[1];
+    }
+    const match = text.match(/\b(19|20)\d{2}\b/);
     return match ? match[0] : '';
   }
 
@@ -580,6 +585,23 @@ export function createMetadataTools(deps) {
         title = parentTitle;
       }
     }
+    if (!title && year) {
+      const numericTitleMatch = cleaned.match(/^\s*(\d{3,4})\s*\((19\d{2}|20\d{2})\)\s*$/);
+      if (numericTitleMatch) {
+        title = numericTitleMatch[1];
+      }
+    }
+    if (!title) {
+      const numericCandidate = cleaned
+        .replace(/\b(19|20)\d{2}\b/g, '')
+        .replace(/[()\[\]{}]/g, '')
+        .replace(/[_\-.]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (/^\d{3,4}$/.test(numericCandidate)) {
+        title = numericCandidate;
+      }
+    }
     return {
       title,
       year,
@@ -771,6 +793,32 @@ export function createMetadataTools(deps) {
       lines.push('');
       lines.push('Video');
       const format = getTrackValue(video, ['Format', 'Format/String']);
+      const formatProfileRaw = getTrackValue(video, [
+        'Format_Profile',
+        'Format_Profile/String',
+        'Format_Profile_String',
+        'Format profile',
+        'Format profile/String'
+      ]);
+      const formatLevelRaw = getTrackValue(video, [
+        'Format_Level',
+        'Format_Level/String',
+        'Format_Profile_Level',
+        'Format_Profile_Level/String',
+        'Format_Profile_Level_String',
+        'Format level',
+        'Format level/String'
+      ]);
+      let formatProfile = formatProfileRaw ? String(formatProfileRaw).trim() : '';
+      if (formatProfile && !formatProfile.includes('@') && formatLevelRaw) {
+        let level = String(formatLevelRaw).trim();
+        if (level) {
+          if (!level.toUpperCase().startsWith('L')) {
+            level = `L${level}`;
+          }
+          formatProfile = `${formatProfile}@${level}`;
+        }
+      }
       const width = getTrackValue(video, ['Width']);
       const height = getTrackValue(video, ['Height']);
       const bitDepth = getTrackValue(video, ['BitDepth', 'Bit_depth']);
@@ -905,7 +953,8 @@ export function createMetadataTools(deps) {
       }
 
       if (format) {
-        lines.push(`Format          : ${format}`);
+        const formatLine = formatProfile ? `${format} | ${formatProfile}` : format;
+        lines.push(`Format          : ${formatLine}`);
       }
       if (width && height) {
         lines.push(`Risoluzione     : ${width}x${height}`);
@@ -923,15 +972,17 @@ export function createMetadataTools(deps) {
       lines.push('');
       lines.push('Audio');
       audioTracks.forEach((track, index) => {
-        const format = getTrackValue(track, ['Format', 'Format/String', 'Format_Commercial', 'Format_Commercial_IfAny']);
+        const format = getTrackValue(track, ['Format', 'Format/String']);
+        const commercial = getTrackValue(track, ['Format_Commercial', 'Format_Commercial_IfAny', 'Format_Commercial/String']);
         const lang = resolveLangName(track);
         const title = getTrackValue(track, ['Title', 'Title/String']) || '';
+        const formatLine = [format, commercial].filter(Boolean).join(' / ');
         const labelParts = [];
         if (lang) {
           labelParts.push(lang);
         }
-        if (format) {
-          labelParts.unshift(format);
+        if (formatLine) {
+          labelParts.unshift(formatLine);
         }
         const detail = title ? ` | Title: ${title}` : '';
         lines.push(`#${index + 1}            : ${labelParts.join(' / ') || 'Traccia audio'}${detail}`);

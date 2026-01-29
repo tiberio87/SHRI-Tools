@@ -9,6 +9,9 @@ const DEFAULT_SETTINGS = {
   tagList: '',
   autoTagDetect: true,
   autoNoGroupTag: true,
+  renameLangInFolders: true,
+  renameLangInFiles: true,
+  autoApplyNameSuggestions: false,
   uploadMode: 'ua',
   torrentPasskey: '',
   torrentAnnounceUrl: '',
@@ -316,6 +319,15 @@ export function createSettingsTools({
       ui.ptscreensKeyInput.value = settings.ptscreensKey || '';
     }
     ui.preferredLanguageSelect.value = preferredLanguage;
+    if (ui.renameLangFoldersToggle) {
+      ui.renameLangFoldersToggle.checked = settings.renameLangInFolders !== false;
+    }
+    if (ui.renameLangFilesToggle) {
+      ui.renameLangFilesToggle.checked = settings.renameLangInFiles !== false;
+    }
+    if (ui.autoApplyNameSuggestToggle) {
+      ui.autoApplyNameSuggestToggle.checked = settings.autoApplyNameSuggestions === true;
+    }
     ui.serviceListInput.value = settings.serviceList || '';
     ui.tagListInput.value = settings.tagList || '';
     if (ui.ffmpegPathInput) {
@@ -463,6 +475,9 @@ export function createSettingsTools({
       imgbbKey: ui.imgbbKeyInput?.value.trim() || '',
       ptscreensKey: ui.ptscreensKeyInput?.value.trim() || '',
       preferredLanguage: ui.preferredLanguageSelect.value,
+      renameLangInFolders: Boolean(ui.renameLangFoldersToggle?.checked),
+      renameLangInFiles: Boolean(ui.renameLangFilesToggle?.checked),
+      autoApplyNameSuggestions: Boolean(ui.autoApplyNameSuggestToggle?.checked),
       serviceList: ui.serviceListInput.value.trim(),
       tagList: ui.tagListInput.value.trim(),
       autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),
