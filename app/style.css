@@ -390,6 +390,8 @@ body:not(.light) .theme-toggle .icon-moon {
   color: var(--accent);
   font-weight: 600;
   font-size: 12px;
+  border: none;
+  font-family: inherit;
 }
 
 .status.clickable {
@@ -400,6 +402,14 @@ body:not(.light) .theme-toggle .icon-moon {
 .status.clickable:hover {
   transform: translateY(-1px);
   box-shadow: 0 6px 12px var(--shadow);
+}
+
+#renameBadge {
+  min-width: 120px;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .content-grid {
@@ -438,6 +448,11 @@ body:not(.light) .theme-toggle .icon-moon {
   flex-direction: column;
   gap: 10px;
   box-shadow: 0 10px 20px var(--shadow);
+}
+
+.rename-section {
+  gap: 5px;
+  padding: 12px 14px 10px;
 }
 
 .plan-section {

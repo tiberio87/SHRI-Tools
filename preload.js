@@ -1,4 +1,4 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
   selectFile: () => ipcRenderer.invoke('select-file'),
@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
   uaUpdateStart: (payload) => ipcRenderer.invoke('ua-update-start', payload),
   uaUpdateSendInput: (text) => ipcRenderer.invoke('ua-update-input', text),
   uaUpdateStop: () => ipcRenderer.invoke('ua-update-stop'),
+  getFilePath: (file) => (file ? webUtils.getPathForFile(file) : ''),
   onTorrentProgress: (handler) => {
     const listener = (_event, data) => handler(data);
     ipcRenderer.on('torrent-progress', listener);
