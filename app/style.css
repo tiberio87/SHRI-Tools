@@ -496,9 +496,13 @@ body:not(.light) .theme-toggle .icon-moon {
 
 .row {
   display: grid;
-  grid-template-columns: minmax(95px, 1fr) minmax(100px, 1fr) minmax(150px, 1fr) minmax(105px, 1fr) minmax(100px, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 8px 10px;
   align-items: center;
+}
+
+.format-row {
+  grid-template-columns: minmax(95px, 1fr) minmax(100px, 1fr) minmax(150px, 1fr) minmax(105px, 1fr) minmax(100px, 1fr);
 }
 
 .action-row {
