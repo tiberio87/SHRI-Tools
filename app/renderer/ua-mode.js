@@ -602,7 +602,7 @@ export function createUAMode({
     const trim = raw.trim();
     const linkifyUrl = (url) => {
       const safeUrl = escapeHtml(url);
-      return `<a class="ua-hl-link" href="${safeUrl}" target="_blank" rel="noreferrer">${safeUrl}</a>`;
+      return `<a class="ua-hl-link" data-external="${safeUrl}" href="${safeUrl}" target="_blank" rel="noreferrer">${safeUrl}</a>`;
     };
     const formatKeyNumber = (label, value) =>
       `${escapeHtml(label)} <span class="ua-hl-info">${escapeHtml(value)}</span>`;

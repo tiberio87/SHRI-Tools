@@ -161,21 +161,42 @@ export function createMetadataTools(deps) {
   }
 
   function getResolution(videoTrack) {
-    const width = parseInt(videoTrack?.Width || 0, 10);
-    const height = parseInt(videoTrack?.Height || 0, 10);
-    if (width >= 3800 || height >= 2160) {
+    const widthRaw = parseInt(videoTrack?.Width || 0, 10);
+    const heightRaw = parseInt(videoTrack?.Height || 0, 10);
+    if (!widthRaw || !heightRaw) {
+      return '';
+    }
+
+    const widthList = [3840, 2560, 1920, 1280, 1024, 854, 720, 15360, 7680, 0].slice().sort((a, b) => a - b);
+    const heightList = [2160, 1440, 1080, 720, 576, 540, 480, 8640, 4320, 0].slice().sort((a, b) => a - b);
+    const snapUp = (list, value) => {
+      for (const entry of list) {
+        if (value <= entry) {
+          return entry;
+        }
+      }
+      return list[list.length - 1] || value;
+    };
+
+    const width = snapUp(widthList, widthRaw);
+    const height = snapUp(heightList, heightRaw);
+
+    if (width >= 3840 || height >= 2160) {
       return '2160p';
     }
-    if (width >= 1900 || height >= 1080) {
+    if (width >= 2560 || height >= 1440) {
+      return '1440p';
+    }
+    if (width >= 1920 || height >= 1080) {
       return '1080p';
     }
-    if (width >= 1200 || height >= 720) {
+    if (width >= 1280 || height >= 720) {
       return '720p';
     }
-    if (width >= 700 || height >= 576) {
+    if (width >= 1024 || height >= 576) {
       return '576p';
     }
-    if (width >= 640 || height >= 480) {
+    if (width >= 854 || height >= 480) {
       return '480p';
     }
     return '';
