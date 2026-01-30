@@ -505,6 +505,7 @@ function resetSource() {
   state.metadata = null;
   state.tagSuggestion = '';
   state.autoDetectRunning = false;
+  state.lastAutoSuggestKey = '';
   state.lastTorrentPath = '';
   state.screenshots = [];
   state.screenshotsMeta = null;
@@ -2480,6 +2481,7 @@ async function loadPath(targetPath) {
   resetAllInputs({ skipPreview: true });
   clearWizardRulesCheck();
 
+  state.lastAutoSuggestKey = '';
   state.targetPath = targetPath;
   state.kind = scan.kind;
   state.videoFiles = scan.videoFiles || [];

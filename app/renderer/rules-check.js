@@ -12,6 +12,61 @@ function normalizeForMatch(value) {
     .replace(/[^a-z0-9]/gi, '');
 }
 
+function normalizeVideoCodec(value) {
+  const raw = normalizeForMatch(value);
+  if (!raw) {
+    return '';
+  }
+  if (raw.includes('x264') || raw.includes('avc') || raw.includes('h264')) {
+    return 'h264';
+  }
+  if (raw.includes('x265') || raw.includes('hevc') || raw.includes('h265')) {
+    return 'h265';
+  }
+  if (raw.includes('mpeg2') || raw.includes('mpeg')) {
+    return 'mpeg2';
+  }
+  if (raw.includes('vc1') || raw.includes('wmv3')) {
+    return 'vc1';
+  }
+  return raw;
+}
+
+function normalizeAudioCodec(value) {
+  const raw = normalizeForMatch(value);
+  if (!raw) {
+    return '';
+  }
+  if (raw.includes('dtsx')) {
+    return 'dtsx';
+  }
+  if (raw.includes('dtsxll') || raw.includes('dtshdma') || (raw.includes('dtshd') && raw.includes('master'))) {
+    return 'dtshdma';
+  }
+  if (raw.includes('dtshra') || (raw.includes('dtshd') && raw.includes('high'))) {
+    return 'dtshra';
+  }
+  if (raw.includes('truehd') || raw.includes('mlp')) {
+    return 'truehd';
+  }
+  if (raw.includes('eac3') || raw.includes('ddplus') || raw.includes('ddp')) {
+    return 'ddp';
+  }
+  if (raw.includes('ac3') || raw === 'dd') {
+    return 'dd';
+  }
+  if (raw.includes('flac')) {
+    return 'flac';
+  }
+  if (raw.includes('pcm') || raw.includes('lpcm')) {
+    return 'pcm';
+  }
+  if (raw.includes('dts')) {
+    return 'dts';
+  }
+  return raw;
+}
+
 function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -117,10 +172,10 @@ function extractAudioCodecFromName(name) {
   if (/\bDTS[-\s]?X\b/.test(upper) || /\bDTSX\b/.test(upper)) {
     return 'DTS:X';
   }
-  if (/\bDTS[-\s]?HD\s*MA\b/.test(upper) || /\bDTSHDMA\b/.test(upper)) {
+  if (/\bDTS[-\s]?HD[.\s_-]*MA\b/.test(upper) || /\bDTSHDMA\b/.test(upper)) {
     return 'DTS-HD MA';
   }
-  if (/\bDTS[-\s]?HD\s*HRA\b/.test(upper) || /\bDTSHDHRA\b/.test(upper)) {
+  if (/\bDTS[-\s]?HD[.\s_-]*HRA\b/.test(upper) || /\bDTSHDHRA\b/.test(upper)) {
     return 'DTS-HD HRA';
   }
   if (/\bDTS\b/.test(upper)) {
@@ -489,7 +544,10 @@ export function createRulesCheckTools({
     let videoCodecMismatch = false;
     if (!videoCodecOk) {
       missing.push('VCodec');
-    } else if (expectedVideoCodec && normalizeForMatch(expectedVideoCodec) !== normalizeForMatch(actualVideoCodec)) {
+    } else if (
+      expectedVideoCodec &&
+      normalizeVideoCodec(expectedVideoCodec) !== normalizeVideoCodec(actualVideoCodec)
+    ) {
       videoCodecMismatch = true;
       mismatchDetails.push(`VCodec (file: ${actualVideoCodec}, impostazioni: ${expectedVideoCodec})`);
     }
@@ -498,7 +556,10 @@ export function createRulesCheckTools({
     let audioCodecMismatch = false;
     if (!audioCodecOk) {
       missing.push('ACodec');
-    } else if (expectedAudioCodec && normalizeForMatch(expectedAudioCodec) !== normalizeForMatch(actualAudioCodec)) {
+    } else if (
+      expectedAudioCodec &&
+      normalizeAudioCodec(expectedAudioCodec) !== normalizeAudioCodec(actualAudioCodec)
+    ) {
       audioCodecMismatch = true;
       mismatchDetails.push(`ACodec (file: ${actualAudioCodec}, impostazioni: ${expectedAudioCodec})`);
     }

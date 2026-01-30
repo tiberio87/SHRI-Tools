@@ -291,7 +291,7 @@ export function createUAMode({
     trackerTitle.textContent = 'Dettaglio tracker';
     trackerListCard.appendChild(trackerTitle);
     const trackerList = document.createElement('div');
-    trackerList.className = 'ua-health-list';
+    trackerList.className = 'ua-health-list ua-health-list--trackers';
     if (trackerEntries.length) {
       trackerEntries.forEach((entry) => {
         const rowLabel = `${entry.name} · API key`;
