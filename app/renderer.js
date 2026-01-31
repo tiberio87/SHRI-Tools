@@ -16,7 +16,7 @@ import {
   hasEncodingSignature
 } from './renderer/media-utils.js';
 import { createUploadKit } from './renderer/upload-kit.js';
-import { createMetadataTools } from './renderer/metadata.js';
+import { createMetadataTools, hasCjkChars } from './renderer/metadata.js';
 import { createRenameTools } from './renderer/rename.js';
 import { getParentPath, getPathBaseName, stripExtension } from './renderer/path-utils.js';
 import { createLogger } from './renderer/logger.js';
@@ -368,6 +368,7 @@ function resetMetadataInputs() {
   [
     ui.imdbInput,
     ui.tvdbInput,
+    ui.malInput,
     ui.titleInput,
     ui.yearInput,
     ui.seasonInput,
@@ -632,6 +633,13 @@ function renderFetchStatus(payload, data) {
       link: `https://www.themoviedb.org/${data.tmdbType}/${data.tmdbId}`
     });
   }
+  if (data.malId) {
+    parts.push({
+      label: 'MAL',
+      value: data.malId,
+      link: `https://myanimelist.net/anime/${data.malId}`
+    });
+  }
   ui.fetchStatus.innerHTML = '';
   if (!parts.length) {
     setHint(ui.fetchStatus, `Rilevato ${targetLabel}: Nessun dato rilevato.`);
@@ -696,7 +704,7 @@ function getAutoMatchWarnings(payload, data) {
     return [];
   }
   const hasTitle = Boolean(data?.title);
-  const hasIds = Boolean(data?.tmdbId || data?.imdbId || data?.tvdbSeriesId);
+  const hasIds = Boolean(data?.tmdbId || data?.imdbId || data?.tvdbSeriesId || data?.malId);
   const typeHint = payload?.typeHint || '';
   const isTv = typeHint.startsWith('tv') || typeHint.startsWith('anime');
   const hasEpisodes = Array.isArray(data?.episodes) && data.episodes.length > 0;
@@ -2272,14 +2280,19 @@ async function fetchMetadataAuto(guess) {
   try {
     const typeHint = guess.typeHint || ui.typeSelect.value;
     const isTvType = typeHint.startsWith('tv') || typeHint.startsWith('anime');
+    const filenameHint = state.mainVideo
+      ? getPathBaseName(state.mainVideo)
+      : getPathBaseName(state.targetPath || '');
     const payload = {
       imdbId: ui.imdbInput.value.trim(),
       tvdbId: isTvType ? ui.tvdbInput.value.trim() : '',
+      malId: ui.malInput.value.trim(),
       title: guess.title || ui.titleInput.value.trim(),
       year: guess.year || ui.yearInput.value.trim(),
       season: isTvType ? (guess.season || ui.seasonInput.value.trim()) : '',
       episode: isTvType ? (guess.episode || ui.episodeInput.value.trim()) : '',
       typeHint,
+      filename: filenameHint,
       omdbKey: settings.omdbKey,
       tmdbKey: settings.tmdbKey,
       tvdbKey: settings.tvdbKey,
@@ -2319,8 +2332,13 @@ async function fetchMetadataAuto(guess) {
         setIfAuto(ui.typeSelect, 'anime-season');
       }
     }
-    if (finalData.title) {
-      setIfAuto(ui.titleInput, finalData.title);
+    const animeRomaji = finalData?.animeRomaji || '';
+    let resolvedTitle = finalData.title || '';
+    if (finalData?.isAnime && animeRomaji && hasCjkChars(resolvedTitle)) {
+      resolvedTitle = animeRomaji;
+    }
+    if (resolvedTitle) {
+      setIfAuto(ui.titleInput, resolvedTitle);
     }
     if (finalData.year) {
       setIfAuto(ui.yearInput, finalData.year);
@@ -2356,12 +2374,16 @@ async function fetchMetadataAuto(guess) {
     }
 
     const finalHasMatch = Boolean(
-      finalData?.title || finalData?.tmdbId || finalData?.imdbId || finalData?.tvdbSeriesId
+      finalData?.title ||
+        finalData?.tmdbId ||
+        finalData?.imdbId ||
+        finalData?.tvdbSeriesId ||
+        finalData?.malId
     );
     if (!finalHasMatch) {
       setFetchBadge('error', 'Auto matching fallito');
     } else {
-      const usedManualId = Boolean(payload.imdbId || payload.tvdbId);
+      const usedManualId = Boolean(payload.imdbId || payload.tvdbId || payload.malId);
       const modeLabel = usedManualId ? 'Matching manuale' : 'Auto Matching';
       setFetchBadge(usedManualId ? 'manual' : 'auto', modeLabel);
     }
@@ -2838,7 +2860,8 @@ if (ui.generateTorrentBtn) {
       outputName,
       private: isPrivate,
       requestId: currentTorrentRequestId,
-      mkbrrPath: settings.torrentMkbrrPath || ''
+      mkbrrPath: settings.torrentMkbrrPath || '',
+      mkbrrWorkers: settings.torrentMkbrrWorkers
     };
     const result = await window.api.createTorrent(payload);
     logDebug('createTorrent result', result);
@@ -3315,7 +3338,8 @@ if (ui.torrentClientSelect) {
   ui.renameFileCheckbox,
   ui.renameFolderCheckbox,
   ui.imdbInput,
-  ui.tvdbInput
+  ui.tvdbInput,
+  ui.malInput
 ].forEach((element) => {
   element.addEventListener('input', () => {
     if (element.dataset.auto === 'true') {

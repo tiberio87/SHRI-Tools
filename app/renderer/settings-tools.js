@@ -17,6 +17,7 @@ const DEFAULT_SETTINGS = {
   torrentAnnounceUrl: '',
   torrentOutputDir: '',
   torrentMkbrrPath: '',
+  torrentMkbrrWorkers: 1,
   uploadAssistantPath: '',
   torrentPrivate: true,
   ffmpegPath: '',
@@ -440,6 +441,12 @@ export function createSettingsTools({
     if (ui.settingsMkbrrPathInput) {
       ui.settingsMkbrrPathInput.value = settings.torrentMkbrrPath || '';
     }
+    if (ui.settingsMkbrrWorkersInput) {
+      const workers = Number.isFinite(settings.torrentMkbrrWorkers)
+        ? settings.torrentMkbrrWorkers
+        : 1;
+      ui.settingsMkbrrWorkersInput.value = String(workers);
+    }
     if (ui.settingsUploadAssistantPathInput) {
       ui.settingsUploadAssistantPathInput.value = settings.uploadAssistantPath || '';
     }
@@ -467,6 +474,16 @@ export function createSettingsTools({
     const announceResolved = resolveAnnounceInput(announceInput);
     const passkey = announceResolved.passkey || '';
     const announceUrl = passkey ? '' : announceResolved.announceUrl || '';
+    const mkbrrWorkersRaw = ui.settingsMkbrrWorkersInput?.value.trim() || '';
+    let mkbrrWorkers = Number.parseInt(mkbrrWorkersRaw, 10);
+    if (!mkbrrWorkersRaw) {
+      mkbrrWorkers = Number.isFinite(stored.torrentMkbrrWorkers)
+        ? stored.torrentMkbrrWorkers
+        : 1;
+    }
+    if (!Number.isFinite(mkbrrWorkers) || mkbrrWorkers < 0) {
+      mkbrrWorkers = 1;
+    }
 
     return {
       omdbKey: ui.omdbKeyInput.value.trim(),
@@ -519,6 +536,7 @@ export function createSettingsTools({
       torrentAnnounceUrl: announceUrl,
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
       torrentMkbrrPath: ui.settingsMkbrrPathInput?.value.trim() || '',
+      torrentMkbrrWorkers: mkbrrWorkers,
       uploadAssistantPath: ui.settingsUploadAssistantPathInput?.value.trim() || '',
       torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked)
     };

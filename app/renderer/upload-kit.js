@@ -186,11 +186,58 @@ export function createUploadKit(deps) {
     updateUploadTitleHint();
   }
 
-  function normalizeIdValue(value) {
+  function normalizeNumericId(value) {
     if (value === undefined || value === null || value === '') {
       return '0';
     }
-    return String(value);
+    const raw = String(value).trim();
+    if (!raw) {
+      return '0';
+    }
+    const numeric = raw.replace(/[^\d]/g, '');
+    if (!numeric) {
+      return '0';
+    }
+    const parsed = Number.parseInt(numeric, 10);
+    if (!Number.isFinite(parsed) || parsed === 0) {
+      return '0';
+    }
+    return String(parsed);
+  }
+
+  function normalizeImdbValue(value) {
+    if (value === undefined || value === null || value === '') {
+      return '0';
+    }
+    let raw = String(value).trim().toLowerCase();
+    if (!raw) {
+      return '0';
+    }
+    if (raw.startsWith('tt')) {
+      raw = raw.slice(2);
+    }
+    const numeric = raw.replace(/[^\d]/g, '');
+    if (!numeric) {
+      return '0';
+    }
+    const parsed = Number.parseInt(numeric, 10);
+    if (!Number.isFinite(parsed) || parsed === 0) {
+      return '0';
+    }
+    return String(parsed).padStart(7, '0');
+  }
+
+  function normalizeKeywords(value) {
+    if (!value) {
+      return '';
+    }
+    if (Array.isArray(value)) {
+      return value
+        .map((entry) => String(entry || '').replace(/,/g, ' ').trim())
+        .filter(Boolean)
+        .join(', ');
+    }
+    return String(value).replace(/\s+/g, ' ').trim();
   }
 
   function buildTrackerTorrentFilename() {
@@ -1126,9 +1173,12 @@ ${downloadBlock}
     const { title } = buildUploadTitle();
     const description = buildUploadDescription(form);
     const mediainfo = await ensureUploadMiFullCache();
-    const tmdb = normalizeIdValue(state.metadata?.tmdbId || state.metadata?.tmdb);
-    const imdb = normalizeIdValue(state.metadata?.imdbId || state.metadata?.imdb);
-    const tvdb = normalizeIdValue(state.metadata?.tvdbSeriesId || state.metadata?.tvdbId);
+    const tmdb = normalizeNumericId(state.metadata?.tmdbId || state.metadata?.tmdb);
+    const imdb = normalizeImdbValue(state.metadata?.imdbId || state.metadata?.imdb);
+    const tvdbSource = mapping.isTv ? (state.metadata?.tvdbSeriesId || state.metadata?.tvdbId) : '';
+    const tvdb = normalizeNumericId(tvdbSource);
+    const mal = normalizeNumericId(state.metadata?.malId || state.metadata?.mal);
+    const keywords = normalizeKeywords(state.metadata?.keywords || '');
     const isSeasonPack = mapping.isTv && form.type.includes('season');
     const seasonNumber = mapping.isTv ? normalizeIntValue(form.season) : null;
     let episodeNumber = mapping.isTv ? normalizeIntValue(form.episode) : null;
@@ -1151,12 +1201,13 @@ ${downloadBlock}
       tmdb,
       imdb,
       tvdb,
+      mal: mal || '0',
       anonymous: useAnonymous ? '1' : '0',
       personal_release: usePersonal ? '1' : '0',
       mod_queue_opt_in: useModQueue ? '1' : '0',
       stream: '0',
       sd: mapping.isSd ? '1' : '0',
-      keywords: '',
+      keywords,
       internal: '0',
       featured: '0',
       free: '0',

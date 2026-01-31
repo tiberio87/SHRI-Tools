@@ -252,6 +252,10 @@
               <label for="tvdbInput">TVDB ID (fallback)</label>
               <input id="tvdbInput" type="text" placeholder="12345" />
             </div>
+            <div class="field">
+              <label for="malInput">MAL ID (fallback)</label>
+              <input id="malInput" type="text" placeholder="12345" />
+            </div>
             <div class="field manual-field">
               <label for="typeSelect">Tipo</label>
               <select id="typeSelect">
@@ -407,6 +411,16 @@
               <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
               <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
             </div>
+          </div>
+          <div class="field">
+            <label for="settingsMkbrrWorkersInput">Workers mkbrr</label>
+            <input
+              id="settingsMkbrrWorkersInput"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="1 (0=Auto)"
+            />
           </div>
         </div>
         <div class="row">

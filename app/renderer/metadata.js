@@ -125,6 +125,11 @@ const LANGUAGE_WORDS = new Set([
   'KOREAN'
 ]);
 
+export function hasCjkChars(value) {
+  const text = String(value || '');
+  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uF900-\uFAFF]/.test(text);
+}
+
 export function createMetadataTools(deps) {
   const { state, ui, logDebug, setDropdownAuto, setInputAuto, applyFormatSuggestion } = deps;
 

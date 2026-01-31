@@ -973,9 +973,20 @@ async function createTorrentBuffer(targetPath, options) {
   });
 }
 
-async function runMkbrrCreate({ mkbrrPath, targetPath, announce, outputPath, isPrivate, onLine }) {
+async function runMkbrrCreate({
+  mkbrrPath,
+  targetPath,
+  announce,
+  outputPath,
+  isPrivate,
+  mkbrrWorkers,
+  onLine
+}) {
   return new Promise((resolve, reject) => {
     const args = ['create', targetPath, '-t', announce, '-o', outputPath];
+    if (Number.isFinite(mkbrrWorkers) && mkbrrWorkers > 0) {
+      args.push('--workers', String(mkbrrWorkers));
+    }
     if (isPrivate === false) {
       args.push('--private=false');
     }
@@ -1106,9 +1117,22 @@ async function fetchTmdbDetails(type, id, apiKey, language) {
   return fetchJson(url);
 }
 
+async function fetchTmdbExternalIds(type, id, apiKey) {
+  const params = new URLSearchParams({ api_key: apiKey });
+  const url = `https://api.themoviedb.org/3/${type}/${id}/external_ids?${params.toString()}`;
+  return fetchJson(url);
+}
+
 async function fetchTmdbImages(type, id, apiKey) {
   const params = new URLSearchParams({ api_key: apiKey });
   const url = `https://api.themoviedb.org/3/${type}/${id}/images?${params.toString()}`;
+  return fetchJson(url);
+}
+
+async function fetchTmdbKeywords(type, id, apiKey) {
+  const params = new URLSearchParams({ api_key: apiKey });
+  const endpoint = type === 'tv' ? 'tv' : 'movie';
+  const url = `https://api.themoviedb.org/3/${endpoint}/${id}/keywords?${params.toString()}`;
   return fetchJson(url);
 }
 
@@ -1138,6 +1162,217 @@ function getTmdbLangCode(language) {
     return '';
   }
   return String(language).split('-')[0].toLowerCase();
+}
+
+async function fetchImdbAkas(imdbId) {
+  if (!imdbId) {
+    return [];
+  }
+  const normalized = String(imdbId).startsWith('tt') ? String(imdbId) : `tt${String(imdbId).padStart(7, '0')}`;
+  const query = {
+    query: `
+      query GetAkas {
+        title(id: "${normalized}") {
+          akas(first: 100) {
+            edges {
+              node {
+                text
+                country { text }
+                language { text }
+                attributes { text }
+              }
+            }
+          }
+        }
+      }
+    `
+  };
+
+  const response = await fetchJson('https://api.graphql.imdb.com/', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(query)
+  });
+  const edges = response?.data?.title?.akas?.edges || [];
+  return edges.map((edge) => ({
+    title: edge?.node?.text || '',
+    country: edge?.node?.country?.text || '',
+    language: edge?.node?.language?.text || '',
+    attributes: edge?.node?.attributes || []
+  }));
+}
+
+async function fetchAniListAnime(searchTerm) {
+  const rawTerm = String(searchTerm || '').trim();
+  if (!rawTerm) {
+    return null;
+  }
+  const cleaned = rawTerm
+    .replace(/\[[^\]]+]/g, ' ')
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/[_\\.]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const candidates = [
+    rawTerm,
+    cleaned,
+    cleaned.replace(/\bthe movie\b/i, '').trim()
+  ].filter(Boolean);
+  const query = `
+    query ($search: String) {
+      Page (page: 1, perPage: 5) {
+        media (search: $search, type: ANIME, sort: SEARCH_MATCH) {
+          id
+          idMal
+          title {
+            romaji
+            english
+            native
+          }
+          seasonYear
+          episodes
+          tags {
+            name
+          }
+        }
+      }
+    }
+  `;
+  const demographics = ['Shounen', 'Seinen', 'Shoujo', 'Josei', 'Kodomo', 'Mina'];
+
+  for (const candidate of candidates) {
+    try {
+      const response = await fetchJson('https://graphql.anilist.co', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ query, variables: { search: candidate } })
+      });
+      const media = response?.data?.Page?.media;
+      if (!Array.isArray(media) || !media.length) {
+        continue;
+      }
+      const best = media[0] || {};
+      const titles = best.title || {};
+      const tags = Array.isArray(best.tags) ? best.tags : [];
+      let demographic = '';
+      for (const tag of demographics) {
+        if (tags.some((entry) => String(entry?.name || '').toLowerCase() === tag.toLowerCase())) {
+          demographic = tag;
+          break;
+        }
+      }
+      return {
+        romaji: String(titles.romaji || ''),
+        english: String(titles.english || ''),
+        native: String(titles.native || ''),
+        malId: Number(best.idMal || 0),
+        seasonYear: Number(best.seasonYear || 0),
+        episodes: Number(best.episodes || 0),
+        demographic
+      };
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  return null;
+}
+
+async function fetchAniListByMalId(malId) {
+  const numericId = Number(String(malId || '').replace(/[^\d]/g, ''));
+  if (!numericId) {
+    return null;
+  }
+  const query = `
+    query ($id: Int) {
+      Media (idMal: $id, type: ANIME) {
+        id
+        idMal
+        title {
+          romaji
+          english
+          native
+        }
+        seasonYear
+        episodes
+        tags {
+          name
+        }
+      }
+    }
+  `;
+  const demographics = ['Shounen', 'Seinen', 'Shoujo', 'Josei', 'Kodomo', 'Mina'];
+  const response = await fetchJson('https://graphql.anilist.co', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ query, variables: { id: numericId } })
+  });
+  const best = response?.data?.Media;
+  if (!best) {
+    return null;
+  }
+  const titles = best.title || {};
+  const tags = Array.isArray(best.tags) ? best.tags : [];
+  let demographic = '';
+  for (const tag of demographics) {
+    if (tags.some((entry) => String(entry?.name || '').toLowerCase() === tag.toLowerCase())) {
+      demographic = tag;
+      break;
+    }
+  }
+  return {
+    romaji: String(titles.romaji || ''),
+    english: String(titles.english || ''),
+    native: String(titles.native || ''),
+    malId: Number(best.idMal || numericId || 0),
+    seasonYear: Number(best.seasonYear || 0),
+    episodes: Number(best.episodes || 0),
+    demographic
+  };
+}
+
+function pickItalianImdbTitle(akas) {
+  if (!Array.isArray(akas)) {
+    return '';
+  }
+  const hasAttrs = (attrs) => Array.isArray(attrs) && attrs.length > 0;
+  const countryMatch = akas.find((aka) => aka?.country === 'Italy' && !hasAttrs(aka?.attributes));
+  if (countryMatch?.title) {
+    return String(countryMatch.title);
+  }
+  const languageMatch = akas.find((aka) => aka?.language === 'Italy' && !hasAttrs(aka?.attributes));
+  return languageMatch?.title ? String(languageMatch.title) : '';
+}
+
+function hasCjkChars(value) {
+  return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uF900-\uFAFF]/.test(String(value || ''));
+}
+
+function toEpisodeKey(season, episode) {
+  const seasonNum = Number(season || 0);
+  const episodeNum = Number(episode || 0);
+  if (!seasonNum && !episodeNum) {
+    return '';
+  }
+  return `${seasonNum}-${episodeNum}`;
+}
+
+function buildEpisodeFallbackMap(episodes, seasonHint = '') {
+  const map = new Map();
+  const seasonTarget = Number(seasonHint || 0);
+  if (!Array.isArray(episodes)) {
+    return map;
+  }
+  episodes.forEach((ep) => {
+    const season = Number(ep?.season ?? ep?.season_number ?? seasonTarget);
+    const episode = Number(ep?.episode ?? ep?.episode_number ?? 0);
+    const name = ep?.name || '';
+    const key = toEpisodeKey(season, episode);
+    if (key && name) {
+      map.set(key, name);
+    }
+  });
+  return map;
 }
 
 function pickTmdbLogo(logos, preferredLang, originalLang) {
@@ -1669,6 +1904,10 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
     const outputName = payload?.outputName || '';
     const isPrivate = payload?.private !== false;
     const mkbrrPath = String(payload?.mkbrrPath || '').trim();
+    const mkbrrWorkersRaw = payload?.mkbrrWorkers;
+    const mkbrrWorkers = Number.isFinite(Number(mkbrrWorkersRaw))
+      ? Number(mkbrrWorkersRaw)
+      : Number.parseInt(String(mkbrrWorkersRaw || ''), 10);
     const requestId = payload?.requestId || '';
     const sendProgress = (progress, stage, logLine, generator) => {
       if (_event?.sender) {
@@ -1766,6 +2005,7 @@ ipcMain.handle('create-torrent', async (_event, payload) => {
           announce,
           outputPath,
           isPrivate,
+          mkbrrWorkers,
           onLine: handleMkbrrLine
         });
         generator = 'mkbrr';
@@ -2274,7 +2514,7 @@ ipcMain.handle('open-path', async (_event, targetPath) => {
   }
 });
 
-async function enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint) {
+async function enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint, fallbackTitle = '') {
   if (!tmdbKey || !result?.tmdbId) {
     return;
   }
@@ -2314,6 +2554,46 @@ async function enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint) 
     }
   }
 
+  const shouldFetchAniList = result.isAnime || hint.startsWith('anime');
+  if (shouldFetchAniList) {
+    const searchTitle =
+      result.title || details?.title || details?.name || details?.original_title || details?.original_name || '';
+    let animeInfo = await fetchAniListAnime(searchTitle);
+    if (!animeInfo && fallbackTitle && fallbackTitle !== searchTitle) {
+      animeInfo = await fetchAniListAnime(fallbackTitle);
+    }
+    if (animeInfo) {
+      result.malId = animeInfo.malId || result.malId || '';
+      result.animeRomaji = animeInfo.romaji || result.animeRomaji || '';
+      result.animeEnglish = animeInfo.english || result.animeEnglish || '';
+      result.animeNative = animeInfo.native || result.animeNative || '';
+      result.animeYear = animeInfo.seasonYear || result.animeYear || '';
+      result.animeEpisodes = animeInfo.episodes || result.animeEpisodes || '';
+      result.animeDemographic = animeInfo.demographic || result.animeDemographic || '';
+      if (!result.isAnime) {
+        result.isAnime = true;
+      }
+      if (!result.type) {
+        result.type = 'anime';
+      }
+    }
+  }
+
+  const keywordsData = await fetchTmdbKeywords(type, result.tmdbId, tmdbKey);
+  const keywordsList = Array.isArray(keywordsData?.keywords)
+    ? keywordsData.keywords
+    : Array.isArray(keywordsData?.results)
+      ? keywordsData.results
+      : [];
+  if (keywordsList.length) {
+    const keywords = keywordsList
+      .map((entry) => String(entry?.name || '').replace(/,/g, ' ').trim())
+      .filter(Boolean);
+    if (keywords.length) {
+      result.keywords = keywords.join(', ');
+    }
+  }
+
   const images = await fetchTmdbImages(type, result.tmdbId, tmdbKey);
   const logoPath = pickTmdbLogo(images?.logos, preferredLanguage, result.originalLanguage);
   if (logoPath) {
@@ -2337,12 +2617,20 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     tmdbOverview: '',
     tmdbLogoPath: '',
     tmdbLogoUrl: '',
+    keywords: '',
     tvdbAttempted: false,
     tvdbSeriesId: '',
     tvdbSeriesSlug: '',
     tvdbEpisodesInfo: null,
     tmdbFallback: false,
-    isAnime: false
+    isAnime: false,
+    malId: '',
+    animeRomaji: '',
+    animeEnglish: '',
+    animeNative: '',
+    animeYear: '',
+    animeEpisodes: '',
+    animeDemographic: ''
   };
 
   if (!payload) {
@@ -2351,6 +2639,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
 
   const imdbId = payload.imdbId || '';
   const tvdbId = payload.tvdbId || '';
+  const malId = payload.malId || '';
   const titleGuess = payload.title || '';
   const yearGuess = payload.year || '';
   const typeHint = payload.typeHint || '';
@@ -2361,8 +2650,54 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
   const tvdbKey = payload.tvdbKey || '';
   const preferredLanguage = payload.preferredLanguage || '';
   let tmdbTvId = '';
+  const preferredLangCode = getTmdbLangCode(preferredLanguage);
+  const wantsItalianTitle = preferredLangCode === 'it';
 
-  const isTvHint = typeHint.startsWith('tv') || typeHint.startsWith('anime');
+  const normalizedMal = String(malId).replace(/[^\d]/g, '');
+  const hasManualAnime = Boolean(normalizedMal);
+  const isTvHint =
+    typeHint.startsWith('tv') || typeHint.startsWith('anime') || hasManualAnime;
+  if (imdbId) {
+    result.imdbId = imdbId;
+  }
+  if (normalizedMal) {
+    result.malId = normalizedMal;
+    result.isAnime = true;
+    if (!result.type) {
+      result.type = 'anime';
+    }
+  }
+
+  if (normalizedMal) {
+    try {
+      const animeInfo = await fetchAniListByMalId(normalizedMal);
+      if (animeInfo) {
+        result.malId = animeInfo.malId || result.malId || '';
+        result.animeRomaji = animeInfo.romaji || result.animeRomaji || '';
+        result.animeEnglish = animeInfo.english || result.animeEnglish || '';
+        result.animeNative = animeInfo.native || result.animeNative || '';
+        result.animeYear = animeInfo.seasonYear || result.animeYear || '';
+        result.animeEpisodes = animeInfo.episodes || result.animeEpisodes || '';
+        result.animeDemographic = animeInfo.demographic || result.animeDemographic || '';
+        if (!result.title) {
+          result.title = animeInfo.romaji || animeInfo.english || animeInfo.native || result.title;
+        }
+        if (!result.year && animeInfo.seasonYear) {
+          result.year = String(animeInfo.seasonYear);
+        }
+        if (!result.isAnime) {
+          result.isAnime = true;
+        }
+        if (!result.type) {
+          result.type = 'anime';
+        }
+      } else {
+        result.warnings.push('AniList: MAL ID non trovato.');
+      }
+    } catch (error) {
+      result.warnings.push(String(error));
+    }
+  }
 
   try {
     if (!isTvHint) {
@@ -2392,26 +2727,74 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       if (tv?.id) {
         tmdbTvId = String(tv.id);
       }
-      if (movie?.original_language) {
-        result.originalLanguage = movie.original_language;
-      } else if (tv?.original_language) {
-        result.originalLanguage = tv.original_language;
-      }
-      if (!result.title) {
-        result.title = movie?.title || tv?.name || result.title;
-      }
-      if (!result.year) {
-        result.year = extractYear(movie?.release_date || tv?.first_air_date);
-      }
-      if (movie?.id && !isTvHint) {
-        result.tmdbId = String(movie.id);
-        result.tmdbType = 'movie';
-      } else if (tv?.id) {
-        result.tmdbId = String(tv.id);
-        result.tmdbType = 'tv';
-      } else if (movie?.id) {
-        result.tmdbId = String(movie.id);
-        result.tmdbType = 'movie';
+      const hasTv = Boolean(tv?.id);
+      const hasMovie = Boolean(movie?.id);
+      const type = hasTv && (!hasMovie || isTvHint) ? 'tv' : 'movie';
+      const tmdbId = type === 'tv' ? tv?.id : movie?.id;
+      if (tmdbId) {
+        const details = await fetchTmdbDetails(type, tmdbId, tmdbKey, preferredLanguage);
+        if (details?.original_language) {
+          result.originalLanguage = details.original_language;
+        }
+        const tmdbTitle = details?.title || details?.name || '';
+        const tmdbOriginalTitle = details?.original_title || details?.original_name || '';
+        const preferTmdbTitle = wantsItalianTitle && tmdbTitle;
+        if (preferTmdbTitle) {
+          result.title = tmdbTitle;
+        } else if (!result.title) {
+          result.title = tmdbTitle || result.title;
+        }
+        if (!result.year) {
+          result.year = extractYear(details.release_date || details.first_air_date);
+        }
+        result.tmdbId = String(tmdbId);
+        result.tmdbType = type;
+        if (details?.imdb_id && !result.imdbId) {
+          result.imdbId = details.imdb_id;
+        }
+        const originalLang = String(details?.original_language || '');
+        const tmdbMissingLocalizedTitle =
+          wantsItalianTitle &&
+          tmdbTitle &&
+          tmdbOriginalTitle &&
+          tmdbTitle === tmdbOriginalTitle &&
+          originalLang &&
+          originalLang !== preferredLangCode;
+        if (wantsItalianTitle && !tmdbTitle) {
+          result.warnings.push('TMDB: titolo localizzato non disponibile.');
+        }
+        if (tmdbMissingLocalizedTitle || (wantsItalianTitle && !result.title)) {
+          let imdbLookup = result.imdbId || '';
+          if (imdbLookup) {
+            const akas = await fetchImdbAkas(imdbLookup);
+            const italianTitle = pickItalianImdbTitle(akas);
+            if (italianTitle) {
+              result.title = italianTitle;
+            }
+          }
+        }
+      } else {
+        if (movie?.original_language) {
+          result.originalLanguage = movie.original_language;
+        } else if (tv?.original_language) {
+          result.originalLanguage = tv.original_language;
+        }
+        if (!result.title) {
+          result.title = movie?.title || tv?.name || result.title;
+        }
+        if (!result.year) {
+          result.year = extractYear(movie?.release_date || tv?.first_air_date);
+        }
+        if (movie?.id && !isTvHint) {
+          result.tmdbId = String(movie.id);
+          result.tmdbType = 'movie';
+        } else if (tv?.id) {
+          result.tmdbId = String(tv.id);
+          result.tmdbType = 'tv';
+        } else if (movie?.id) {
+          result.tmdbId = String(movie.id);
+          result.tmdbType = 'movie';
+        }
       }
     } else if (tmdbKey && titleGuess) {
       const type = isTvHint ? 'tv' : 'movie';
@@ -2436,14 +2819,50 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (details?.original_language) {
           result.originalLanguage = details.original_language;
         }
-        if (!result.title) {
-          result.title = details.title || details.name || result.title;
+        const tmdbTitle = details?.title || details?.name || '';
+        const tmdbOriginalTitle = details?.original_title || details?.original_name || '';
+        const preferTmdbTitle = wantsItalianTitle && tmdbTitle;
+        if (preferTmdbTitle) {
+          result.title = tmdbTitle;
+        } else if (!result.title) {
+          result.title = tmdbTitle || result.title;
         }
         if (!result.year) {
           result.year = extractYear(details.release_date || details.first_air_date);
         }
         result.tmdbId = String(first.id);
         result.tmdbType = type;
+        if (details?.imdb_id && !result.imdbId) {
+          result.imdbId = details.imdb_id;
+        }
+        const originalLang = String(details?.original_language || '');
+        const tmdbMissingLocalizedTitle =
+          wantsItalianTitle &&
+          tmdbTitle &&
+          tmdbOriginalTitle &&
+          tmdbTitle === tmdbOriginalTitle &&
+          originalLang &&
+          originalLang !== preferredLangCode;
+        if (wantsItalianTitle && !tmdbTitle) {
+          result.warnings.push('TMDB: titolo localizzato non disponibile.');
+        }
+        if (tmdbMissingLocalizedTitle || (wantsItalianTitle && !result.title)) {
+          let imdbLookup = result.imdbId || '';
+          if (!imdbLookup && tmdbKey) {
+            const external = await fetchTmdbExternalIds(type, first.id, tmdbKey);
+            imdbLookup = external?.imdb_id || '';
+            if (imdbLookup) {
+              result.imdbId = imdbLookup;
+            }
+          }
+          if (imdbLookup) {
+            const akas = await fetchImdbAkas(imdbLookup);
+            const italianTitle = pickItalianImdbTitle(akas);
+            if (italianTitle) {
+              result.title = italianTitle;
+            }
+          }
+        }
       }
     }
   } catch (error) {
@@ -2546,9 +2965,52 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
   }
 
   try {
-    await enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint);
+    await enrichTmdbMetadata(result, tmdbKey, preferredLanguage, typeHint, payload?.filename || '');
   } catch (error) {
     result.warnings.push(String(error));
+  }
+
+  const needsEpisodeFallback =
+    result.isAnime &&
+    Array.isArray(result.episodes) &&
+    result.episodes.some((ep) => hasCjkChars(ep?.name || ''));
+
+  if (needsEpisodeFallback) {
+    let fallbackMap = new Map();
+    const seasonTarget = String(seasonHint || '').trim();
+    if (tmdbKey && (tmdbTvId || result.tmdbId) && seasonTarget) {
+      try {
+        const tmdbSeason = await fetchTmdbTvSeason(tmdbTvId || result.tmdbId, seasonTarget, tmdbKey, 'en-US');
+        const tmdbEpisodes = Array.isArray(tmdbSeason?.episodes) ? tmdbSeason.episodes : [];
+        fallbackMap = buildEpisodeFallbackMap(tmdbEpisodes, seasonTarget);
+      } catch (error) {
+        result.warnings.push(`Anime fallback TMDb episodi: ${error}`);
+      }
+    }
+
+    if (!fallbackMap.size && tvdbKey && result.tvdbSeriesId) {
+      try {
+        const token = await tvdbLogin(tvdbKey);
+        const fallbackResponse = await tvdbFetchEpisodes(result.tvdbSeriesId, token, '');
+        fallbackMap = buildEpisodeFallbackMap(fallbackResponse.episodes, seasonTarget);
+      } catch (error) {
+        result.warnings.push(`Anime fallback TVDB episodi: ${error}`);
+      }
+    }
+
+    if (fallbackMap.size) {
+      result.episodes = result.episodes.map((ep) => {
+        const key = toEpisodeKey(ep?.season ?? ep?.season_number ?? seasonTarget, ep?.episode ?? ep?.episode_number ?? 0);
+        if (!key) {
+          return ep;
+        }
+        const fallbackName = fallbackMap.get(key);
+        if (fallbackName && hasCjkChars(ep?.name || '') && !hasCjkChars(fallbackName)) {
+          return { ...ep, name: fallbackName };
+        }
+        return ep;
+      });
+    }
   }
 
   return result;
