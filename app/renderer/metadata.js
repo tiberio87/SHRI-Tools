@@ -230,23 +230,8 @@ export function createMetadataTools(deps) {
       return langs[0];
     }
 
-    const original = normalizeLangTag(originalLangTag);
-    if (original && langs.includes(original)) {
-      if (original === 'ITA') {
-        const other = langs.find((lang) => lang !== original);
-        return other ? `${original}${separator}${other}` : original;
-      }
-      if (langs.includes('ITA')) {
-        return `${original}${separator}ITA`;
-      }
-      const other = langs.find((lang) => lang !== original);
-      return other ? `${original}${separator}${other}` : original;
-    }
-    if (langs.includes('ITA')) {
-      const other = langs.find((lang) => lang !== 'ITA');
-      return other ? `ITA${separator}${other}` : 'ITA';
-    }
-    return langs.join(separator);
+    const sorted = [...langs].sort();
+    return sorted.join(separator);
   }
 
   function extractYear(raw) {

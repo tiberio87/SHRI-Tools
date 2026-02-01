@@ -1053,23 +1053,23 @@ body.light .fetch-warning {
 
 
 .format-row.with-region {
-  grid-template-columns: minmax(105px, 0.6fr) minmax(170px, 0.9fr) minmax(105px, 0.6fr) minmax(120px, 0.7fr)
+  grid-template-columns: minmax(95px, 0.6fr) minmax(140px, 0.9fr) minmax(105px, 0.6fr) minmax(120px, 0.7fr)
     minmax(130px, 0.75fr) minmax(90px, 0.55fr) minmax(170px, 1.5fr);
 }
 
 .format-row.no-source {
-  grid-template-columns: minmax(105px, 0.6fr) minmax(140px, 0.8fr) minmax(105px, 0.6fr) minmax(90px, 0.55fr)
+  grid-template-columns: minmax(95px, 0.6fr) minmax(140px, 0.8fr) minmax(105px, 0.6fr) minmax(90px, 0.55fr)
     minmax(170px, 1.5fr);
 }
 
 .format-row.no-service {
-  grid-template-columns: minmax(105px, 0.6fr) minmax(170px, 0.9fr) minmax(105px, 0.6fr) minmax(90px, 0.55fr)
+  grid-template-columns: minmax(95px, 0.6fr) minmax(140px, 0.9fr) minmax(105px, 0.6fr) minmax(90px, 0.55fr)
     minmax(170px, 1.5fr);
 }
 
 .format-row.with-region.no-service {
-  grid-template-columns: minmax(105px, 0.6fr) minmax(170px, 0.9fr) minmax(105px, 0.6fr) minmax(130px, 0.75fr)
-    minmax(90px, 0.55fr) minmax(170px, 1.5fr);
+  grid-template-columns: minmax(95px, 0.6fr) minmax(140px, 0.9fr) minmax(105px, 0.6fr) minmax(80px, 0.75fr)
+    minmax(80px, 0.55fr) minmax(170px, 1.5fr);
 }
 
 

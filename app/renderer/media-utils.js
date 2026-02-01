@@ -126,6 +126,22 @@ export function hasEncodingSignature(track) {
   if (!track) {
     return false;
   }
+  const encoderPattern = /(x264|x265|libx264|libx265|ffmpeg|handbrake|staxrip|megui|nvenc|nvencc|qsv|svt|av1|ripbot)/i;
+  const muxerOnlyPattern = /(libebml|libmatroska|mkvmerge|lavf)/i;
+  const getValue = (key) => String(track[key] || '').trim();
+  const hasAny = (keys) => keys.some((key) => getValue(key));
+  const firstValue = (keys) => {
+    for (const key of keys) {
+      const value = getValue(key);
+      if (value) {
+        return value;
+      }
+    }
+    return '';
+  };
+  const isGeneral = track['@type'] === 'General';
+  const libraryKeys = ['Encoded_Library', 'Encoded_Library_Name', 'Encoded_Library/String', 'Encoded_Library_Name/String'];
+  const settingsKeys = ['Encoded_Library_Settings', 'Encoding_Settings', 'Encoded_Library_Settings/String', 'Encoding_Settings/String'];
   const directKeys = [
     'Encoded_Library',
     'Encoded_Library_Name',
@@ -136,13 +152,29 @@ export function hasEncodingSignature(track) {
     'Encoded_Library_Settings/String',
     'Encoding_Settings/String'
   ];
-  if (directKeys.some((key) => String(track[key] || '').trim())) {
+
+  if (isGeneral) {
+    if (hasAny(settingsKeys)) {
+      return true;
+    }
+    const libraryValue = firstValue(libraryKeys);
+    if (libraryValue) {
+      if (encoderPattern.test(libraryValue)) {
+        return true;
+      }
+      if (muxerOnlyPattern.test(libraryValue)) {
+        return false;
+      }
+      return true;
+    }
+  }
+
+  if (!isGeneral && hasAny(directKeys)) {
     return true;
   }
 
-  const encoderPattern = /(x264|x265|libx264|libx265|ffmpeg|handbrake|staxrip|megui|nvenc|nvencc|qsv|svt|av1|ripbot)/i;
   const writingKeys = ['Writing_library', 'Writing_Application', 'Writing library', 'Writing application'];
-  return writingKeys.some((key) => encoderPattern.test(String(track[key] || '')));
+  return writingKeys.some((key) => encoderPattern.test(getValue(key)));
 }
 
 export function suggestFormatFromMediaInfo(mediaInfo) {
