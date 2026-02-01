@@ -486,7 +486,7 @@
           </div>
         </div>
       </div>
-      <div class="settings-block" data-settings-scope="all">
+      <div class="settings-block" data-settings-scope="integrated">
         <h3 class="settings-title">Impostazioni di rinomina</h3>
         <div class="row">
           <label class="checkbox">
@@ -503,6 +503,16 @@
             <input id="autoApplyNameSuggestToggle" type="checkbox" />
             Applica automaticamente suggerimenti
           </label>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="settingsBdinfoPathInput">Percorso BDInfo (opzionale)</label>
+            <div class="input-with-action">
+              <input id="settingsBdinfoPathInput" type="text" placeholder="Seleziona BDInfoCLI.exe" />
+              <button id="browseBdinfoPathBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+            <div class="hint">Puoi scaricarlo <a href="https://github.com/Audionut/BDInfoCLI-ng/releases" data-external="https://github.com/Audionut/BDInfoCLI-ng/releases">QUI</a>.</div>
+          </div>
         </div>
       </div>
       <div class="settings-block" data-settings-scope="integrated">

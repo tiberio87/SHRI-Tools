@@ -46,6 +46,7 @@ export function createUploadKit(deps) {
   let uploadMiMode = 'short';
   let uploadMiShortCache = '';
   let uploadMiFullCache = '';
+  let uploadMiCopyLabel = 'MediaInfo copiato.';
   let uploadIdsText = '';
   let screensProgressUnsub = null;
   let screensProgressRequestId = '';
@@ -69,6 +70,183 @@ export function createUploadKit(deps) {
       tokens.push('HDR');
     }
     return tokens.join(' ');
+  }
+
+  function isFullDisc(form) {
+    return form?.format === 'Full Disc';
+  }
+
+  function isDvdDisc(form) {
+    if (!isFullDisc(form)) {
+      return false;
+    }
+    const source = String(form.source || '').toUpperCase();
+    if (!source) {
+      return false;
+    }
+    if (source.includes('BLURAY') || source.includes('UHD')) {
+      return false;
+    }
+    return source.includes('DVD') || source.includes('HDDVD') || source.includes('HD DVD');
+  }
+
+  function shouldUseBdInfo(form) {
+    return isFullDisc(form) && !isDvdDisc(form);
+  }
+
+  function extractBdInfoSummary(rawText) {
+    const text = String(rawText || '').trim();
+    if (!text) {
+      return '';
+    }
+    const quickIndex = text.toLowerCase().indexOf('quick summary');
+    if (quickIndex === -1) {
+      return text;
+    }
+    const after = text.slice(quickIndex);
+    const lines = after.split(/\r?\n/);
+    let startIndex = -1;
+    for (let i = 0; i < lines.length; i += 1) {
+      if (lines[i].toLowerCase().includes('quick summary')) {
+        startIndex = i + 1;
+        break;
+      }
+    }
+    if (startIndex === -1) {
+      return text;
+    }
+    const out = [];
+    for (let i = startIndex; i < lines.length; i += 1) {
+      const line = lines[i];
+      const trimmed = line.trim();
+      if (/^\*{5,}/.test(trimmed) || /^files?:/i.test(trimmed) || /^chapters?:/i.test(trimmed)) {
+        break;
+      }
+      out.push(line);
+    }
+    const summary = out.join('\n').replace(/ +/g, ' ').trim();
+    return summary || text;
+  }
+
+  function parseBdInfoFiles(rawText, targetPlaylist = '') {
+    const text = String(rawText || '');
+    if (!text) {
+      return [];
+    }
+    const lines = text.split(/\r?\n/);
+    const files = [];
+    let inFiles = false;
+    const sectionEnd = (line) =>
+      /^(chapters?|video|audio|subtitles?|playlist|quick summary|stream diagnostics)\s*:/i.test(line.trim());
+    const normalizedPlaylist = String(targetPlaylist || '').trim().toUpperCase();
+    const playlistToken = normalizedPlaylist && !normalizedPlaylist.endsWith('.MPLS')
+      ? `${normalizedPlaylist}.MPLS`
+      : normalizedPlaylist;
+    let startIndex = 0;
+    if (playlistToken) {
+      for (let i = 0; i < lines.length; i += 1) {
+        const raw = lines[i] || '';
+        if (new RegExp(`^\\s*PLAYLIST:\\s*${playlistToken}\\b`, 'i').test(raw)) {
+          startIndex = i;
+          break;
+        }
+        if (new RegExp(`^\\s*Name:\\s*${playlistToken}\\b`, 'i').test(raw)) {
+          startIndex = i;
+          break;
+        }
+      }
+    }
+    for (let i = startIndex; i < lines.length; i += 1) {
+      const rawLine = lines[i];
+      const line = String(rawLine || '');
+      if (!inFiles && /^files\s*:/i.test(line.trim())) {
+        inFiles = true;
+        continue;
+      }
+      if (!inFiles) {
+        continue;
+      }
+      if (playlistToken && new RegExp(`^\\s*PLAYLIST:\\s*\\d{5}\\.MPLS`, 'i').test(line) && !line.toUpperCase().includes(playlistToken)) {
+        break;
+      }
+      if (!line.trim()) {
+        if (files.length) {
+          break;
+        }
+        continue;
+      }
+      if (sectionEnd(line)) {
+        break;
+      }
+      if (/^name\s+/i.test(line) || /^-+/.test(line.trim())) {
+        continue;
+      }
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 4) {
+        continue;
+      }
+      let fileName = parts[0];
+      let offset = 0;
+      if (parts[1] && parts[1].startsWith('(') && parts[1].endsWith(')')) {
+        fileName = `${parts[0]} ${parts[1]}`;
+        offset = 1;
+      }
+      if (!/\.m2ts$/i.test(fileName)) {
+        const fileMatch = line.match(/([0-9]{5}\.M2TS)/i);
+        if (!fileMatch) {
+          continue;
+        }
+        fileName = fileMatch[1];
+      }
+      const lengthRaw = parts[2 + offset] || '';
+      const length = lengthRaw.split('.').shift() || '';
+      const seconds = length
+        ? length
+          .split(':')
+          .map((part) => Number.parseInt(part, 10))
+          .reduce((acc, part) => (Number.isNaN(part) ? acc : acc * 60 + part), 0)
+        : 0;
+      const sizeRaw = parts[3 + offset] || '';
+      const size = Number.parseInt(sizeRaw.replace(/[^\d]/g, ''), 10) || 0;
+      files.push({
+        file: fileName.toUpperCase(),
+        length: lengthRaw || '',
+        seconds,
+        size
+      });
+    }
+    return files;
+  }
+
+  function buildStreamPath(rootPath, streamFile) {
+    const base = String(rootPath || '');
+    if (!base || !streamFile) {
+      return '';
+    }
+    const sep = base.includes('\\') ? '\\' : '/';
+    const trimmed = base.replace(/[\\/]+$/, '');
+    return `${trimmed}${sep}BDMV${sep}STREAM${sep}${streamFile}`;
+  }
+
+  function detectBdInfoSkipFrame(rawText) {
+    const text = String(rawText || '');
+    if (!text) {
+      return '';
+    }
+    if (/VC-1/i.test(text)) {
+      return 'nokey';
+    }
+    if (/Dolby Vision/i.test(text) || /\bDV\b/i.test(text)) {
+      return 'nokey';
+    }
+    return '';
+  }
+
+  function getBdInfoSummaryText() {
+    if (state.bdInfoError) {
+      return '';
+    }
+    return extractBdInfoSummary(state.bdInfoRaw || '');
   }
 
   function buildUploadInfoLine(form) {
@@ -143,7 +321,8 @@ export function createUploadKit(deps) {
       type,
       separatorStyle: 'spaces',
       episodeTitle: dropEpisodeTitle ? '' : form.episodeTitle,
-      allowNoGroupTag: settings.autoNoGroupTag !== false
+      allowNoGroupTag: settings.autoNoGroupTag !== false,
+      tokenStyle: 'title'
     });
     return { title: baseName, fallback };
   }
@@ -937,7 +1116,9 @@ export function createUploadKit(deps) {
     const shoutouts = buildShoutouts(form);
     const categoryHeader = buildCategoryHeader(form);
 
-    const synthetic = buildSyntheticMediaInfo();
+    const useBdInfo = shouldUseBdInfo(form);
+    const bdinfoSummary = useBdInfo ? getBdInfoSummaryText() : '';
+    const synthetic = useBdInfo ? null : buildSyntheticMediaInfo();
     const mediainfoSection = synthetic
       ? `[code][size=13][b][color=#da8d49]MEDIAINFO SINTENTICO[/color][/b][/size]
 [size=11][color=#FFFFFF]Nome File       : ${synthetic.fn}[/color][/size]
@@ -963,6 +1144,10 @@ export function createUploadKit(deps) {
 
 [size=13][b][color=#da8d49]SOTTOTITOLI[/color][/b][/size]
 [size=11][color=#FFFFFF]${synthetic.subs}[/color][/size][/code]`
+      : '';
+    const bdinfoSection = useBdInfo
+      ? `[code][size=13][b][color=#da8d49]BDINFO[/color][/b][/size]
+[size=11][color=#FFFFFF]${bdinfoSummary || 'BDInfo non disponibile.'}[/color][/size][/code]`
       : '';
 
     const infoBlock = infoLine
@@ -991,7 +1176,7 @@ ${summaryBlock}
 ${screensBlock}
 ${extrasBlock}
 
-${mediainfoSection}
+${useBdInfo ? bdinfoSection : mediainfoSection}
 
 ${downloadBlock}
 
@@ -1001,6 +1186,16 @@ ${downloadBlock}
   function buildUploadWarnings(form, settings) {
     const warnings = [];
     const mapping = getUploadMapping(form, settings);
+    const useBdInfo = shouldUseBdInfo(form);
+    if (useBdInfo && !getBdInfoSummaryText()) {
+      warnings.push('BDInfo mancante: necessario per Full Disc.');
+    }
+    if (isFullDisc(form) && !isDvdDisc(form) && !form.region) {
+      warnings.push('Regione non impostata per Full Disc (opzionale).');
+    }
+    if (isDvdDisc(form) && !form.region) {
+      warnings.push('Regione obbligatoria per DVD/HDDVD.');
+    }
     if (!state.metadata?.title) {
       warnings.push('Titolo non trovato via API: uso fallback dal file.');
     }
@@ -1079,6 +1274,10 @@ ${downloadBlock}
     const torrentLabel = state.lastTorrentPath ? state.lastTorrentPath : 'Nessun .torrent';
     const isTv = mapping.isTv;
     const isSeasonPack = isTv && form.type.includes('season');
+    const fullDisc = isFullDisc(form);
+    const dvdDisc = isDvdDisc(form);
+    const needsRegion = dvdDisc;
+    const region = form.region || '';
     return {
       title: title || '-',
       category: mapping.categoryKey || '-',
@@ -1089,7 +1288,11 @@ ${downloadBlock}
       isTv,
       season: form.season || '',
       episode: isSeasonPack ? '0' : (form.episode || ''),
-      isSeasonPack
+      isSeasonPack,
+      fullDisc,
+      needsRegion,
+      region,
+      warnRegion: fullDisc && !needsRegion && !region
     };
   }
 
@@ -1108,6 +1311,22 @@ ${downloadBlock}
           <span class="confirm-value">${escapeHtml(summary.episode || '-')}${summary.isSeasonPack ? ' / INTERA STAGIONE' : ''}</span>
         </div>`
       : '';
+    const regionRow = summary.needsRegion && !summary.region
+      ? `
+        <div class="confirm-row confirm-row-input">
+          <label class="confirm-label" for="confirmRegionInput">Regione:</label>
+          <input id="confirmRegionInput" class="confirm-input" type="text" placeholder="Es. 1 / 2 / A / B / C" />
+        </div>
+        <div class="confirm-row confirm-row-hint">
+          <span class="confirm-hint">Regione obbligatoria per DVD/HDDVD.</span>
+        </div>`
+      : summary.fullDisc
+        ? `
+        <div class="confirm-row">
+          <span class="confirm-label">Regione:</span>
+          <span class="confirm-value ${summary.warnRegion ? 'warning' : ''}">${escapeHtml(summary.region || 'Non impostata')}</span>
+        </div>`
+        : '';
     return `
       <div class="confirm-summary">
         <div class="confirm-intro">Confermi l'upload con questi dati?</div>
@@ -1136,6 +1355,7 @@ ${downloadBlock}
           <span class="confirm-label">Torrent:</span>
           <span class="confirm-value">${escapeHtml(summary.torrent)}</span>
         </div>
+        ${regionRow}
         <div class="confirm-flags">
           <div class="confirm-flags-title">Opzioni upload</div>
           <div class="confirm-flags-row">
@@ -1172,7 +1392,9 @@ ${downloadBlock}
     const mapping = getUploadMapping(form, settings);
     const { title } = buildUploadTitle();
     const description = buildUploadDescription(form);
-    const mediainfo = await ensureUploadMiFullCache();
+    const useBdInfo = shouldUseBdInfo(form);
+    const bdinfoSummary = useBdInfo ? getBdInfoSummaryText() : '';
+    const mediainfo = useBdInfo ? '' : await ensureUploadMiFullCache();
     const tmdb = normalizeNumericId(state.metadata?.tmdbId || state.metadata?.tmdb);
     const imdb = normalizeImdbValue(state.metadata?.imdbId || state.metadata?.imdb);
     const tvdbSource = mapping.isTv ? (state.metadata?.tvdbSeriesId || state.metadata?.tvdbId) : '';
@@ -1197,7 +1419,7 @@ ${downloadBlock}
       name: title || '',
       description,
       mediainfo,
-      bdinfo: '',
+      bdinfo: useBdInfo ? bdinfoSummary : '',
       tmdb,
       imdb,
       tvdb,
@@ -1248,15 +1470,54 @@ ${downloadBlock}
       showToast('Upload UNIT3D non disponibile.', 'error');
       return;
     }
-    const form = getFormState();
+    let form = getFormState();
+    const useBdInfo = shouldUseBdInfo(form);
+    if (useBdInfo && state.bdInfoLoading) {
+      showToast('BDInfo in corso: attendi la scansione.', 'warning');
+      return;
+    }
+    if (useBdInfo && !getBdInfoSummaryText()) {
+      showToast('Per i Full Disc serve il BDInfo: seleziona una playlist e avvia la scansione.', 'warning');
+      return;
+    }
     const summary = buildUploadSummaryData(form, settings);
     const summaryHtml = buildUploadSummaryHtml(summary, settings);
     const confirmed = await openConfirmModal(
       summaryHtml,
-      { html: true }
+      {
+        html: true,
+        onOpen: () => {
+          const regionInput = document.getElementById('confirmRegionInput');
+          if (!regionInput || !ui.confirmOkBtn) {
+            if (ui.confirmOkBtn) {
+              ui.confirmOkBtn.disabled = false;
+            }
+            return;
+          }
+          const updateState = () => {
+            const value = regionInput.value.trim();
+            ui.confirmOkBtn.disabled = !value;
+          };
+          updateState();
+          regionInput.addEventListener('input', updateState);
+          regionInput.focus();
+        }
+      }
     );
     if (!confirmed) {
       return;
+    }
+    const regionInput = document.getElementById('confirmRegionInput');
+    if (regionInput) {
+      const value = regionInput.value.trim();
+      if (!value) {
+        showToast('Inserisci la regione per completare l\'upload.', 'warning');
+        return;
+      }
+      if (ui.regionInput) {
+        ui.regionInput.value = value;
+      }
+      form = { ...form, region: value };
     }
     const flagOverrides = readUploadConfirmFlags(settings);
     if (ui.uploadToUnit3dBtn) {
@@ -1469,6 +1730,8 @@ ${downloadBlock}
     }
     const settings = loadSettings();
     const form = getFormState();
+    const useBdInfo = shouldUseBdInfo(form);
+    const bdinfoSummary = useBdInfo ? getBdInfoSummaryText() : '';
     if (state.targetPath !== uploadTitleSourcePath) {
       uploadTitleOverride = '';
       uploadTitleSourcePath = state.targetPath;
@@ -1497,18 +1760,44 @@ ${downloadBlock}
       ? ids.map((item) => `${item.label}: ${item.value}`).join('\n')
       : '';
 
-    uploadMiShortCache = buildMediaInfoShort();
-    uploadMiFullCache = 'Caricamento...';
+    if (ui.uploadMiSection) {
+      const titleNode = ui.uploadMiSection.querySelector('.section-header h3');
+      if (titleNode) {
+        titleNode.textContent = useBdInfo ? 'BDInfo' : 'MediaInfo';
+      }
+    }
+    if (ui.uploadMiShortBtn) {
+      ui.uploadMiShortBtn.classList.toggle('hidden', useBdInfo);
+    }
+    if (ui.uploadMiFullBtn) {
+      ui.uploadMiFullBtn.classList.toggle('hidden', useBdInfo);
+    }
     uploadMiMode = 'full';
-    ui.uploadMiFullBtn.classList.add('active');
-    ui.uploadMiShortBtn.classList.remove('active');
-    ui.uploadMiText.textContent = uploadMiFullCache || '-';
-
-    if (state.mainVideo) {
-      const result = await window.api.getMediaInfoText(state.mainVideo);
-      uploadMiFullCache = result?.text || result?.error || 'Nessun output disponibile.';
-      if (uploadMiMode === 'full') {
-        ui.uploadMiText.textContent = uploadMiFullCache;
+    uploadMiCopyLabel = useBdInfo ? 'BDInfo copiato.' : 'MediaInfo copiato.';
+    if (useBdInfo) {
+      uploadMiShortCache = bdinfoSummary || 'BDInfo non disponibile.';
+      uploadMiFullCache = uploadMiShortCache;
+      if (ui.uploadMiText) {
+        ui.uploadMiText.textContent = uploadMiFullCache || '-';
+      }
+    } else {
+      uploadMiShortCache = buildMediaInfoShort();
+      uploadMiFullCache = 'Caricamento...';
+      if (ui.uploadMiFullBtn) {
+        ui.uploadMiFullBtn.classList.add('active');
+      }
+      if (ui.uploadMiShortBtn) {
+        ui.uploadMiShortBtn.classList.remove('active');
+      }
+      if (ui.uploadMiText) {
+        ui.uploadMiText.textContent = uploadMiFullCache || '-';
+      }
+      if (state.mainVideo) {
+        const result = await window.api.getMediaInfoText(state.mainVideo);
+        uploadMiFullCache = result?.text || result?.error || 'Nessun output disponibile.';
+        if (uploadMiMode === 'full' && ui.uploadMiText) {
+          ui.uploadMiText.textContent = uploadMiFullCache;
+        }
       }
     }
 
@@ -1544,7 +1833,8 @@ ${downloadBlock}
 
   async function generateScreenshots() {
     const settings = loadSettings();
-    const videoPath = state.mainVideo || state.videoFiles[0];
+    const form = getFormState();
+    let videoPath = state.mainVideo || state.videoFiles[0];
     if (!videoPath) {
       ui.screensHint.textContent = 'Nessun file video disponibile.';
       return;
@@ -1562,6 +1852,41 @@ ${downloadBlock}
     setScreensProgress(0);
     setScreensStage('start');
     ui.screensHint.textContent = 'Generazione screenshot in corso...';
+    let skipFrame = '';
+    let seekMode = 'fast';
+    if (isFullDisc(form) && state.bdInfoRaw) {
+      const files = parseBdInfoFiles(state.bdInfoRaw, state.bdInfoSelectedPlaylist);
+      if (files.length) {
+        const hasDuration = files.some((item) => item.seconds > 0);
+        const longest = files
+          .slice()
+          .sort((a, b) => {
+            if (hasDuration) {
+              return (b.seconds || 0) - (a.seconds || 0);
+            }
+            return (b.size || 0) - (a.size || 0);
+          })[0];
+        const streamDir = state.mainVideo ? getParentPath(state.mainVideo) : '';
+        const discRoot = state.bdInfoTarget || getParentPath(streamDir);
+        const candidate = streamDir
+          ? `${streamDir}\\${longest.file}`
+          : buildStreamPath(discRoot, longest.file);
+        if (candidate) {
+          videoPath = candidate;
+          logDebug('screens: source', {
+            mode: 'bdinfo',
+            file: longest.file,
+            length: longest.length || '',
+            seconds: longest.seconds || 0,
+            size: longest.size || 0,
+            playlist: state.bdInfoSelectedPlaylist || '',
+            path: candidate
+          });
+        }
+      }
+      skipFrame = detectBdInfoSkipFrame(state.bdInfoRaw);
+    }
+
     const payload = {
       videoPath,
       ffmpegPath: settings.ffmpegPath,
@@ -1570,7 +1895,11 @@ ${downloadBlock}
       fallbackHost: settings.imageHostFallback || 'ptscreens',
       imgbbKey: settings.imgbbKey || '',
       ptscreensKey: settings.ptscreensKey || '',
-      requestId: screensProgressRequestId
+      requestId: screensProgressRequestId,
+      isDisc: isFullDisc(form),
+      category: form.type || 'Movie',
+      seekMode,
+      skipFrame
     };
     const result = await window.api.generateScreenshots(payload);
     if (result?.ok) {
@@ -1678,7 +2007,7 @@ ${downloadBlock}
     if (ui.copyUploadMiBtn) {
       ui.copyUploadMiBtn.addEventListener('click', () => {
         const text = uploadMiMode === 'full' ? uploadMiFullCache : uploadMiShortCache;
-        copyToClipboard(text, 'MediaInfo copiato.');
+        copyToClipboard(text, uploadMiCopyLabel);
       });
     }
 

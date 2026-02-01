@@ -8,13 +8,17 @@ import {
 } from './renderer/constants.js';
 import {
   normalizeLangTag,
-  getGeneralTrack,
   getAudioTracks,
-  getTrackLang,
-  getTrackValue,
-  getVideoTrack,
-  hasEncodingSignature
+  getTrackLang
 } from './renderer/media-utils.js';
+import {
+  detectFormatFromName,
+  detectSourceFromName,
+  detectRepackFromName,
+  detectFormatFromMediaInfo,
+  extractTokensPresent,
+  isDiscStructure
+} from './renderer/parsing-tools.js';
 import { createUploadKit } from './renderer/upload-kit.js';
 import { createMetadataTools, hasCjkChars } from './renderer/metadata.js';
 import { createRenameTools } from './renderer/rename.js';
@@ -26,14 +30,22 @@ import { createServiceTagTools } from './renderer/service-tags.js';
 import { createSettingsTools } from './renderer/settings-tools.js';
 import { createRulesCheckTools } from './renderer/rules-check.js';
 import { createUAMode } from './renderer/ua-mode.js';
+import { setupSourceDragDrop } from './renderer/drag-drop.js';
+import { createRenameFlow } from './renderer/rename-flow.js';
+import { createAutoDetectFlow } from './renderer/auto-detect.js';
 
-let previewTimer = null;
 let currentTorrentRequestId = null;
 let settingsSnapshot = '';
 let settingsDirty = false;
 let wizardStepIndex = 0;
 let torrentGenerator = 'node';
 let uaMode;
+let refreshPreview = async () => {};
+let schedulePreview = () => {};
+let showMediaInfoReport = async () => {};
+let autoDetectFromPath = async () => {};
+let updateAutoDetectControls = () => {};
+let manualDetectFromInputs = async () => {};
 const torrentLogLines = [];
 const WIZARD_STEP_COUNT = 3;
 
@@ -500,6 +512,20 @@ function resetSource() {
   state.videoFiles = [];
   state.mainVideo = null;
   state.mediaInfo = null;
+  state.bdInfoRaw = '';
+  state.bdInfoParsed = null;
+  state.bdInfoError = '';
+  state.bdInfoLoading = false;
+  state.bdInfoTarget = '';
+  state.bdInfoProgress = 0;
+  state.bdInfoStage = '';
+  state.bdInfoStageText = '';
+  state.bdInfoRequestId = '';
+  state.bdInfoPlaylists = [];
+  state.bdInfoSelectedPlaylist = '';
+  state.bdInfoProgressTotal = 0;
+  state.bdInfoProgressDone = 0;
+  state.bdInfoShowAllPlaylists = false;
   state.mainExtension = '';
   state.audioLangs = [];
   state.episodeMap = {};
@@ -536,40 +562,6 @@ function mapTypeLabel(value) {
   return '';
 }
 
-function isDiscStructure() {
-  if (state.kind !== 'dir' || !Array.isArray(state.videoFiles) || !state.videoFiles.length) {
-    return false;
-  }
-  return state.videoFiles.some((filePath) =>
-    /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(filePath || '')
-  );
-}
-
-function getDiscSourceHint(width, height) {
-  const files = Array.isArray(state.videoFiles) ? state.videoFiles : [];
-  const hasVideoTs = files.some((filePath) => /[\\\/]VIDEO_TS[\\\/]/i.test(filePath || ''));
-  if (hasVideoTs) {
-    return {
-      source: 'DVD',
-      sourceReason: 'Rilevato da struttura disco: VIDEO_TS'
-    };
-  }
-  const isUhd = width >= 3800 || height >= 2100;
-  const isHd = width >= 1800 || height >= 1000;
-  if (isUhd) {
-    return {
-      source: 'UHD BluRay',
-      sourceReason: 'Rilevato da struttura disco: BDMV + risoluzione UHD'
-    };
-  }
-  if (isHd) {
-    return {
-      source: 'BluRay',
-      sourceReason: 'Rilevato da struttura disco: BDMV + risoluzione HD'
-    };
-  }
-  return { source: '', sourceReason: '' };
-}
 
 function renderFetchStatus(payload, data) {
   const targetLabel = state.kind === 'dir' ? 'Serie TV' : 'File';
@@ -1000,6 +992,57 @@ function setTorrentStage(stage) {
   ui.torrentProgressStage.classList.remove('hidden');
 }
 
+function updateBdInfoProgressUi() {
+  const row = document.getElementById('bdinfoProgressRow');
+  const fill = document.getElementById('bdinfoProgressFill');
+  const text = document.getElementById('bdinfoProgressText');
+  const stageRow = document.getElementById('bdinfoProgressStage');
+  const stageText = document.getElementById('bdinfoProgressStageText');
+  const cancelBtn = document.getElementById('bdinfoCancelButton');
+
+  if (!stageRow || !stageText) {
+    schedulePreview();
+    return;
+  }
+
+  if (row && fill && text) {
+    const progress = Number.isFinite(state.bdInfoProgress) ? state.bdInfoProgress : 0;
+    const hasTotal = Number.isFinite(state.bdInfoProgressTotal) && state.bdInfoProgressTotal > 0;
+    const showProgress = state.bdInfoLoading ? hasTotal || progress > 0 : progress > 0;
+    row.classList.toggle('hidden', !showProgress);
+    fill.style.width = `${Math.round(progress * 100)}%`;
+    text.textContent = `${Math.round(progress * 100)}%`;
+  } else if (row) {
+    row.classList.add('hidden');
+  }
+
+  const showStage = state.bdInfoLoading || Boolean(state.bdInfoStageText);
+  stageRow.classList.toggle('hidden', !showStage);
+  stageRow.classList.toggle('done', state.bdInfoStage === 'done');
+  stageText.textContent = state.bdInfoStageText || (state.bdInfoLoading ? 'BDInfo in corso...' : '');
+
+  if (cancelBtn) {
+    cancelBtn.classList.toggle('hidden', !state.bdInfoLoading);
+  }
+}
+
+async function cancelBdInfo() {
+  if (!state.bdInfoLoading || !state.bdInfoRequestId) {
+    return;
+  }
+  try {
+    await window.api.cancelBdInfo?.({ requestId: state.bdInfoRequestId });
+  } catch (error) {
+    // ignore cancel errors
+  }
+  state.bdInfoLoading = false;
+  state.bdInfoError = 'Operazione annullata.';
+  state.bdInfoStage = 'cancelled';
+  state.bdInfoStageText = 'Operazione annullata';
+  updateBdInfoProgressUi();
+  schedulePreview();
+}
+
 function setTorrentGeneratorHint(generator) {
   if (!ui.torrentGeneratorHint) {
     return;
@@ -1231,457 +1274,6 @@ function applyFormatSuggestion(suggested) {
   setDropdownAuto(select, trigger, suggested, suggested);
 }
 
-function detectFormatFromName(name) {
-  const upper = String(name || '').toUpperCase();
-  if (/\bDVD[-.\s]?RIP\b/.test(upper) || /\bDVDRIP\b/.test(upper)) {
-    return 'Encode';
-  }
-  if (/\bWEB[-.\s]?DL\b/.test(upper) || /\bWEBDL\b/.test(upper)) {
-    return 'WEB-DL';
-  }
-  if (/\bWEB[-.\s]?RIP\b/.test(upper) || /\bWEBRIP\b/.test(upper)) {
-    return 'WEBRip';
-  }
-  if (/\bREMUX\b/.test(upper)) {
-    return 'Remux';
-  }
-  if (/\bFULL\s*DISC\b/.test(upper) || /\bBDMV\b/.test(upper) || /\bBDISO\b/.test(upper)) {
-    return 'Full Disc';
-  }
-  if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper) || /\bUHD\b/.test(upper)) {
-    return 'Encode';
-  }
-  return '';
-}
-
-function detectSourceFromName(name) {
-  const upper = String(name || '').toUpperCase();
-  if (/\bHDTV\b/.test(upper)) {
-    return 'HDTV';
-  }
-  if (/\bDVD[-.\s]?RIP\b/.test(upper) || /\bDVDRIP\b/.test(upper)) {
-    return 'DVD';
-  }
-  if (/\bUHD\b/.test(upper) && /(\bBLU[-\s]?RAY\b|\bBLURAY\b)/.test(upper)) {
-    return 'UHD BluRay';
-  }
-  if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper)) {
-    return 'BluRay';
-  }
-  if (/\bDVD\b/.test(upper)) {
-    return 'DVD';
-  }
-  return '';
-}
-
-function detectRepackFromName(name) {
-  const upper = String(name || '').toUpperCase();
-  if (/\bRERIP\b/.test(upper)) {
-    return 'RERIP';
-  }
-  if (/\bPROPER\b/.test(upper)) {
-    return 'PROPER';
-  }
-  if (/\bREPACK\b/.test(upper)) {
-    return 'REPACK';
-  }
-  return '';
-}
-
-function detectOriginalSourceMedium(mediaInfo, { width = 0, height = 0 } = {}) {
-  const sourceKeys = [
-    'Original source medium',
-    'Original source medium/String',
-    'Original_source_medium',
-    'Original_source_medium/String',
-    'OriginalSourceMedium',
-    'Original_Source_Medium',
-    'Original_Source_Medium/String'
-  ];
-  const resolveSource = (raw) => {
-    if (!raw) {
-      return '';
-    }
-    const upper = String(raw).toUpperCase();
-    if (upper.includes('BLU-RAY') || upper.includes('BLURAY')) {
-      if (width >= 3800 || height >= 2100) {
-        return 'UHD BluRay';
-      }
-      return 'BluRay';
-    }
-    if (upper.includes('HD DVD') || upper.includes('HDDVD')) {
-      return 'HD DVD';
-    }
-    if (upper.includes('DVD')) {
-      return 'DVD';
-    }
-    return '';
-  };
-
-  const audioTracks = getAudioTracks(mediaInfo);
-  for (const track of audioTracks) {
-    const raw =
-      getTrackValue(track, sourceKeys) ||
-      getTrackValue(track?.extra || {}, sourceKeys);
-    const resolved = resolveSource(raw);
-    if (resolved) {
-      return resolved;
-    }
-  }
-
-  const textTracks = (mediaInfo?.media?.track || []).filter((track) => track['@type'] === 'Text');
-  for (const track of textTracks) {
-    const raw =
-      getTrackValue(track, sourceKeys) ||
-      getTrackValue(track?.extra || {}, sourceKeys);
-    const resolved = resolveSource(raw);
-    if (resolved) {
-      return resolved;
-    }
-  }
-  return '';
-}
-
-function normalizeNumber(raw) {
-  const cleaned = String(raw || '').replace(/[^0-9]/g, '');
-  if (!cleaned) {
-    return 0;
-  }
-  return Number.parseInt(cleaned, 10) || 0;
-}
-
-function shortenDebugValue(value, limit = 220) {
-  if (!value) {
-    return '';
-  }
-  const text = String(value);
-  if (text.length <= limit) {
-    return text;
-  }
-  return `${text.slice(0, limit)}…`;
-}
-
-function hasLosslessAudio(mediaInfo) {
-  const audioTracks = getAudioTracks(mediaInfo);
-  const losslessPattern = /\b(TRUEHD|MLP\s*FBA|DTS[-\s]?HD\s*MA|DTS:X|FLAC|PCM|LPCM)\b/i;
-  return audioTracks.some((track) => {
-    const combined = `${track?.Format || ''} ${track?.Format_Commercial_IfAny || ''} ${track?.Title || ''}`.trim();
-    return losslessPattern.test(combined);
-  });
-}
-
-function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}) {
-  if (!mediaInfo || mediaInfo.error) {
-    return {
-      value: '',
-      reason: '',
-      source: '',
-      sourceReason: '',
-      debug: { error: 'mediaInfo missing or error' }
-    };
-  }
-  const videoTrack = getVideoTrack(mediaInfo);
-  const generalTrack = getGeneralTrack(mediaInfo);
-  if (!videoTrack && !generalTrack) {
-    return {
-      value: '',
-      reason: '',
-      source: '',
-      sourceReason: '',
-      debug: { error: 'no video/general tracks' }
-    };
-  }
-
-  const width = normalizeNumber(getTrackValue(videoTrack, ['Width', 'Width/String', 'Width_Original', 'Width_Original/String']));
-  const height = normalizeNumber(
-    getTrackValue(videoTrack, ['Height', 'Height/String', 'Height_Original', 'Height_Original/String'])
-  );
-  const isUhd = width >= 3800 || height >= 2100;
-  const isHd = width >= 1800 || height >= 1000;
-  const sourceGuess = isUhd ? 'UHD BluRay' : isHd ? 'BluRay' : '';
-  const originalSource = detectOriginalSourceMedium(mediaInfo, { width, height });
-  const sourceHint = originalSource || sourceGuess;
-  const sourceHintReason = originalSource
-    ? 'Rilevato dal parsing MediaInfo: original source medium'
-    : (sourceGuess ? 'Rilevato dal parsing MediaInfo: risoluzione disco' : '');
-
-  const debugInfo = {
-    width,
-    height,
-    isUhd,
-    isHd,
-    isDiscStructure: isDiscStructure(),
-    sourceGuess,
-    originalSource,
-    sourceHint,
-    sourceHintReason,
-    service: String(service || ''),
-    source: String(source || '')
-  };
-  const withDebug = (result) => ({ ...result, debug: debugInfo });
-
-  if (isDiscStructure()) {
-    const discHint = getDiscSourceHint(width, height);
-    return withDebug({
-      value: 'Full Disc',
-      reason: 'Rilevato da struttura disco: BDMV/VIDEO_TS',
-      source: discHint.source || sourceGuess,
-      sourceReason: discHint.sourceReason || (sourceGuess ? 'Rilevato da struttura disco: risoluzione' : '')
-    });
-  }
-
-  if (/\b(UNTOUCHED|VU1080|VU720|VU)\b/i.test(String(baseName || ''))) {
-    return withDebug({
-      value: 'Remux',
-      reason: 'Rilevato da parsing del nome file: marker UNTOUCHED/VU',
-      source: '',
-      sourceReason: ''
-    });
-  }
-
-  const encodingSettings = String(
-    getTrackValue(videoTrack, [
-      'Encoded_Library_Settings',
-      'Encoded_Library_Settings/String',
-      'Encoding_Settings',
-      'Encoding_Settings/String'
-    ]) || ''
-  ).toLowerCase();
-  const encodedLibrary = String(
-    getTrackValue(videoTrack, [
-      'Encoded_Library',
-      'Encoded_Library/String',
-      'Encoded_Library_Name',
-      'Encoded_Library_Name/String'
-    ]) || ''
-  ).toLowerCase();
-  const generalApp = String(
-    getTrackValue(generalTrack, ['Encoded_Application', 'Writing_Application', 'Writing application']) || ''
-  ).toLowerCase();
-  const generalLibrary = String(
-    getTrackValue(generalTrack, ['Encoded_Library', 'Writing_Library', 'Writing library']) || ''
-  ).toLowerCase();
-  const generalFrontend = String(generalTrack?.extra?.Writing_frontend || '').toLowerCase();
-  const toolString = `${generalApp} ${generalFrontend}`.trim();
-  const encoderSignature = `${encodingSettings} ${encodedLibrary} ${generalApp} ${generalFrontend} ${generalLibrary}`.trim();
-  const fingerprintLibrary = `${encodedLibrary} ${generalLibrary}`.trim();
-  const hasEncodingTools = /(handbrake|staxrip|megui|megatagger|x264|x265)/.test(toolString);
-  const hasEncoderTool = /(x264|x265|libx264|libx265|nvenc|nvencc|qsv|svt|av1|ffmpeg|handbrake|staxrip|megui)/.test(
-    encoderSignature
-  );
-  const hasEncodingSettings = Boolean(encodingSettings);
-  const hasEncodeSignature =
-    hasEncodingSignature(videoTrack) || hasEncodingSignature(generalTrack);
-  const hasEncode = hasEncodingSettings || hasEncodingTools || hasEncodeSignature;
-  const isHandbrake = toolString.includes('handbrake') || generalApp.includes('handbrake') || generalLibrary.includes('handbrake');
-
-  if ((generalApp.includes('makemkv') || generalLibrary.includes('makemkv')) && !hasEncodingSettings) {
-    return withDebug({
-      value: 'Remux',
-      reason: 'Rilevato dal parsing MediaInfo: MakeMKV senza encoding',
-      source: '',
-      sourceReason: ''
-    });
-  }
-
-  const hdrProfile = String(videoTrack?.HDR_Format_Profile || '').toLowerCase();
-  const hasStreamingDv = hdrProfile.includes('dvhe.05') || hdrProfile.includes('dvhe.08');
-
-  const upperName = String(baseName || '').toUpperCase();
-  const nameHasWeb = /\bWEB\b/.test(upperName);
-  const serviceUpper = String(service || '').toUpperCase();
-  const sourceUpper = String(source || '').toUpperCase();
-  const sourceIsBluRay = sourceUpper.includes('BLURAY') || sourceUpper.includes('BLU-RAY');
-  const losslessAudio = hasLosslessAudio(mediaInfo);
-  const videoFormatRaw = String(videoTrack?.Format || '').toUpperCase();
-  const isHevc = videoFormatRaw.includes('HEVC') || videoFormatRaw.includes('H.265') || videoFormatRaw.includes('X265');
-
-  Object.assign(debugInfo, {
-    nameHasWeb,
-    serviceUpper,
-    sourceUpper,
-    sourceIsBluRay,
-    losslessAudio,
-    hasEncodingSettings,
-    hasEncodingTools,
-    hasEncoderTool,
-    hasEncodeSignature,
-    hasEncode,
-    isHandbrake,
-    hasStreamingDv,
-    hdrProfile: hdrProfile || '',
-    isHevc,
-    encodedLibrary: shortenDebugValue(encodedLibrary),
-    generalLibrary: shortenDebugValue(generalLibrary),
-    generalApp: shortenDebugValue(generalApp),
-    generalFrontend: shortenDebugValue(generalFrontend),
-    encodingSettings: shortenDebugValue(encodingSettings),
-    encodingSettingsLength: encodingSettings.length,
-    fingerprintLibrary: shortenDebugValue(fingerprintLibrary)
-  });
-
-  if (/\bREMUX\b/.test(upperName) && sourceIsBluRay && losslessAudio) {
-    return withDebug({
-      value: 'Remux',
-      reason: 'Rilevato dal parsing del nome file: REMUX con audio lossless',
-      source: '',
-      sourceReason: ''
-    });
-  }
-
-  if (!serviceUpper && !nameHasWeb && !sourceIsBluRay && sourceHint && losslessAudio) {
-    if (!isUhd && isHevc) {
-      return withDebug({
-        value: 'Encode',
-        reason: 'Rilevato dal parsing MediaInfo: HEVC 1080p senza marker disco',
-        source: '',
-        sourceReason: ''
-      });
-    }
-    if (hasEncoderTool) {
-      return withDebug({
-        value: 'Encode',
-        reason: 'Rilevato dal parsing MediaInfo: audio lossless con encoding',
-        source: sourceHint,
-        sourceReason: sourceHintReason
-      });
-    }
-    return withDebug({
-      value: 'Remux',
-      reason: 'Rilevato dal parsing MediaInfo: audio lossless senza encoding',
-      source: sourceHint,
-      sourceReason: sourceHintReason
-    });
-  }
-
-  if (hasStreamingDv && !hasEncodingTools && !hasEncodingSettings && !sourceIsBluRay) {
-    return withDebug({
-      value: 'WEB-DL',
-      reason: 'Rilevato dal parsing MediaInfo: DV streaming profile',
-      source: '',
-      sourceReason: ''
-    });
-  }
-  if (encodingSettings.includes('crf=')) {
-    return withDebug({
-      value: nameHasWeb || serviceUpper ? 'WEBRip' : 'Encode',
-      reason: 'Rilevato dal parsing MediaInfo: CRF rilevato',
-      source: '',
-      sourceReason: ''
-    });
-  }
-  if (serviceUpper === 'CR') {
-    if (fingerprintLibrary.includes('core 142')) {
-      return withDebug({
-        value: 'WEB-DL',
-        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core 142)',
-        source: '',
-        sourceReason: ''
-      });
-    }
-    const coreMatch = fingerprintLibrary.match(/core\s+(\d+)/);
-    if (coreMatch && Number(coreMatch[1]) >= 152) {
-      return withDebug({
-        value: 'WEBRip',
-        reason: 'Rilevato dal parsing MediaInfo: fingerprint Crunchyroll (core >= 152)',
-        source: '',
-        sourceReason: ''
-      });
-    }
-    if (encodingSettings.includes('bitrate=')) {
-      return withDebug({
-        value: 'WEB-DL',
-        reason: 'Rilevato dal parsing MediaInfo: Crunchyroll bitrate=',
-        source: '',
-        sourceReason: ''
-      });
-    }
-  }
-  const formatProfile = String(videoTrack?.Format_Profile || '');
-  if (
-    formatProfile.includes('Main@L4.0') &&
-    encodingSettings.includes('rc=2pass') &&
-    (fingerprintLibrary.includes('core 118') || fingerprintLibrary.includes('core 148'))
-  ) {
-    return withDebug({
-      value: 'WEB-DL',
-      reason: 'Rilevato dal parsing MediaInfo: fingerprint Netflix',
-      source: '',
-      sourceReason: ''
-    });
-  }
-  if (nameHasWeb) {
-    if (hasEncodingTools) {
-      return withDebug({
-        value: 'WEBRip',
-        reason: 'Rilevato dal parsing MediaInfo: tool encoding su sorgente WEB',
-        source: '',
-        sourceReason: ''
-      });
-    }
-    if (!hasEncode) {
-      return withDebug({
-        value: 'WEB-DL',
-        reason: 'Rilevato dal parsing MediaInfo: WEB senza encoding',
-        source: '',
-        sourceReason: ''
-      });
-    }
-  }
-  if (serviceUpper && !hasEncode) {
-    return withDebug({
-      value: 'WEB-DL',
-      reason: 'Rilevato dal parsing MediaInfo: servizio presente senza encoding',
-      source: '',
-      sourceReason: ''
-    });
-  }
-  if (originalSource && !nameHasWeb && !serviceUpper && !sourceIsBluRay) {
-    return withDebug({
-      value: hasEncode ? 'Encode' : 'Remux',
-      reason: hasEncode
-        ? 'Rilevato dal parsing MediaInfo: encoding rilevato'
-        : 'Rilevato dal parsing MediaInfo: source disco senza encoding',
-      source: originalSource,
-      sourceReason: sourceHintReason
-    });
-  }
-  if (isHandbrake && !nameHasWeb && !serviceUpper && !sourceIsBluRay) {
-    return withDebug({
-      value: 'Encode',
-      reason: 'Rilevato dal parsing MediaInfo: HandBrake indica encode',
-      source: '',
-      sourceReason: ''
-    });
-  }
-  if (sourceIsBluRay) {
-    return withDebug({
-      value: hasEncode ? 'Encode' : 'Remux',
-      reason: hasEncode
-        ? 'Rilevato dal parsing MediaInfo: BluRay con encoding'
-        : 'Rilevato dal parsing MediaInfo: BluRay senza encoding',
-      source: '',
-      sourceReason: ''
-    });
-  }
-  return withDebug({ value: '', reason: '', source: '', sourceReason: '' });
-}
-
-function extractTokensPresent(name, tokens) {
-  const matches = [];
-  const safeName = String(name || '');
-  for (const token of tokens) {
-    if (!token) {
-      continue;
-    }
-    const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-    if (regex.test(safeName)) {
-      matches.push(token);
-    }
-  }
-  return matches;
-}
 
 function applyNameSuggestions(format, service, source, repack, settingsOverride) {
   const settings = settingsOverride || getSettings();
@@ -1955,7 +1547,7 @@ const {
   updateTagOptions,
   loadServiceDefaults,
   updateServiceOptions,
-  schedulePreview
+  schedulePreview: () => schedulePreview()
 });
 const {
   clearWizardRulesCheck,
@@ -2102,396 +1694,214 @@ const renameTools = createRenameTools({
   languageCodesPattern: LANGUAGE_CODES_PATTERN
 });
 
-async function updateRenamePlan() {
-  if (!state.targetPath) {
-    ui.renamePlanList.innerHTML = '';
-    ui.warningList.innerHTML = '';
-    updateRenameBadge(null);
-    clearWizardRulesCheck();
-    return;
-  }
+const renameFlow = createRenameFlow({
+  ui,
+  state,
+  renameTools,
+  buildBdInfoShort: metadataTools.buildBdInfoShort,
+  buildMediaInfoShort: metadataTools.buildMediaInfoShort,
+  getFormState,
+  updateRenameBadge,
+  clearWizardRulesCheck,
+  updateWizardRulesCheck,
+  getPathBaseName,
+  isDiscStructure,
+  showToast,
+  openMediaInfoModal,
+  cancelBdInfo,
+  scanBdInfoPlaylist: () => scanSelectedBdInfoPlaylist(),
+  updateVisibility,
+  updateFormatServiceSuggest,
+  getMediaInfoText: (path) => window.api.getMediaInfoText(path),
+  previewRename: (payload) => window.api.previewRename(payload)
+});
 
-  const form = getFormState();
-  const { folderName, baseName, fileRenames, warnings } = renameTools.buildRenameTargets();
-  const discStructure = isDiscStructure();
-  const plan = await window.api.previewRename({
-    targetPath: state.targetPath,
-    renameFiles: ui.renameFileCheckbox.checked && !discStructure,
-    renameFolder: state.kind === 'dir' && ui.renameFolderCheckbox.checked,
-    folderName: state.kind === 'dir' ? folderName : '',
-    fileRenames
-  });
-  updateRenameBadge(plan);
+({ refreshPreview, schedulePreview, showMediaInfoReport } = renameFlow);
 
-  ui.renamePlanList.innerHTML = '';
-  ui.warningList.innerHTML = '';
-  const planWarnings = plan.warnings || [];
-  const hasWarnings = warnings.length > 0 || planWarnings.length > 0;
+const autoDetectFlow = createAutoDetectFlow({
+  ui,
+  state,
+  metadataTools,
+  hasCjkChars,
+  normalizeLangTag,
+  loadSettings,
+  logDebug,
+  setHint,
+  setFetchBadge,
+  setIfAuto,
+  setInputAuto,
+  updateVisibility,
+  schedulePreview,
+  renderFetchStatus,
+  getPathBaseName,
+  getParentPath,
+  isDiscStructure,
+  fetchMetadata: (payload) => window.api.fetchMetadata(payload)
+});
 
-  let folderOp = null;
-  let filteredOps = plan.ops || [];
-  if (state.kind === 'dir') {
-    const targetFolder = state.targetPath;
-    folderOp = filteredOps.find((op) => op.from === targetFolder) || null;
-    if (folderOp) {
-      filteredOps = filteredOps.filter((op) => op !== folderOp);
-    }
-  }
+({ autoDetectFromPath, updateAutoDetectControls, manualDetectFromInputs } = autoDetectFlow);
 
-  if (state.kind === 'dir') {
-    const infoPath = state.targetPath;
-    const infoName = folderName || getPathBaseName(state.targetPath);
-    if (infoName || folderOp) {
-      const folderLabel = document.createElement('div');
-      folderLabel.className = 'plan-label';
-      folderLabel.textContent = 'Cartella';
-      ui.renamePlanList.appendChild(folderLabel);
-
-      const info = document.createElement('div');
-      info.className = 'plan-info';
-      if (folderOp) {
-        const fromLine = document.createElement('div');
-        fromLine.className = 'plan-text old';
-        fromLine.textContent = getPathBaseName(folderOp.from);
-        const toLine = document.createElement('div');
-        toLine.className = 'plan-text new';
-        toLine.textContent = getPathBaseName(folderOp.to);
-        info.appendChild(fromLine);
-        info.appendChild(toLine);
-      } else {
-        info.textContent = `Cartella: ${infoName}`;
-      }
-      if (infoPath) {
-        info.title = infoPath;
-      }
-      ui.renamePlanList.appendChild(info);
-    }
-  }
-
-  const filesLabel = document.createElement('div');
-  filesLabel.className = 'plan-label';
-  filesLabel.textContent = 'File';
-  ui.renamePlanList.appendChild(filesLabel);
-
-  const itemsContainer = document.createElement('div');
-  itemsContainer.className = 'plan-items';
-  ui.renamePlanList.appendChild(itemsContainer);
-
-  if (filteredOps.length) {
-    for (const op of filteredOps) {
-      const item = document.createElement('div');
-      item.className = 'plan-item rename';
-
-      const fromLine = document.createElement('div');
-      fromLine.className = 'plan-text old';
-      fromLine.textContent = getPathBaseName(op.from);
-
-      const toLine = document.createElement('div');
-      toLine.className = 'plan-text new';
-      toLine.textContent = getPathBaseName(op.to);
-
-      item.appendChild(fromLine);
-      item.appendChild(toLine);
-      itemsContainer.appendChild(item);
-    }
-  } else {
-    const empty = document.createElement('div');
-    empty.className = `plan-item empty${hasWarnings ? '' : ' success'}`;
-    empty.textContent = hasWarnings
-      ? 'Nessuna operazione pronta.'
-      : 'Nessuna rinomina necessaria con le configurazioni attuali.';
-    itemsContainer.appendChild(empty);
-  }
-
-  if (state.kind === 'file' && state.mainVideo) {
-    const infoHeader = document.createElement('div');
-    infoHeader.className = 'plan-label-row';
-
-    const infoLabel = document.createElement('div');
-    infoLabel.className = 'plan-label';
-    infoLabel.textContent = 'MediaInfo (sintetico)';
-
-    const infoBtn = document.createElement('button');
-    infoBtn.className = 'status clickable';
-    infoBtn.textContent = 'Apri mediainfo completo';
-    infoBtn.addEventListener('click', async () => {
-      if (!state.mainVideo) {
-        showToast('MediaInfo non disponibile.', 'warning');
-        return;
-      }
-      await showMediaInfoReport();
-    });
-
-    infoHeader.appendChild(infoLabel);
-    infoHeader.appendChild(infoBtn);
-    ui.renamePlanList.appendChild(infoHeader);
-
-    const info = document.createElement('pre');
-    info.className = 'plan-mediainfo';
-    info.textContent = metadataTools.buildMediaInfoShort();
-    ui.renamePlanList.appendChild(info);
-  }
-
-  const allWarnings = [...warnings, ...planWarnings];
-  if (allWarnings.length) {
-    for (const warning of allWarnings) {
-      const item = document.createElement('div');
-      item.className = 'warning-item';
-      item.textContent = warning;
-      ui.warningList.appendChild(item);
-    }
-  }
-
-  updateWizardRulesCheck(form);
-
+function getDiscRootPath(targetPath, mainVideo) {
+  const candidate = String(mainVideo || targetPath || '');
+  const match = candidate.match(/^(.*?)[\\/](BDMV|VIDEO_TS)[\\/]/i);
+  return match ? match[1] : targetPath;
 }
 
-async function refreshPreview() {
-  updateVisibility();
-  updateFormatServiceSuggest();
-  await updateRenamePlan();
-}
-
-function schedulePreview() {
-  if (previewTimer) {
-    clearTimeout(previewTimer);
-  }
-  previewTimer = setTimeout(() => {
-    refreshPreview();
-  }, 120);
-}
-
-async function fetchMetadataAuto(guess) {
-  if (state.autoDetectRunning) {
-    return { hasMatch: false, data: null };
-  }
+async function loadBdInfoPlaylists(targetPath) {
   const settings = loadSettings();
-  if (!settings.omdbKey && !settings.tmdbKey && !settings.tvdbKey) {
-    setHint(ui.fetchStatus, 'Imposta le API key nelle impostazioni.');
-    logDebug('fetchMetadata: nessuna API key disponibile');
-    ui.fetchBadge.classList.add('hidden');
-    return { hasMatch: false, data: null };
+  const bdinfoPath = String(settings.bdinfoPath || '').trim();
+  state.bdInfoRaw = '';
+  state.bdInfoParsed = null;
+  state.bdInfoError = '';
+  state.bdInfoLoading = true;
+  state.bdInfoTarget = targetPath;
+  state.bdInfoProgress = 0;
+  state.bdInfoProgressTotal = 0;
+  state.bdInfoProgressDone = 0;
+  state.bdInfoShowAllPlaylists = false;
+  state.bdInfoStage = 'list';
+  state.bdInfoStageText = 'Lettura playlist BDInfo...';
+  if (state.bdInfoRequestId) {
+    await window.api.cancelBdInfo?.({ requestId: state.bdInfoRequestId });
   }
+  state.bdInfoRequestId = `bdinfo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  updateBdInfoProgressUi();
 
-  state.autoDetectRunning = true;
-  setHint(ui.fetchStatus, 'Ricerca in corso...');
-  ui.fetchBadge.classList.remove('error');
-
-  try {
-    const typeHint = guess.typeHint || ui.typeSelect.value;
-    const isTvType = typeHint.startsWith('tv') || typeHint.startsWith('anime');
-    const filenameHint = state.mainVideo
-      ? getPathBaseName(state.mainVideo)
-      : getPathBaseName(state.targetPath || '');
-    const payload = {
-      imdbId: ui.imdbInput.value.trim(),
-      tvdbId: isTvType ? ui.tvdbInput.value.trim() : '',
-      malId: ui.malInput.value.trim(),
-      title: guess.title || ui.titleInput.value.trim(),
-      year: guess.year || ui.yearInput.value.trim(),
-      season: isTvType ? (guess.season || ui.seasonInput.value.trim()) : '',
-      episode: isTvType ? (guess.episode || ui.episodeInput.value.trim()) : '',
-      typeHint,
-      filename: filenameHint,
-      omdbKey: settings.omdbKey,
-      tmdbKey: settings.tmdbKey,
-      tvdbKey: settings.tvdbKey,
-      preferredLanguage: Object.prototype.hasOwnProperty.call(settings, 'preferredLanguage')
-        ? settings.preferredLanguage
-        : 'it-IT'
-    };
-
-    const data = await window.api.fetchMetadata(payload);
-    logDebug('fetchMetadata payload', payload);
-    logDebug('fetchMetadata result', data);
-    let finalData = data;
-    const hasMatch = Boolean(
-      data?.title || data?.tmdbId || data?.imdbId || data?.tvdbSeriesId
-    );
-    if (!hasMatch && payload.title) {
-      const cleanedTitle = metadataTools.cleanSearchTitle(payload.title);
-      if (cleanedTitle && cleanedTitle !== payload.title) {
-        const retryPayload = { ...payload, title: cleanedTitle };
-        logDebug('fetchMetadata retry (clean title)', retryPayload);
-        const retryData = await window.api.fetchMetadata(retryPayload);
-        logDebug('fetchMetadata retry result', retryData);
-        const retryHasMatch = Boolean(
-          retryData?.title || retryData?.tmdbId || retryData?.imdbId || retryData?.tvdbSeriesId
-        );
-        if (retryHasMatch) {
-          finalData = retryData;
-        }
-      }
-    }
-    state.metadata = finalData;
-    if (finalData?.isAnime) {
-      const currentType = ui.typeSelect.value;
-      if (currentType === 'tv-episode') {
-        setIfAuto(ui.typeSelect, 'anime-episode');
-      } else if (currentType === 'tv-season') {
-        setIfAuto(ui.typeSelect, 'anime-season');
-      }
-    }
-    const animeRomaji = finalData?.animeRomaji || '';
-    let resolvedTitle = finalData.title || '';
-    if (finalData?.isAnime && animeRomaji && hasCjkChars(resolvedTitle)) {
-      resolvedTitle = animeRomaji;
-    }
-    if (resolvedTitle) {
-      setIfAuto(ui.titleInput, resolvedTitle);
-    }
-    if (finalData.year) {
-      setIfAuto(ui.yearInput, finalData.year);
-    }
-    if (finalData.originalLanguage) {
-      const normalizedOriginal = normalizeLangTag(finalData.originalLanguage);
-      setInputAuto(ui.originalLanguageInput, normalizedOriginal);
-      if (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false') {
-        const recomputed = metadataTools.buildLanguageTag(state.audioLangs, normalizedOriginal);
-        if (recomputed) {
-          setInputAuto(ui.languageTagInput, recomputed);
-        }
-      }
-    }
-    if (Array.isArray(finalData.episodes)) {
-      const map = {};
-      finalData.episodes.forEach((ep) => {
-        const key = metadataTools.episodeKey(ep.season, ep.episode);
-        if (key && ep.name) {
-          map[key] = ep.name;
-        }
-      });
-      state.episodeMap = map;
-    }
-
-    if (state.kind !== 'dir') {
-      const season = ui.seasonInput.value;
-      const episode = ui.episodeInput.value;
-      const key = metadataTools.episodeKey(season, episode);
-      if (key && state.episodeMap[key]) {
-        setIfAuto(ui.episodeTitleInput, state.episodeMap[key]);
-      }
-    }
-
-    const finalHasMatch = Boolean(
-      finalData?.title ||
-        finalData?.tmdbId ||
-        finalData?.imdbId ||
-        finalData?.tvdbSeriesId ||
-        finalData?.malId
-    );
-    if (!finalHasMatch) {
-      setFetchBadge('error', 'Auto matching fallito');
-    } else {
-      const usedManualId = Boolean(payload.imdbId || payload.tvdbId || payload.malId);
-      const modeLabel = usedManualId ? 'Matching manuale' : 'Auto Matching';
-      setFetchBadge(usedManualId ? 'manual' : 'auto', modeLabel);
-    }
-    renderFetchStatus(payload, finalData);
-    return { hasMatch: finalHasMatch, data: finalData };
-  } catch (error) {
-    ui.fetchBadge.classList.add('hidden');
-    setHint(ui.fetchStatus, `Errore: ${error.message || error}`);
-    return { hasMatch: false, data: null, error };
-  } finally {
-    state.autoDetectRunning = false;
+  if (!bdinfoPath) {
+    state.bdInfoLoading = false;
+    state.bdInfoError = 'Percorso BDInfo non configurato.';
+    state.bdInfoStage = 'error';
+    state.bdInfoStageText = 'BDInfo non configurato';
     schedulePreview();
-  }
-}
-
-async function autoDetectFromPath() {
-  if (!ui.autoDetectToggle.checked || !state.targetPath) {
     return;
   }
 
-  logDebug('autoDetect: start', { targetPath: state.targetPath });
-  let guess = { title: '', year: '', season: '', episode: '', typeHint: '' };
-
-  if (state.kind === 'dir') {
-    const folderName = getPathBaseName(state.targetPath);
-    const folderGuess = metadataTools.guessMetadataFromName(folderName);
-    const firstFileGuess = state.videoFiles.length ? metadataTools.guessMetadataFromName(state.videoFiles[0]) : {};
-    const discStructure = isDiscStructure();
-
-    guess.title = folderGuess.title || firstFileGuess.title || '';
-    guess.year = folderGuess.year || firstFileGuess.year || '';
-    guess.season = folderGuess.season || firstFileGuess.season || '';
-    guess.typeHint = discStructure && !guess.season ? 'movie' : 'tv-season';
-
-    setIfAuto(ui.typeSelect, guess.typeHint);
-    setIfAuto(ui.titleInput, guess.title);
-    setIfAuto(ui.yearInput, guess.year);
-    if (guess.season && guess.typeHint === 'tv-season') {
-      setIfAuto(ui.seasonInput, guess.season);
-    }
-  } else if (state.mainVideo) {
-    const fileGuess = metadataTools.guessMetadataFromName(state.mainVideo);
-    guess = {
-      ...guess,
-      ...fileGuess,
-      typeHint: fileGuess.season && fileGuess.episode ? 'tv-episode' : 'movie'
-    };
-
-    if (guess.typeHint === 'tv-episode') {
-      setIfAuto(ui.typeSelect, 'tv-episode');
-      if (guess.season) {
-        setIfAuto(ui.seasonInput, guess.season);
-      }
-      if (guess.episode) {
-        setIfAuto(ui.episodeInput, guess.episode);
-      }
-      if (guess.episodeTitle) {
-        setIfAuto(ui.episodeTitleInput, guess.episodeTitle);
-      }
-    } else {
-      setIfAuto(ui.typeSelect, 'movie');
-    }
-
-    setIfAuto(ui.titleInput, guess.title);
-    setIfAuto(ui.yearInput, guess.year);
+  const discRoot = getDiscRootPath(targetPath, state.mainVideo);
+  state.bdInfoTarget = discRoot;
+  const result = await window.api.getBdInfoText?.({
+    path: discRoot,
+    bdinfoPath,
+    requestId: state.bdInfoRequestId,
+    listOnly: true
+  });
+  if (state.targetPath !== targetPath) {
+    return;
   }
-
-  logDebug('autoDetect: guess', guess);
-  updateVisibility();
-  const result = await fetchMetadataAuto(guess);
-  if (!result?.hasMatch && state.kind !== 'dir' && state.mainVideo) {
-    const parentPath = getParentPath(state.mainVideo);
-    const parentName = parentPath ? getPathBaseName(parentPath) : '';
-    const parentGuess = parentName ? metadataTools.guessMetadataFromName(parentName) : {};
-    const fallbackTitle = parentGuess.title || '';
-    const fallbackYear = parentGuess.year || '';
-    const fallbackSeason = parentGuess.season || guess.season;
-    const isEpisodeGuess = guess.typeHint === 'tv-episode' || guess.typeHint === 'anime-episode';
-    const shouldRetry = isEpisodeGuess && fallbackTitle && fallbackTitle !== guess.title;
-
-    if (shouldRetry) {
-      const fallback = {
-        ...guess,
-        title: fallbackTitle,
-        year: fallbackYear || guess.year,
-        season: fallbackSeason,
-        typeHint: 'tv-episode'
-      };
-      logDebug('autoDetect: fallback', { title: fallback.title, year: fallback.year, season: fallback.season });
-      await fetchMetadataAuto(fallback);
-    }
+  state.bdInfoPlaylists = Array.isArray(result?.playlists) ? result.playlists : [];
+  const selected = state.bdInfoSelectedPlaylist;
+  const listHasSelected = selected && state.bdInfoPlaylists.some((item) => item.playlist === selected);
+  if (!state.bdInfoPlaylists.length) {
+    state.bdInfoSelectedPlaylist = '';
+  } else if (!listHasSelected) {
+    const sorted = state.bdInfoPlaylists
+      .slice()
+      .filter((item) =>
+        Number.isFinite(item?.durationSeconds) ? item.durationSeconds >= 600 : true
+      )
+      .sort((a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0));
+    state.bdInfoSelectedPlaylist = sorted[0]?.playlist || '';
   }
+  if (!result?.ok) {
+    state.bdInfoError = result?.error || 'Errore BDInfo.';
+    state.bdInfoStage = 'error';
+    state.bdInfoStageText = state.bdInfoError;
+  } else {
+    state.bdInfoError = '';
+    state.bdInfoStage = '';
+    state.bdInfoStageText = '';
+  }
+  state.bdInfoLoading = false;
+  updateBdInfoProgressUi();
+  logDebug('bdinfo playlists', {
+    ok: Boolean(result?.ok),
+    error: result?.error || '',
+    count: state.bdInfoPlaylists.length,
+    path: discRoot,
+    requestId: state.bdInfoRequestId || ''
+  });
+  schedulePreview();
 }
 
-function updateAutoDetectControls() {
-  const isAuto = ui.autoDetectToggle.checked;
-  ui.autoDetectBtn.disabled = isAuto;
+async function fetchBdInfo(targetPath, playlistOverride = '') {
+  const settings = loadSettings();
+  const bdinfoPath = String(settings.bdinfoPath || '').trim();
+  state.bdInfoRaw = '';
+  state.bdInfoParsed = null;
+  state.bdInfoError = '';
+  state.bdInfoLoading = true;
+  state.bdInfoTarget = targetPath;
+  state.bdInfoProgress = 0;
+  state.bdInfoProgressTotal = 0;
+  state.bdInfoProgressDone = 0;
+  state.bdInfoStage = 'start';
+  state.bdInfoStageText = 'Avvio BDInfo...';
+  if (state.bdInfoRequestId) {
+    await window.api.cancelBdInfo?.({ requestId: state.bdInfoRequestId });
+  }
+  state.bdInfoRequestId = `bdinfo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  updateBdInfoProgressUi();
+
+  if (!bdinfoPath) {
+    state.bdInfoLoading = false;
+    state.bdInfoError = 'Percorso BDInfo non configurato.';
+    state.bdInfoStage = 'error';
+    state.bdInfoStageText = 'BDInfo non configurato';
+    schedulePreview();
+    return;
+  }
+
+  const discRoot = getDiscRootPath(targetPath, state.mainVideo);
+  state.bdInfoTarget = discRoot;
+  const result = await window.api.getBdInfoText?.({
+    path: discRoot,
+    bdinfoPath,
+    requestId: state.bdInfoRequestId,
+    playlist: playlistOverride
+  });
+  if (state.targetPath !== targetPath) {
+    return;
+  }
+  if (Array.isArray(result?.playlists) && result.playlists.length) {
+    state.bdInfoPlaylists = result.playlists;
+  }
+  if (result?.playlist) {
+    state.bdInfoSelectedPlaylist = result.playlist;
+  } else if (playlistOverride) {
+    state.bdInfoSelectedPlaylist = playlistOverride;
+  }
+  if (!result?.ok) {
+    state.bdInfoError = result?.error || 'Errore BDInfo.';
+    state.bdInfoRaw = result?.text || '';
+    state.bdInfoParsed = null;
+    state.bdInfoStage = 'error';
+    state.bdInfoStageText = state.bdInfoError;
+  } else {
+    state.bdInfoRaw = result?.text || '';
+    state.bdInfoError = '';
+    state.bdInfoParsed = null;
+    state.bdInfoProgress = 1;
+    state.bdInfoStage = 'done';
+    state.bdInfoStageText = 'Completato';
+    metadataTools.fillFromBdInfo?.();
+  }
+  state.bdInfoLoading = false;
+  updateBdInfoProgressUi();
+  logDebug('bdinfo result', {
+    ok: Boolean(result?.ok),
+    error: result?.error || '',
+    bytes: state.bdInfoRaw ? state.bdInfoRaw.length : 0,
+    path: discRoot,
+    playlist: result?.playlist || playlistOverride || '',
+    requestId: state.bdInfoRequestId || ''
+  });
+  schedulePreview();
 }
 
-async function manualDetectFromInputs() {
-  const guess = {
-    title: ui.titleInput.value.trim(),
-    year: ui.yearInput.value.trim(),
-    season: ui.seasonInput.value.trim(),
-    episode: ui.episodeInput.value.trim(),
-    typeHint: ui.typeSelect.value
-  };
-  await fetchMetadataAuto(guess);
+async function scanSelectedBdInfoPlaylist() {
+  if (!state.targetPath || !state.bdInfoSelectedPlaylist || state.bdInfoLoading) {
+    return;
+  }
+  await fetchBdInfo(state.targetPath, state.bdInfoSelectedPlaylist);
 }
 
 async function loadPath(targetPath) {
@@ -2509,6 +1919,20 @@ async function loadPath(targetPath) {
   state.videoFiles = scan.videoFiles || [];
   state.mainVideo = scan.mainVideo;
   state.mediaInfo = scan.mediaInfo;
+  state.bdInfoRaw = '';
+  state.bdInfoParsed = null;
+  state.bdInfoError = '';
+  state.bdInfoLoading = false;
+  state.bdInfoTarget = '';
+  state.bdInfoProgress = 0;
+  state.bdInfoStage = '';
+  state.bdInfoStageText = '';
+  state.bdInfoRequestId = '';
+  state.bdInfoPlaylists = [];
+  state.bdInfoSelectedPlaylist = '';
+  state.bdInfoProgressTotal = 0;
+  state.bdInfoProgressDone = 0;
+  state.bdInfoShowAllPlaylists = false;
   state.metadata = null;
   state.screenshots = [];
   state.lastTorrentPath = '';
@@ -2572,6 +1996,10 @@ async function loadPath(targetPath) {
     }
   }
 
+  if (scan.kind === 'dir' && isDiscStructure()) {
+    loadBdInfoPlaylists(targetPath);
+  }
+
   if (scan.kind === 'dir') {
     ui.typeSelect.value = ui.typeSelect.value.includes('anime') ? 'anime-season' : 'tv-season';
   }
@@ -2579,21 +2007,6 @@ async function loadPath(targetPath) {
   metadataTools.fillFromMediaInfo();
   await autoDetectFromPath();
   schedulePreview();
-}
-
-async function showMediaInfoReport() {
-  if (!state.mainVideo || state.mediaInfo?.error) {
-    return;
-  }
-  ui.mediaInfoText.textContent = 'Caricamento...';
-  ui.mediaInfoPath.textContent = `File: ${state.mainVideo}`;
-  openMediaInfoModal();
-  const result = await window.api.getMediaInfoText(state.mainVideo);
-  if (result?.error) {
-    ui.mediaInfoText.textContent = `Errore MediaInfo: ${result.error}`;
-  } else {
-    ui.mediaInfoText.textContent = result?.text || 'Nessun output disponibile.';
-  }
 }
 
 const uploadKit = createUploadKit({
@@ -2632,106 +2045,7 @@ ui.resetSourceBtn.addEventListener('click', () => {
   resetSource();
 });
 
-if (ui.sourceSection) {
-  let dragDepth = 0;
-  const resetDrag = () => {
-    dragDepth = 0;
-    ui.sourceSection.classList.remove('drag-active');
-  };
-  const uriToPath = (uri) => {
-    if (!uri) {
-      return '';
-    }
-    try {
-      const url = new URL(uri);
-      if (url.protocol === 'file:') {
-        let filePath = decodeURIComponent(url.pathname || '');
-        if (/^\/[A-Za-z]:/.test(filePath)) {
-          filePath = filePath.slice(1);
-        }
-        return filePath.replace(/\//g, '\\');
-      }
-    } catch {
-      // Ignore invalid URL
-    }
-    if (/^[A-Za-z]:[\\/]/.test(uri)) {
-      return uri;
-    }
-    return '';
-  };
-  const getDropPath = async (event) => {
-    const files = event.dataTransfer?.files;
-    let path = files && files.length ? files[0].path : '';
-    if (!path && event.dataTransfer?.items?.length) {
-      const item = event.dataTransfer.items[0];
-      const file = item.getAsFile?.();
-      path = file?.path || '';
-    }
-    if (!path && files && files.length && window.api?.getFilePath) {
-      try {
-        path = await window.api.getFilePath(files[0]);
-      } catch {
-        // ignore
-      }
-    }
-    if (!path && event.dataTransfer) {
-      const uriList = event.dataTransfer.getData('text/uri-list') || '';
-      const text = event.dataTransfer.getData('text/plain') || '';
-      const raw = uriList || text;
-      const firstLine = raw
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .find((line) => line && !line.startsWith('#'));
-      path = uriToPath(firstLine || '');
-    }
-    return path;
-  };
-
-  document.addEventListener('dragover', (event) => {
-    event.preventDefault();
-  });
-
-  document.addEventListener('drop', (event) => {
-    event.preventDefault();
-    const files = event.dataTransfer?.files;
-    const items = event.dataTransfer?.items;
-    const firstFile = files?.length ? files[0] : null;
-    const firstItem = items?.length ? items[0] : null;
-  });
-
-  ui.sourceSection.addEventListener('dragenter', (event) => {
-    event.preventDefault();
-    dragDepth += 1;
-    ui.sourceSection.classList.add('drag-active');
-  });
-
-  ui.sourceSection.addEventListener('dragover', (event) => {
-    event.preventDefault();
-  });
-
-  ui.sourceSection.addEventListener('dragleave', () => {
-    dragDepth = Math.max(0, dragDepth - 1);
-    if (dragDepth === 0) {
-      ui.sourceSection.classList.remove('drag-active');
-    }
-  });
-
-  ui.sourceSection.addEventListener('drop', async (event) => {
-    event.preventDefault();
-    const files = event.dataTransfer?.files;
-    const items = event.dataTransfer?.items;
-    const firstFile = files?.length ? files[0] : null;
-    const firstItem = items?.length ? items[0] : null;
-    const path = await getDropPath(event);
-    if (!path) {
-      showToast('Drag & drop non disponibile, usa Seleziona file/cartella.', 'warning');
-      resetDrag();
-      return;
-    }
-    await loadPath(path);
-    resetDrag();
-  });
-}
+setupSourceDragDrop({ ui, showToast, loadPath });
 
 if (ui.applyNameSuggestBtn) {
   ui.applyNameSuggestBtn.addEventListener('click', () => {
@@ -3047,6 +2361,15 @@ if (ui.browseMkbrrPathBtn) {
   });
 }
 
+if (ui.browseBdinfoPathBtn) {
+  ui.browseBdinfoPathBtn.addEventListener('click', async () => {
+    const filePath = await window.api.selectAnyFile?.();
+    if (filePath && ui.settingsBdinfoPathInput) {
+      ui.settingsBdinfoPathInput.value = filePath;
+    }
+  });
+}
+
 if (ui.browseUploadAssistantPathBtn) {
   ui.browseUploadAssistantPathBtn.addEventListener('click', async () => {
     const dir = await window.api.selectFolder();
@@ -3078,6 +2401,41 @@ if (window.api?.onTorrentProgress) {
     if (data.logLine) {
       appendTorrentLog(data.logLine);
     }
+  });
+}
+
+if (window.api?.onBdInfoProgress) {
+  window.api.onBdInfoProgress((data) => {
+    if (!data) {
+      return;
+    }
+    if (data.requestId && state.bdInfoRequestId && data.requestId !== state.bdInfoRequestId) {
+      return;
+    }
+    if (state.bdInfoTarget && data.targetPath && data.targetPath !== state.bdInfoTarget) {
+      return;
+    }
+    if (typeof data.totalM2ts === 'number') {
+      state.bdInfoProgressTotal = Math.max(0, data.totalM2ts);
+    }
+    if (typeof data.processedM2ts === 'number') {
+      state.bdInfoProgressDone = Math.max(0, data.processedM2ts);
+    }
+    if (typeof data.progress === 'number') {
+      state.bdInfoProgress = Math.max(0, Math.min(1, data.progress));
+    } else if (state.bdInfoProgressTotal > 0 && Number.isFinite(state.bdInfoProgressDone)) {
+      state.bdInfoProgress = Math.max(
+        0,
+        Math.min(1, state.bdInfoProgressDone / state.bdInfoProgressTotal)
+      );
+    }
+    if (data.stage) {
+      state.bdInfoStage = data.stage;
+    }
+    if (data.text) {
+      state.bdInfoStageText = data.text;
+    }
+    updateBdInfoProgressUi();
   });
 }
 ui.mediaInfoModal.addEventListener('click', (event) => {

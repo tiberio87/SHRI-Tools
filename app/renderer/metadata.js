@@ -44,6 +44,7 @@ const CLEAN_TITLE_TOKENS = new Set([
   'AVC',
   'HDR',
   'HDR10',
+  'HDR10PLUS',
   'DV',
   'DOLBYVISION',
   'AAC',
@@ -1034,11 +1035,388 @@ export function createMetadataTools(deps) {
     return lines.join('\n').trim() || 'MediaInfo non disponibile.';
   }
 
+  function parseBdInfoText(raw) {
+    const result = {
+      discTitle: '',
+      discLabel: '',
+      discSize: '',
+      playlist: '',
+      playlistLabel: '',
+      duration: '',
+      region: '',
+      videoLine: '',
+      audioLines: [],
+      subtitleLines: []
+    };
+    const text = String(raw || '').trim();
+    if (!text) {
+      return result;
+    }
+
+    if (text.startsWith('{') || text.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(text);
+        const pickFirst = (keys, fallback = '') => {
+          for (const key of keys) {
+            if (parsed && Object.prototype.hasOwnProperty.call(parsed, key) && parsed[key]) {
+              return String(parsed[key]).trim();
+            }
+          }
+          return fallback;
+        };
+        result.discTitle = pickFirst(['disc_title', 'discTitle', 'title', 'discTitleString']);
+        result.discLabel = pickFirst(['disc_label', 'discLabel', 'label']);
+        result.discSize = pickFirst(['disc_size', 'discSize', 'size']);
+        result.playlist = pickFirst(['playlist', 'mainPlaylist', 'mpls']);
+        result.playlistLabel = pickFirst(['playlist_label', 'playlistLabel', 'label', 'comment', 'name']);
+        result.duration = pickFirst(['duration', 'length']);
+        result.region = pickFirst(['region', 'disc_region', 'discRegion']);
+        const video = parsed?.video || parsed?.VIDEO || null;
+        if (video && typeof video === 'string') {
+          result.videoLine = video.trim();
+        } else if (video && typeof video === 'object') {
+          const videoParts = [];
+          if (video.codec) {
+            videoParts.push(video.codec);
+          }
+          if (video.resolution) {
+            videoParts.push(video.resolution);
+          }
+          if (video.fps) {
+            videoParts.push(video.fps);
+          }
+          if (video.hdr) {
+            videoParts.push(video.hdr);
+          }
+          result.videoLine = videoParts.join(' / ');
+        }
+        const audio = parsed?.audio || parsed?.AUDIO || [];
+        if (Array.isArray(audio)) {
+          result.audioLines = audio.map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+        const subs = parsed?.subtitles || parsed?.SUBTITLES || [];
+        if (Array.isArray(subs)) {
+          result.subtitleLines = subs.map((entry) => String(entry || '').trim()).filter(Boolean);
+        }
+        return result;
+      } catch (error) {
+        // fallback to text parsing
+      }
+    }
+
+    const lines = text.split(/\r?\n/).map((line) => line.trim());
+    const isTableHeader = (value) => {
+      const raw = String(value || '').trim();
+      if (!raw) {
+        return true;
+      }
+      if (/^[\-\s|]+$/.test(raw)) {
+        return true;
+      }
+      const cleaned = raw.replace(/\s{2,}/g, ' ').trim().toLowerCase();
+      if (!cleaned) {
+        return true;
+      }
+      if (cleaned === 'codec bitrate description') {
+        return true;
+      }
+      if (cleaned === 'codec language bitrate description') {
+        return true;
+      }
+      if (cleaned.startsWith('codec language') && cleaned.includes('bitrate')) {
+        return true;
+      }
+      return false;
+    };
+    let section = '';
+    for (const line of lines) {
+      if (!line) {
+        continue;
+      }
+      const upper = line.toUpperCase();
+      if (/^DISC\s+INFO/.test(upper)) {
+        section = 'disc';
+        continue;
+      }
+      if (/^PLAYLIST/.test(upper)) {
+        section = 'playlist';
+        continue;
+      }
+      if (/^VIDEO\s*:/.test(upper)) {
+        section = 'video';
+        const rest = line.split(':').slice(1).join(':').trim();
+        if (rest && !result.videoLine) {
+          result.videoLine = rest;
+        }
+        continue;
+      }
+      if (/^AUDIO\s*:/.test(upper)) {
+        section = 'audio';
+        continue;
+      }
+      if (/^SUBTITLES?\s*:/.test(upper)) {
+        section = 'subs';
+        continue;
+      }
+      if (/^[A-Z][A-Z0-9 _-]{2,}:\s*$/.test(upper)) {
+        section = '';
+        continue;
+      }
+
+      if (!result.discTitle && /^Disc Title\s*:/i.test(line)) {
+        result.discTitle = line.split(':').slice(1).join(':').trim();
+        continue;
+      }
+      if (!result.discLabel && /^Disc Label\s*:/i.test(line)) {
+        result.discLabel = line.split(':').slice(1).join(':').trim();
+        continue;
+      }
+      if (!result.discSize && /^Disc Size\s*:/i.test(line)) {
+        result.discSize = line.split(':').slice(1).join(':').trim();
+        continue;
+      }
+      if (!result.region && /region/i.test(line)) {
+        const match = line.match(/(?:disc\s*)?region(?:\s*code)?\s*[:=]\s*([A-Z0-9\s]+)/i);
+        if (match) {
+          result.region = match[1].replace(/[^A-Z0-9]/gi, '').trim();
+          continue;
+        }
+      }
+
+      if (section === 'playlist') {
+        if (!result.playlist && /^(Playlist|MPLS)\s*:/i.test(line)) {
+          const candidate = line.split(':').slice(1).join(':').trim();
+          if (candidate) {
+            const match = candidate.match(/([0-9]{5}\.MPLS)/i);
+            result.playlist = match ? match[1] : candidate;
+          }
+          continue;
+        }
+        if (!result.playlist && /^Name\s*:/i.test(line)) {
+          result.playlist = line.split(':').slice(1).join(':').trim();
+          continue;
+        }
+        if (!result.playlistLabel && /^(Label|Comment|Description|Title)\s*:/i.test(line)) {
+          result.playlistLabel = line.split(':').slice(1).join(':').trim();
+          continue;
+        }
+        if (!result.duration && /^(Length|Duration)\s*:/i.test(line)) {
+          result.duration = line.split(':').slice(1).join(':').trim();
+          continue;
+        }
+      }
+
+      if (section === 'video' && !result.videoLine) {
+        if (/^-{3,}$/.test(line) || isTableHeader(line)) {
+          continue;
+        }
+        result.videoLine = line.replace(/^VIDEO\s*:/i, '').trim();
+        continue;
+      }
+      if (section === 'audio') {
+        if (/^-{3,}$/.test(line) || isTableHeader(line)) {
+          continue;
+        }
+        if (!/^-+$/.test(line)) {
+          result.audioLines.push(line);
+        }
+        continue;
+      }
+      if (section === 'subs') {
+        if (/^-{3,}$/.test(line) || isTableHeader(line)) {
+          continue;
+        }
+        if (!/^-+$/.test(line)) {
+          result.subtitleLines.push(line);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  function formatBdInfoAudio(line) {
+    const cleaned = String(line || '').replace(/\s{2,}/g, ' ').trim();
+    if (!cleaned) {
+      return '';
+    }
+    const columns = String(line || '')
+      .trim()
+      .split(/\s{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (columns.length >= 2) {
+      const codec = columns[0];
+      const language = columns[1];
+      const descriptionRaw = columns[3] || columns[2] || '';
+      const description = descriptionRaw.replace(/\s*\/\s*$/g, '').replace(/\s{2,}/g, ' ').trim();
+      const details = [codec, description].filter(Boolean).join(' ');
+      return language ? `${language} | ${details || codec}` : details || cleaned;
+    }
+    const parts = cleaned.split('/').map((part) => part.trim()).filter(Boolean);
+    if (parts.length < 2) {
+      return cleaned;
+    }
+    const lang = parts[parts.length - 1];
+    const codec = parts[0];
+    const channels = parts.find((part) => /\d\.\d/.test(part) || /channels?/i.test(part));
+    const detail = [codec, channels].filter(Boolean).join(' ');
+    return detail ? `${lang} | ${detail}` : cleaned;
+  }
+
+  function formatBdInfoSubtitle(line) {
+    const cleaned = String(line || '').replace(/\s{2,}/g, ' ').trim();
+    if (!cleaned) {
+      return '';
+    }
+    const columns = String(line || '')
+      .trim()
+      .split(/\s{2,}/)
+      .map((part) => part.trim())
+      .filter(Boolean);
+    if (columns.length >= 2) {
+      const codec = columns[0];
+      const language = columns[1];
+      const descriptionRaw = columns[3] || columns[2] || '';
+      const description = descriptionRaw.replace(/\s*\/\s*$/g, '').replace(/\s{2,}/g, ' ').trim();
+      const details = [codec, description].filter(Boolean).join(' ');
+      return language ? `${language}${details ? ` | ${details}` : ''}` : details || cleaned;
+    }
+    return cleaned;
+  }
+
+  function buildBdInfoShort() {
+    if (state.bdInfoLoading) {
+      return 'BDInfo in caricamento...';
+    }
+    if (state.bdInfoError) {
+      return `BDInfo non disponibile: ${state.bdInfoError}`;
+    }
+    if (!state.bdInfoRaw) {
+      if (state.bdInfoPlaylists && state.bdInfoPlaylists.length) {
+        return 'Seleziona una playlist per generare il report BDInfo.';
+      }
+      return 'BDInfo non disponibile.';
+    }
+    const parsed = state.bdInfoParsed || parseBdInfoText(state.bdInfoRaw);
+    state.bdInfoParsed = parsed;
+
+    const lines = [];
+    lines.push('BDInfo');
+    const title = parsed.discTitle || parsed.discLabel;
+    if (title) {
+      lines.push(`Titolo disco   : ${title}`);
+    }
+    const selectedPlaylist = state.bdInfoSelectedPlaylist || parsed.playlist;
+    if (selectedPlaylist) {
+      lines.push(`Playlist      : ${selectedPlaylist}`);
+    }
+    if (parsed.duration) {
+      lines.push(`Durata        : ${parsed.duration}`);
+    }
+    if (parsed.playlistLabel) {
+      lines.push(`Commento      : ${parsed.playlistLabel}`);
+    }
+    if (parsed.discSize) {
+      lines.push(`Dimensione    : ${parsed.discSize}`);
+    }
+    if (parsed.region) {
+      lines.push(`Regione       : ${parsed.region}`);
+    }
+
+    const playlists = Array.isArray(state.bdInfoPlaylists) ? state.bdInfoPlaylists : [];
+    if (playlists.length) {
+      lines.push('');
+      lines.push('Playlists');
+      const filtered = playlists
+        .filter((item) => Number.isFinite(item?.durationSeconds) ? item.durationSeconds >= 600 : true)
+        .sort((a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0));
+      const top = filtered.slice(0, 6);
+      top.forEach((item) => {
+        const playlistName = item.playlist || '';
+        const duration = item.duration || '';
+        const isSelected = selectedPlaylist && playlistName === selectedPlaylist;
+        const label = isSelected && parsed.playlistLabel ? ` — ${parsed.playlistLabel}` : '';
+        lines.push(`${isSelected ? '*' : ' '} ${playlistName} — ${duration}${label}`);
+        if (isSelected && parsed.videoLine) {
+          lines.push(`  Video: ${parsed.videoLine}`);
+        }
+        if (isSelected && parsed.audioLines.length) {
+          const audioSummary = parsed.audioLines
+            .slice(0, 4)
+            .map((line) => formatBdInfoAudio(line) || line)
+            .filter(Boolean)
+            .join('; ');
+          if (audioSummary) {
+            lines.push(`  Audio: ${audioSummary}`);
+          }
+        }
+        if (isSelected && parsed.subtitleLines.length) {
+          const subsSummary = parsed.subtitleLines
+            .slice(0, 5)
+            .map((line) => formatBdInfoSubtitle(line) || String(line || '').replace(/\s{2,}/g, ' ').trim())
+            .filter(Boolean)
+            .join('; ');
+          if (subsSummary) {
+            lines.push(`  Sub: ${subsSummary}`);
+          }
+          if (parsed.subtitleLines.length > 5) {
+            lines.push(`  Altri ${parsed.subtitleLines.length - 5} sottotitoli non mostrati`);
+          }
+        }
+      });
+    } else {
+      if (parsed.videoLine) {
+        lines.push('');
+        lines.push('Video');
+        lines.push(`Dettagli      : ${parsed.videoLine}`);
+      }
+
+      if (parsed.audioLines.length) {
+        lines.push('');
+        lines.push('Audio');
+        parsed.audioLines.slice(0, 4).forEach((line, index) => {
+          const formatted = formatBdInfoAudio(line);
+          lines.push(`#${index + 1}            : ${formatted || line}`);
+        });
+      }
+
+      if (parsed.subtitleLines.length) {
+        lines.push('');
+        lines.push('Sottotitoli');
+        parsed.subtitleLines.slice(0, 5).forEach((line, index) => {
+          const cleaned = String(line || '').replace(/\s{2,}/g, ' ').trim();
+          if (cleaned) {
+            lines.push(`#${index + 1}            : ${cleaned}`);
+          }
+        });
+        if (parsed.subtitleLines.length > 5) {
+          lines.push(`Altri ${parsed.subtitleLines.length - 5} sottotitoli presenti e non mostrati`);
+        }
+      }
+    }
+
+    return lines.join('\n').trim() || 'BDInfo non disponibile.';
+  }
+
+  function fillFromBdInfo() {
+    if (!state.bdInfoRaw) {
+      return;
+    }
+    const parsed = state.bdInfoParsed || parseBdInfoText(state.bdInfoRaw);
+    state.bdInfoParsed = parsed;
+    if (parsed.region) {
+      setInputAuto(ui.regionInput, parsed.region);
+    }
+  }
+
   return {
     buildLanguageTag,
+    buildBdInfoShort,
     buildMediaInfoShort,
     cleanSearchTitle,
     extractGroupTagFromName,
+    fillFromBdInfo,
     fillFromMediaInfo,
     getHdrTokens,
     getResolution,

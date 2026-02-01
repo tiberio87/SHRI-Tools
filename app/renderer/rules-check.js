@@ -749,6 +749,10 @@ export function createRulesCheckTools({
     const isDir = state.kind === 'dir';
     const fileCount = state.videoFiles.length;
     const filePath = state.mainVideo || state.videoFiles[0] || '';
+    const isFullDisc = form.format === 'Full Disc';
+    const isDiscStructure = Array.isArray(state.videoFiles) && state.videoFiles.some((file) =>
+      /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(file || '')
+    );
 
     if (isDir) {
       const folderName = getPathBaseName(state.targetPath);
@@ -770,6 +774,17 @@ export function createRulesCheckTools({
         folderData,
         'Cartella'
       );
+
+      if (isFullDisc && isDiscStructure) {
+        if (targets.fileBlock) {
+          targets.fileBlock.classList.add('hidden');
+        }
+        if (targets.fileNote) {
+          targets.fileNote.textContent = '';
+          targets.fileNote.classList.add('hidden');
+        }
+        return;
+      }
 
       const fileBase = filePath ? stripExtension(getPathBaseName(filePath)) : '';
       const fileData = buildRulesCheckSummary({
@@ -851,6 +866,10 @@ export function createRulesCheckTools({
     const isDir = state.kind === 'dir';
     const fileCount = state.videoFiles.length;
     const filePath = state.mainVideo || state.videoFiles[0] || '';
+    const isFullDisc = form.format === 'Full Disc';
+    const isDiscStructure = Array.isArray(state.videoFiles) && state.videoFiles.some((file) =>
+      /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(file || '')
+    );
 
     if (isDir) {
       const folderName = getPathBaseName(state.targetPath);
@@ -872,6 +891,17 @@ export function createRulesCheckTools({
         folderData,
         'Cartella'
       );
+
+      if (isFullDisc && isDiscStructure) {
+        if (ui.wizardRulesFileBlock) {
+          ui.wizardRulesFileBlock.classList.add('hidden');
+        }
+        if (ui.wizardRulesFileNote) {
+          ui.wizardRulesFileNote.textContent = '';
+          ui.wizardRulesFileNote.classList.add('hidden');
+        }
+        return;
+      }
 
       const fileBase = filePath ? stripExtension(getPathBaseName(filePath)) : '';
       const fileData = buildRulesCheckSummary({

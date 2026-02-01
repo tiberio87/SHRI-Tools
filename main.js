@@ -1,8 +1,10 @@
 const { app, BrowserWindow, dialog, ipcMain, Menu, shell, globalShortcut } = require('electron');
 const path = require('path');
+const os = require('os');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const { spawn } = require('child_process');
+const { buildUaScreenshotTimes } = require('./app/screenshot-times');
 
 function createFormData() {
   if (!global.FormData) {
@@ -45,6 +47,7 @@ let mediaInfoInstance = null;
 let mediaInfoTextInstance = null;
 let createTorrentModule = null;
 const transmissionSessions = new Map();
+const bdinfoJobs = new Map();
 let uaProcess = null;
 let uaSender = null;
 let uaUpdateProcess = null;
@@ -128,6 +131,86 @@ function runCommand(command, args, options = {}) {
       });
       child.on('close', (code) => {
         resolve({
+          ok: code === 0,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          code
+        });
+      });
+    } catch (error) {
+      resolve({ ok: false, error, stdout: '', stderr: '', code: -1 });
+    }
+  });
+}
+
+function runCommandWithTimeout(command, args, options = {}) {
+  const timeoutMs = Number.isFinite(options.timeoutMs) ? options.timeoutMs : 120000;
+  const spawnOptions = { ...options };
+  const onStdout = typeof spawnOptions.onStdout === 'function' ? spawnOptions.onStdout : null;
+  const onStderr = typeof spawnOptions.onStderr === 'function' ? spawnOptions.onStderr : null;
+  delete spawnOptions.timeoutMs;
+  delete spawnOptions.onStdout;
+  delete spawnOptions.onStderr;
+
+  return new Promise((resolve) => {
+    try {
+      const child = spawn(command, args, {
+        ...spawnOptions,
+        windowsHide: true
+      });
+      let stdout = '';
+      let stderr = '';
+      let settled = false;
+      const finish = (result) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        resolve(result);
+      };
+
+      const timer = setTimeout(() => {
+        try {
+          child.kill();
+        } catch (error) {
+          // ignore kill errors
+        }
+        finish({
+          ok: false,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          code: -1,
+          timeout: true
+        });
+      }, timeoutMs);
+
+      child.stdout?.on('data', (chunk) => {
+        const text = chunk.toString();
+        stdout += text;
+        if (onStdout) {
+          onStdout(text);
+        }
+      });
+      child.stderr?.on('data', (chunk) => {
+        const text = chunk.toString();
+        stderr += text;
+        if (onStderr) {
+          onStderr(text);
+        }
+      });
+      child.on('error', (error) => {
+        clearTimeout(timer);
+        finish({
+          ok: false,
+          error,
+          stdout: stdout.trim(),
+          stderr: stderr.trim(),
+          code: -1
+        });
+      });
+      child.on('close', (code) => {
+        clearTimeout(timer);
+        finish({
           ok: code === 0,
           stdout: stdout.trim(),
           stderr: stderr.trim(),
@@ -230,6 +313,22 @@ function parseRatio(value, fallback = 0) {
   const cleaned = text.replace(/[^0-9.]/g, '');
   const parsed = parseFloat(cleaned);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function parseFrameRate(videoTrack, fallback = 24) {
+  if (!videoTrack) {
+    return fallback;
+  }
+  const direct = parseNumber(videoTrack.FrameRate, 0);
+  if (direct) {
+    return direct;
+  }
+  const num = parseNumber(videoTrack.FrameRate_Num, 0);
+  const den = parseNumber(videoTrack.FrameRate_Den, 0);
+  if (num && den) {
+    return num / den;
+  }
+  return fallback;
 }
 
 function deriveSar(width, height, par, dar) {
@@ -766,13 +865,20 @@ function buildScreenshotFilters({ scaleWidth, scaleHeight, tonemap }) {
 
 async function captureScreenshot(ffmpegPath, videoPath, outputPath, timestamp, options) {
   const filterChain = buildScreenshotFilters(options);
-  const args = [
-    '-hide_banner',
-    '-y',
-    '-ss',
-    String(timestamp),
-    '-i',
-    videoPath,
+  const seekMode = options?.seekMode === 'accurate' ? 'accurate' : 'fast';
+  const skipFrame = String(options?.skipFrame || '').trim();
+  const args = ['-hide_banner', '-y'];
+  if (skipFrame) {
+    args.push('-skip_frame', skipFrame);
+  }
+  if (seekMode === 'fast') {
+    args.push('-ss', String(timestamp));
+  }
+  args.push('-i', videoPath);
+  if (seekMode === 'accurate') {
+    args.push('-ss', String(timestamp));
+  }
+  args.push(
     '-map',
     '0:v:0',
     '-an',
@@ -786,7 +892,7 @@ async function captureScreenshot(ffmpegPath, videoPath, outputPath, timestamp, o
     '-pred',
     'mixed',
     outputPath
-  ];
+  );
   await runProcess(ffmpegPath, args);
 }
 
@@ -1696,11 +1802,6 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
 
   try {
     const duration = await getVideoDurationSeconds(ffprobePath, videoPath);
-    const times = buildScreenshotTimes(duration, count);
-    const totalShots = times.length;
-    const totalSteps = totalShots * 2;
-    let stepIndex = 0;
-    sendProgress({ progress: 0, stage: 'start', current: 0, total: totalShots });
     let mediaInfo = null;
     try {
       mediaInfo = await analyzeMedia(videoPath);
@@ -1708,6 +1809,26 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       mediaInfo = null;
     }
     const videoTrack = getVideoTrack(mediaInfo);
+    const frameRate = parseFrameRate(videoTrack, 24);
+    const times = buildUaScreenshotTimes({
+      durationSeconds: duration,
+      frameRate,
+      count,
+      isDisc: Boolean(payload?.isDisc),
+      category: payload?.category || 'Movie',
+      retakeCount: payload?.retakeCount || 0
+    });
+    if (!times.length) {
+      times.push(...buildScreenshotTimes(duration, count));
+    }
+    sendProgress({
+      stage: 'debug',
+      message: `Screenshot times: ${times.map((t) => Number(t).toFixed(3)).join(', ')}`
+    });
+    const totalShots = times.length;
+    const totalSteps = totalShots * 2;
+    let stepIndex = 0;
+    sendProgress({ progress: 0, stage: 'start', current: 0, total: totalShots });
     const width = parseNumber(videoTrack?.Width, 1920);
     const height = parseNumber(videoTrack?.Height, 1080);
     const par = parseNumber(videoTrack?.PixelAspectRatio, 1);
@@ -1732,7 +1853,9 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       const options = {
         scaleWidth: needsScale ? scaledWidth : 0,
         scaleHeight: needsScale ? scaledHeight : 0,
-        tonemap: tonemapEnabled
+        tonemap: tonemapEnabled,
+        skipFrame: payload?.skipFrame || '',
+        seekMode: payload?.seekMode || ''
       };
       try {
         await captureScreenshot(ffmpegPath, videoPath, filePath, time, options);
@@ -1743,7 +1866,9 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
           await captureScreenshot(ffmpegPath, videoPath, filePath, time, {
             scaleWidth: needsScale ? scaledWidth : 0,
             scaleHeight: needsScale ? scaledHeight : 0,
-            tonemap: false
+            tonemap: false,
+            skipFrame: payload?.skipFrame || '',
+            seekMode: payload?.seekMode || ''
           });
         } else {
           throw error;
@@ -1849,6 +1974,355 @@ ipcMain.handle('mediainfo-text', async (_event, filePath) => {
     return { text };
   } catch (error) {
     return { text: '', error: String(error) };
+  }
+});
+
+ipcMain.handle('bdinfo-cancel', async (_event, payload) => {
+  const requestId = String(payload?.requestId || '').trim();
+  if (!requestId) {
+    return { ok: false, error: 'RequestId mancante.' };
+  }
+  const job = bdinfoJobs.get(requestId);
+  if (!job) {
+    return { ok: false, error: 'Nessun processo BDInfo attivo.' };
+  }
+  job.cancelled = true;
+  if (job.child) {
+    try {
+      job.child.kill();
+    } catch {
+      // ignore kill errors
+    }
+  }
+  if (job.sender) {
+    job.sender.send('bdinfo-progress', {
+      requestId,
+      targetPath: job.targetPath,
+      stage: 'cancelled',
+      text: 'Operazione annullata',
+      progress: 0
+    });
+  }
+  return { ok: true };
+});
+
+ipcMain.handle('bdinfo-text', async (_event, payload) => {
+  const targetPath = String(payload?.path || '').trim();
+  const bdinfoPath = String(payload?.bdinfoPath || '').trim();
+  const requestId = String(payload?.requestId || '').trim();
+  const listOnly = Boolean(payload?.listOnly);
+  const playlistOverride = String(payload?.playlist || '').trim();
+  const sendProgress = (data) => {
+    if (_event?.sender) {
+      _event.sender.send('bdinfo-progress', {
+        requestId,
+        targetPath,
+        ...data
+      });
+    }
+  };
+  if (!targetPath) {
+    return { ok: false, text: '', error: 'Percorso disco mancante.' };
+  }
+  if (!bdinfoPath) {
+    return { ok: false, text: '', error: 'Percorso BDInfo mancante.' };
+  }
+  if (!fsSync.existsSync(bdinfoPath)) {
+    return { ok: false, text: '', error: 'BDInfo non trovato al percorso indicato.' };
+  }
+
+  const job = requestId
+    ? {
+        requestId,
+        targetPath,
+        sender: _event?.sender || null,
+        cancelled: false,
+        child: null
+      }
+    : null;
+  if (job) {
+    bdinfoJobs.set(requestId, job);
+  }
+
+  let reportDir = '';
+  try {
+    reportDir = await fs.mkdtemp(path.join(os.tmpdir(), 'bdinfo-'));
+    sendProgress({ stage: 'start', text: 'Avvio BDInfo...' });
+    const parseDurationSeconds = (value) => {
+      const parts = String(value || '').trim().split(':').map((part) => Number.parseInt(part, 10));
+      if (parts.length !== 3 || parts.some((part) => Number.isNaN(part))) {
+        return 0;
+      }
+      return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    };
+    const parsePlaylistList = (output) => {
+      const lines = String(output || '').split(/\r?\n/);
+      const entries = [];
+      const lineReLegacy = /^\s*\d+\s+\d+\s+([0-9]{5}\.MPLS)\s+([0-9]{2}:[0-9]{2}:[0-9]{2})\s+([0-9\.,]+)\s+/i;
+      const lineReSimple = /^\s*\d+\s*:\s*([0-9]{5}\.MPLS)\s+([0-9]{2}:[0-9]{2}:[0-9]{2})\b/i;
+      for (const line of lines) {
+        let match = lineReLegacy.exec(line);
+        if (match) {
+          const playlist = match[1];
+          const duration = match[2];
+          const estimatedRaw = match[3] || '';
+          const estimated = Number(estimatedRaw.replace(/[^\d]/g, ''));
+          entries.push({
+            playlist,
+            duration,
+            durationSeconds: parseDurationSeconds(duration),
+            estimated
+          });
+          continue;
+        }
+        match = lineReSimple.exec(line);
+        if (match) {
+          const playlist = match[1];
+          const duration = match[2];
+          entries.push({
+            playlist,
+            duration,
+            durationSeconds: parseDurationSeconds(duration),
+            estimated: 0
+          });
+        }
+      }
+      return entries;
+    };
+
+    const listResult = await runCommand(bdinfoPath, ['-l', targetPath], { cwd: reportDir });
+    const playlists = listResult.ok ? parsePlaylistList(listResult.stdout) : [];
+    const hasEstimated = playlists.some((item) => item.estimated > 0);
+    const selected = playlists
+      .slice()
+      .sort((a, b) => {
+        if (hasEstimated) {
+          return (b.estimated || 0) - (a.estimated || 0);
+        }
+        return (b.durationSeconds || 0) - (a.durationSeconds || 0);
+      })[0]?.playlist || '';
+    if (job?.cancelled) {
+      return { ok: false, text: listResult.stdout || listResult.stderr || '', error: 'Operazione annullata.' };
+    }
+
+    if (listOnly) {
+      sendProgress({ stage: 'list', text: 'Playlist BDInfo caricate.' });
+      return { ok: listResult.ok, text: listResult.stdout || '', error: listResult.stderr || '', playlists };
+    }
+
+    const chosenPlaylist = playlistOverride || selected;
+    const scanArgs = chosenPlaylist
+      ? ['-m', chosenPlaylist, targetPath, reportDir]
+      : ['-w', targetPath, reportDir];
+    let stdoutBuffer = '';
+    let stderrBuffer = '';
+    let collectingM2ts = false;
+    const totalM2tsSet = new Set();
+    const processedM2tsSet = new Set();
+    const sendM2tsProgress = (text, overrideProgress) => {
+      const totalM2ts = totalM2tsSet.size;
+      const processedM2ts = processedM2tsSet.size;
+      const payload = {
+        stage: 'scan',
+        text,
+        totalM2ts,
+        processedM2ts
+      };
+      if (Number.isFinite(overrideProgress)) {
+        payload.progress = Math.max(0, Math.min(1, overrideProgress));
+      } else if (totalM2ts > 0) {
+        payload.progress = Math.max(0, Math.min(1, processedM2ts / totalM2ts));
+      }
+      sendProgress(payload);
+    };
+    const handleLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return;
+      }
+      if (/please wait while we scan the disc/i.test(trimmed)) {
+        collectingM2ts = false;
+        sendM2tsProgress('Scansione BDInfo in corso...');
+        return;
+      }
+      if (/preparing to analyze/i.test(trimmed)) {
+        collectingM2ts = true;
+        sendM2tsProgress('Analisi playlist BDInfo...');
+        return;
+      }
+      if (/^\s*file\s+elapsed\s+remaining/i.test(trimmed)) {
+        collectingM2ts = false;
+        return;
+      }
+      if (/please wait while we generate the report/i.test(trimmed)) {
+        collectingM2ts = false;
+        sendProgress({
+          stage: 'report',
+          text: 'Generazione report BDInfo...',
+          totalM2ts: totalM2tsSet.size,
+          processedM2ts: processedM2tsSet.size
+        });
+        return;
+      }
+      const match = trimmed.match(/Scanning\s+(\d+)%/i);
+      if (match) {
+        const pct = Math.max(0, Math.min(100, Number.parseInt(match[1], 10)));
+        collectingM2ts = false;
+        const pctTokens = trimmed.match(/\b(\d{5}\.M2TS)\b/gi);
+        if (pctTokens && pctTokens.length) {
+          pctTokens.forEach((token) => processedM2tsSet.add(token.toUpperCase()));
+        }
+        sendProgress({
+          stage: 'scan',
+          progress: pct / 100,
+          text: `Scansione ${pct}%`,
+          totalM2ts: totalM2tsSet.size,
+          processedM2ts: processedM2tsSet.size
+        });
+        return;
+      }
+      const m2tsTokens = trimmed.match(/\b(\d{5}\.M2TS)\b/gi);
+      if (m2tsTokens && m2tsTokens.length) {
+        if (collectingM2ts) {
+          m2tsTokens.forEach((token) => totalM2tsSet.add(token.toUpperCase()));
+          sendM2tsProgress('Analisi playlist BDInfo...');
+          return;
+        }
+        m2tsTokens.forEach((token) => processedM2tsSet.add(token.toUpperCase()));
+        sendM2tsProgress(`Elaborazione: ${m2tsTokens[0]}`);
+        return;
+      }
+      if (/scan completed successfully/i.test(trimmed)) {
+        sendProgress({
+          stage: 'report',
+          progress: 1,
+          text: 'Scansione completata',
+          totalM2ts: totalM2tsSet.size,
+          processedM2ts: processedM2tsSet.size
+        });
+      }
+    };
+    const feedBuffer = (buffer, chunk) => {
+      const next = buffer + chunk;
+      const parts = next.split(/[\r\n]+/);
+      const tail = parts.pop() || '';
+      parts.forEach(handleLine);
+      return tail;
+    };
+    const onStdout = (chunk) => {
+      stdoutBuffer = feedBuffer(stdoutBuffer, chunk);
+    };
+    const onStderr = (chunk) => {
+      stderrBuffer = feedBuffer(stderrBuffer, chunk);
+    };
+    const result = await new Promise((resolve) => {
+      try {
+        const child = spawn(bdinfoPath, scanArgs, { cwd: reportDir, windowsHide: true });
+        let stdout = '';
+        let stderr = '';
+        if (job) {
+          job.child = child;
+        }
+        child.stdout?.on('data', (chunk) => {
+          const text = chunk.toString();
+          stdout += text;
+          onStdout(text);
+        });
+        child.stderr?.on('data', (chunk) => {
+          const text = chunk.toString();
+          stderr += text;
+          onStderr(text);
+        });
+        child.on('error', (error) => {
+          resolve({
+            ok: false,
+            error,
+            stdout: stdout.trim(),
+            stderr: stderr.trim(),
+            code: -1
+          });
+        });
+        child.on('close', (code) => {
+          resolve({
+            ok: code === 0,
+            stdout: stdout.trim(),
+            stderr: stderr.trim(),
+            code
+          });
+        });
+      } catch (error) {
+        resolve({ ok: false, error, stdout: '', stderr: '', code: -1 });
+      }
+    });
+
+    if (job) {
+      job.child = null;
+    }
+
+    if (job?.cancelled) {
+      return { ok: false, text: result.stdout || result.stderr || '', error: 'Operazione annullata.' };
+    }
+
+    if (!result.ok) {
+      sendProgress({ stage: 'error', text: 'Errore BDInfo' });
+      return {
+        ok: false,
+        text: result.stdout || result.stderr || '',
+        error: result.stderr || result.stdout || `BDInfo exited with code ${result.code}`
+      };
+    }
+
+    if (job?.cancelled) {
+      return { ok: false, text: '', error: 'Operazione annullata.' };
+    }
+
+    const findLatestReport = async (dir, depth = 0) => {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      let best = null;
+      for (const entry of entries) {
+        const entryPath = path.join(dir, entry.name);
+        if (entry.isDirectory()) {
+          if (depth < 2) {
+            const nested = await findLatestReport(entryPath, depth + 1);
+            if (nested && (!best || nested.mtimeMs > best.mtimeMs)) {
+              best = nested;
+            }
+          }
+          continue;
+        }
+        const ext = path.extname(entry.name).toLowerCase();
+        if (ext !== '.txt' && ext !== '.log') {
+          continue;
+        }
+        const stat = await fs.stat(entryPath);
+        if (!best || stat.mtimeMs > best.mtimeMs) {
+          best = { path: entryPath, mtimeMs: stat.mtimeMs };
+        }
+      }
+      return best;
+    };
+
+    const report = await findLatestReport(reportDir);
+    if (!report?.path) {
+      return { ok: false, text: '', error: 'BDInfo non ha generato alcun report.' };
+    }
+    const text = await readFile(report.path, 'utf-8');
+    sendProgress({ stage: 'done', progress: 1, text: 'Completato' });
+    return { ok: true, text, error: '', playlist: chosenPlaylist || selected, playlists };
+  } catch (error) {
+    sendProgress({ stage: 'error', text: 'Errore BDInfo' });
+    return { ok: false, text: '', error: String(error) };
+  } finally {
+    if (job && requestId) {
+      bdinfoJobs.delete(requestId);
+    }
+    if (reportDir) {
+      try {
+        await fs.rm(reportDir, { recursive: true, force: true });
+      } catch {
+        // ignore cleanup errors
+      }
+    }
   }
 });
 

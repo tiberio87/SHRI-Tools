@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = {
   renameLangInFolders: true,
   renameLangInFiles: true,
   autoApplyNameSuggestions: false,
+  bdinfoPath: '',
   uploadMode: 'ua',
   torrentPasskey: '',
   torrentAnnounceUrl: '',
@@ -447,6 +448,9 @@ export function createSettingsTools({
         : 1;
       ui.settingsMkbrrWorkersInput.value = String(workers);
     }
+    if (ui.settingsBdinfoPathInput) {
+      ui.settingsBdinfoPathInput.value = settings.bdinfoPath || '';
+    }
     if (ui.settingsUploadAssistantPathInput) {
       ui.settingsUploadAssistantPathInput.value = settings.uploadAssistantPath || '';
     }
@@ -495,6 +499,7 @@ export function createSettingsTools({
       renameLangInFolders: Boolean(ui.renameLangFoldersToggle?.checked),
       renameLangInFiles: Boolean(ui.renameLangFilesToggle?.checked),
       autoApplyNameSuggestions: Boolean(ui.autoApplyNameSuggestToggle?.checked),
+      bdinfoPath: ui.settingsBdinfoPathInput?.value.trim() || '',
       serviceList: ui.serviceListInput.value.trim(),
       tagList: ui.tagListInput.value.trim(),
       autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),

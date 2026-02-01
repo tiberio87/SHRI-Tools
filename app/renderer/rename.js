@@ -82,7 +82,12 @@ export function createRenameTools(deps) {
     if (format === 'Full Disc' && data.region) {
       tokens.push(data.region);
     }
-    if (data.uhd) {
+    const uhdFromEncodeBluray = format === 'Encode' &&
+      typeof data.source === 'string' &&
+      /BLURAY/i.test(data.source) &&
+      /2160p/i.test(String(data.resolution || ''));
+    const wantsUhd = data.tokenStyle === 'title' ? data.uhd : uhdFromEncodeBluray;
+    if (wantsUhd) {
       const sourceHasUhd = typeof data.source === 'string' && /\bUHD\b/i.test(data.source);
       if (!sourceHasUhd) {
         tokens.push('UHD');
@@ -160,6 +165,19 @@ export function createRenameTools(deps) {
       }
       if (data.audioMeta) {
         tokens.push(data.audioMeta);
+      }
+    }
+
+    if (data.tokenStyle !== 'title') {
+      for (let i = 0; i < tokens.length; i += 1) {
+        const token = tokens[i];
+        if (!token) {
+          continue;
+        }
+        let updated = String(token);
+        updated = updated.replace(/HDR10\+/g, 'HDR10Plus');
+        updated = updated.replace(/DD\+/g, 'DDP');
+        tokens[i] = updated;
       }
     }
 

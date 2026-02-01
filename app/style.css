@@ -853,6 +853,16 @@ button.secondary {
   border: 1px solid var(--surface-inline-border);
 }
 
+button.bdinfo-cancel {
+  background: var(--toast-warning-bg);
+  color: var(--toast-warning);
+  border: 1px solid var(--toast-warning);
+}
+
+button.bdinfo-cancel:hover {
+  box-shadow: 0 6px 12px var(--shadow);
+}
+
 button:hover {
   transform: translateY(-1px);
 }
@@ -1198,6 +1208,80 @@ body.light .badge.error {
   gap: 8px;
 }
 
+.bdinfo-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.bdinfo-playlist-table {
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: 10px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-strong);
+}
+
+.bdinfo-playlist-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 170px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.bdinfo-playlist-row {
+  display: grid;
+  grid-template-columns: 90px 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  padding: 5px 6px;
+  border-radius: 8px;
+  box-sizing: border-box;
+  cursor: pointer;
+  color: var(--text);
+}
+
+.bdinfo-playlist-row.header {
+  cursor: default;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  padding: 0 6px 6px;
+}
+
+.bdinfo-playlist-row:hover:not(.header) {
+  background: var(--surface-dropdown-hover);
+}
+
+.bdinfo-playlist-row.selected:not(.header) {
+  background: var(--surface-inline);
+  border: 1px solid var(--auto-border);
+}
+
+.bdinfo-playlist-cell {
+  font-size: 12px;
+  line-height: 1.3;
+  word-break: break-word;
+}
+
+.bdinfo-playlist-more {
+  margin-top: 6px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 12px;
+  cursor: pointer;
+  text-align: left;
+  padding: 2px 0;
+}
+
+.bdinfo-playlist-more:hover {
+  color: var(--accent-strong);
+}
+
 .plan-label-row .plan-label {
   margin-top: 0;
 }
@@ -1281,6 +1365,11 @@ body.light .badge.error {
   word-break: break-word;
 }
 
+.plan-mediainfo.bdinfo-report {
+  max-height: 220px;
+  overflow-y: auto;
+}
+
 .confirm-text {
   font-size: 13px;
   color: var(--text);
@@ -1319,6 +1408,32 @@ body.light .badge.error {
 .confirm-value {
   color: var(--muted);
   word-break: break-word;
+}
+
+.confirm-value.warning {
+  color: var(--toast-warning);
+  font-weight: 600;
+}
+
+.confirm-row-input {
+  align-items: center;
+}
+
+.confirm-input {
+  flex: 1;
+  min-width: 140px;
+  max-width: 220px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.confirm-row-hint {
+  margin-left: 96px;
+}
+
+.confirm-hint {
+  font-size: 11px;
+  color: var(--muted);
 }
 
 .confirm-value.highlight-title {

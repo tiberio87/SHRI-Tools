@@ -6,6 +6,8 @@ contextBridge.exposeInMainWorld('api', {
   selectFolder: () => ipcRenderer.invoke('select-folder'),
   scanPath: (targetPath) => ipcRenderer.invoke('scan-path', targetPath),
   getMediaInfoText: (filePath) => ipcRenderer.invoke('mediainfo-text', filePath),
+  getBdInfoText: (payload) => ipcRenderer.invoke('bdinfo-text', payload),
+  cancelBdInfo: (payload) => ipcRenderer.invoke('bdinfo-cancel', payload),
   readServices: () => ipcRenderer.invoke('read-services'),
   previewRename: (payload) => ipcRenderer.invoke('preview-rename', payload),
   applyRename: (payload) => ipcRenderer.invoke('apply-rename', payload),
@@ -41,6 +43,11 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_event, data) => handler(data);
     ipcRenderer.on('screens-progress', listener);
     return () => ipcRenderer.removeListener('screens-progress', listener);
+  },
+  onBdInfoProgress: (handler) => {
+    const listener = (_event, data) => handler(data);
+    ipcRenderer.on('bdinfo-progress', listener);
+    return () => ipcRenderer.removeListener('bdinfo-progress', listener);
   },
   onUaOutput: (handler) => {
     const listener = (_event, data) => handler(data);

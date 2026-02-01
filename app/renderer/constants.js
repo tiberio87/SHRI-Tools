@@ -284,7 +284,7 @@ export const STOP_WORDS = new Set([
   '2160P', '1080P', '720P', '576P', '480P',
   '4K', '8K',
   'WEB', 'WEBDL', 'WEB-DL', 'WEBRIP', 'WEBRIP',
-  'BLURAY', 'BLU-RAY', 'REMUX', 'UHD', 'HDR', 'HDR10', 'HDR10+', 'DV', 'DOVI',
+  'BLURAY', 'BLU-RAY', 'REMUX', 'UHD', 'HDR', 'HDR10', 'HDR10+', 'HDR10PLUS', 'DV', 'DOVI',
   'X264', 'X265', 'H264', 'H265', 'HEVC', 'AVC', 'AV1',
   'DTS', 'DTS-HD', 'DTSHD', 'TRUEHD', 'AAC', 'DD', 'DDP', 'EAC3', 'AC3', 'FLAC',
   'ATMOS', 'AURO3D', 'IMAX', 'EXTENDED', 'REPACK', 'PROPER', 'RERIP',
