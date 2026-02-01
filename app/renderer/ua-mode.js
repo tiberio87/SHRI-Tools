@@ -828,7 +828,7 @@ export function createUAMode({
       args.push('-a');
     }
     if (ui.uaWebdvToggle?.checked) {
-      args.push('-webdv');
+      args.push('-edition', 'Hybrid');
     }
     if (ui.uaTagToggle?.checked) {
       const tagValue = ui.uaTagInput?.value.trim();
