@@ -1647,6 +1647,27 @@ function getFormState() {
   const languageTagInFolders = settings.renameLangInFolders !== false;
   const languageTagInFiles = settings.renameLangInFiles !== false;
   const allowNoGroupTag = settings.autoNoGroupTag !== false;
+  const subsTag = (() => {
+    if (!state.mediaInfo || state.mediaInfo.error) {
+      return '';
+    }
+    const audioTracks = getAudioTracks(state.mediaInfo);
+    const hasItalianAudio = audioTracks.some((track) => {
+      const lang = normalizeLangTag(getTrackLang(track));
+      if (lang !== 'ITA') {
+        return false;
+      }
+      const title = String(track.Title || track.title || '').toLowerCase();
+      return !title.includes('commentary');
+    });
+    if (hasItalianAudio) {
+      return '';
+    }
+    const tracks = state.mediaInfo?.media?.track || [];
+    const textTracks = tracks.filter((track) => track['@type'] === 'Text');
+    const hasItalianSubs = textTracks.some((track) => normalizeLangTag(getTrackLang(track)) === 'ITA');
+    return hasItalianSubs ? '[SUBS]' : '';
+  })();
 
   return {
     type: ui.typeSelect.value,
@@ -1676,6 +1697,7 @@ function getFormState() {
     videoCodec: ui.videoCodecInput.value.trim(),
     is3d: ui.threeDCheckbox.checked,
     tag: getResolvedTag(),
+    subsTag,
     allowNoGroupTag
   };
 }

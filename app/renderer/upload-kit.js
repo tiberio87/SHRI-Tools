@@ -928,11 +928,14 @@ export function createUploadKit(deps) {
       });
     }
     if (state.metadata?.imdbId) {
+      const imdbValue = normalizeImdbValue(state.metadata.imdbId);
+      if (imdbValue && imdbValue !== '0') {
       parts.push({
         label: 'IMDb',
-        value: state.metadata.imdbId,
-        link: `https://www.imdb.com/title/${state.metadata.imdbId}/`
+        value: imdbValue,
+        link: `https://www.imdb.com/title/tt${imdbValue}/`
       });
+      }
     }
     if (state.metadata?.tvdbSeriesId) {
       const slug = state.metadata.tvdbSeriesSlug;
@@ -943,6 +946,14 @@ export function createUploadKit(deps) {
         label: 'TVDB',
         value: state.metadata.tvdbSeriesId,
         link
+      });
+    }
+    const malValue = normalizeNumericId(state.metadata?.malId || state.metadata?.mal);
+    if (malValue && malValue !== '0') {
+      parts.push({
+        label: 'MAL',
+        value: malValue,
+        link: `https://myanimelist.net/anime/${malValue}`
       });
     }
     return parts;

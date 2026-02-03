@@ -57,7 +57,11 @@ export function createRenameFlow({
     if (state.kind === 'tracker') {
       const form = getFormState();
       const isEpisode = form.type === 'tv-episode' || form.type === 'anime-episode';
-      const baseName = renameTools.computeBaseName(form, isEpisode ? { episodeTitle: '' } : {});
+      const baseName = renameTools.computeBaseName(form, {
+        tokenStyle: 'title',
+        separatorStyle: 'spaces',
+        ...(isEpisode ? { episodeTitle: '' } : {})
+      });
       if (ui.renameFileCheckbox) {
         ui.renameFileCheckbox.checked = false;
         ui.renameFileCheckbox.disabled = true;
@@ -124,6 +128,94 @@ export function createRenameFlow({
       });
       suggestedInfo.appendChild(copySuggestedBtn);
       ui.renamePlanList.appendChild(suggestedInfo);
+
+      const normalizeImdbId = (value) => {
+        if (!value) {
+          return '';
+        }
+        let raw = String(value).trim().toLowerCase();
+        if (raw.startsWith('tt')) {
+          raw = raw.slice(2);
+        }
+        const digits = raw.replace(/[^\d]/g, '');
+        if (!digits) {
+          return '';
+        }
+        const parsed = Number.parseInt(digits, 10);
+        if (!Number.isFinite(parsed) || parsed === 0) {
+          return '';
+        }
+        return String(parsed).padStart(7, '0');
+      };
+
+      const attrs = state.trackerData?.attributes || {};
+      const tmdbId = String(state.metadata?.tmdbId || attrs.tmdb_id || '').trim();
+      const imdbId = normalizeImdbId(state.metadata?.imdbId || attrs.imdb_id || '');
+      const tvdbId = String(state.metadata?.tvdbSeriesId || state.metadata?.tvdbId || attrs.tvdb_id || '').trim();
+      const malId = String(state.metadata?.malId || attrs.mal_id || '').trim().replace(/[^\d]/g, '');
+      const ids = [];
+      const isTvType = form.type.startsWith('tv') || form.type.startsWith('anime');
+      const tmdbType = state.metadata?.tmdbType || (isTvType ? 'tv' : 'movie');
+      if (tmdbId) {
+        ids.push({
+          label: 'TMDB',
+          value: tmdbId,
+          link: `https://www.themoviedb.org/${tmdbType}/${tmdbId}`
+        });
+      }
+      if (imdbId) {
+        ids.push({
+          label: 'IMDb',
+          value: imdbId,
+          link: `https://www.imdb.com/title/tt${imdbId}/`
+        });
+      }
+      if (tvdbId) {
+        const slug = state.metadata?.tvdbSeriesSlug;
+        const link = slug
+          ? `https://thetvdb.com/series/${slug}`
+          : `https://thetvdb.com/?tab=series&id=${tvdbId}`;
+        ids.push({
+          label: 'TVDB',
+          value: tvdbId,
+          link
+        });
+      }
+      if (malId) {
+        ids.push({
+          label: 'MAL',
+          value: malId,
+          link: `https://myanimelist.net/anime/${malId}`
+        });
+      }
+      if (ids.length) {
+        const idsWrap = document.createElement('div');
+        idsWrap.className = 'upload-ids';
+        ids.forEach((item) => {
+          const badge = document.createElement(item.link ? 'button' : 'span');
+          badge.className = `upload-id-badge${item.link ? ' clickable' : ''}`;
+          if (item.link) {
+            badge.type = 'button';
+            badge.addEventListener('click', () => {
+              if (copyToClipboard) {
+                copyToClipboard(item.value, `${item.label} copiato.`);
+              } else {
+                navigator.clipboard?.writeText(item.value);
+                showToast?.(`${item.label} copiato.`, 'success');
+              }
+            });
+          }
+          const label = document.createElement('span');
+          label.className = 'label';
+          label.textContent = item.label;
+          const value = document.createElement('span');
+          value.textContent = item.value;
+          badge.appendChild(label);
+          badge.appendChild(value);
+          idsWrap.appendChild(badge);
+        });
+        ui.renamePlanList.appendChild(idsWrap);
+      }
 
       if (state.mediaInfo || state.trackerMediaInfoText) {
         const infoHeader = document.createElement('div');

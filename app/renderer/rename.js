@@ -168,6 +168,10 @@ export function createRenameTools(deps) {
       }
     }
 
+    if (data.tokenStyle === 'title' && data.subsTag) {
+      tokens.push(data.subsTag);
+    }
+
     if (data.tokenStyle !== 'title') {
       for (let i = 0; i < tokens.length; i += 1) {
         const token = tokens[i];
