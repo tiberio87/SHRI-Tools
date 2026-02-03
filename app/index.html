@@ -47,6 +47,7 @@
             <div class="section-actions">
               <button id="selectFileBtn" class="primary">Seleziona file</button>
               <button id="selectFolderBtn" class="primary">Seleziona cartella</button>
+              <button id="trackerOpenBtn" class="secondary">Analisi tracker</button>
             </div>
           </div>
           <div id="selectedPath" class="path">Seleziona un file/cartella o trascinalo qui.</div>
@@ -833,6 +834,28 @@
             <label for="unit3dResolutionOverridesInput">Override Resolution ID UNIT3D (uno per riga, es. 2160p=2)</label>
             <textarea id="unit3dResolutionOverridesInput" rows="3" placeholder="Es. 2160p=2"></textarea>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="trackerModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Analisi tracker</h3>
+        <div class="modal-actions">
+          <button id="trackerCloseBtn" class="secondary small">Chiudi</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <div class="field">
+          <label for="trackerUrlInput">Link torrent</label>
+          <input id="trackerUrlInput" type="text" placeholder="https://tracker.tld/torrents/123" />
+        </div>
+        <div class="hint">Usa un link Unit3D accessibile con l'API key configurata.</div>
+        <div class="modal-actions">
+          <button id="trackerAnalyzeBtn" class="primary">Analizza</button>
         </div>
       </div>
     </div>

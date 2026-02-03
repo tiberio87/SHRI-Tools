@@ -33,6 +33,7 @@ import { createUAMode } from './renderer/ua-mode.js';
 import { setupSourceDragDrop } from './renderer/drag-drop.js';
 import { createRenameFlow } from './renderer/rename-flow.js';
 import { createAutoDetectFlow } from './renderer/auto-detect.js';
+import { createTrackerAnalysis } from './renderer/tracker-analysis.js';
 
 let currentTorrentRequestId = null;
 let settingsSnapshot = '';
@@ -44,6 +45,7 @@ let refreshPreview = async () => {};
 let schedulePreview = () => {};
 let showMediaInfoReport = async () => {};
 let autoDetectFromPath = async () => {};
+let fetchMetadataAuto = async () => {};
 let updateAutoDetectControls = () => {};
 let manualDetectFromInputs = async () => {};
 const torrentLogLines = [];
@@ -99,6 +101,11 @@ function updateRenameBadge(plan) {
     return;
   }
   if (!state.targetPath) {
+    ui.renameBadge.classList.add('hidden');
+    ui.renameBadge.textContent = '';
+    return;
+  }
+  if (state.kind === 'tracker') {
     ui.renameBadge.classList.add('hidden');
     ui.renameBadge.textContent = '';
     return;
@@ -475,10 +482,17 @@ function resetAllInputs(options = {}) {
 
   if (ui.renameFileCheckbox) {
     ui.renameFileCheckbox.checked = true;
+    ui.renameFileCheckbox.disabled = false;
   }
   if (ui.renameFolderCheckbox) {
     ui.renameFolderCheckbox.checked = false;
     ui.renameFolderCheckbox.disabled = true;
+  }
+  if (ui.openUploadAssistantBtn) {
+    ui.openUploadAssistantBtn.disabled = false;
+  }
+  if (ui.openUploadWizardBtn) {
+    ui.openUploadWizardBtn.disabled = false;
   }
 
   if (ui.renameHint) {
@@ -537,6 +551,10 @@ function resetSource() {
   state.screenshots = [];
   state.screenshotsMeta = null;
   state.screenshotsMeta = null;
+  state.trackerId = '';
+  state.trackerName = '';
+  state.trackerData = null;
+  state.trackerMediaInfoText = '';
 
   setSelectedPath('');
   setScanHint('', '');
@@ -1628,6 +1646,7 @@ function getFormState() {
   const settings = loadSettings();
   const languageTagInFolders = settings.renameLangInFolders !== false;
   const languageTagInFiles = settings.renameLangInFiles !== false;
+  const allowNoGroupTag = settings.autoNoGroupTag !== false;
 
   return {
     type: ui.typeSelect.value,
@@ -1656,7 +1675,8 @@ function getFormState() {
     hdrTokens,
     videoCodec: ui.videoCodecInput.value.trim(),
     is3d: ui.threeDCheckbox.checked,
-    tag: getResolvedTag()
+    tag: getResolvedTag(),
+    allowNoGroupTag
   };
 }
 
@@ -1713,7 +1733,8 @@ const renameFlow = createRenameFlow({
   updateVisibility,
   updateFormatServiceSuggest,
   getMediaInfoText: (path) => window.api.getMediaInfoText(path),
-  previewRename: (payload) => window.api.previewRename(payload)
+  previewRename: (payload) => window.api.previewRename(payload),
+  copyToClipboard
 });
 
 ({ refreshPreview, schedulePreview, showMediaInfoReport } = renameFlow);
@@ -1739,7 +1760,28 @@ const autoDetectFlow = createAutoDetectFlow({
   fetchMetadata: (payload) => window.api.fetchMetadata(payload)
 });
 
-({ autoDetectFromPath, updateAutoDetectControls, manualDetectFromInputs } = autoDetectFlow);
+({ fetchMetadataAuto, autoDetectFromPath, updateAutoDetectControls, manualDetectFromInputs } = autoDetectFlow);
+
+const trackerAnalysis = createTrackerAnalysis({
+  ui,
+  state,
+  metadataTools,
+  loadSettings,
+  logDebug,
+  showToast,
+  resetAllInputs,
+  setSelectedPath,
+  setScanHint,
+  updateTagSuggestion,
+  updateTagOptions,
+  setMediaInfoBadgeVisible,
+  updateVisibility,
+  schedulePreview,
+  fetchMetadataAuto,
+  setIfAuto,
+  setInputAuto
+});
+trackerAnalysis.init();
 
 function getDiscRootPath(targetPath, mainVideo) {
   const candidate = String(mainVideo || targetPath || '');
@@ -1937,6 +1979,10 @@ async function loadPath(targetPath) {
   state.screenshots = [];
   state.lastTorrentPath = '';
   state.episodeMap = {};
+  state.trackerId = '';
+  state.trackerName = '';
+  state.trackerData = null;
+  state.trackerMediaInfoText = '';
   logDebug('scanPath result', {
     kind: scan.kind,
     mainVideo: scan.mainVideo,
@@ -2077,6 +2123,10 @@ ui.autoDetectToggle.addEventListener('change', async () => {
 ui.applyRenameBtn.addEventListener('click', async () => {
   if (!state.targetPath) {
     setHint(ui.renameHint, 'Seleziona un file o una cartella.');
+    return;
+  }
+  if (state.kind === 'tracker') {
+    setHint(ui.renameHint, 'In modalità tracker non vengono rinominati file o cartelle.');
     return;
   }
 

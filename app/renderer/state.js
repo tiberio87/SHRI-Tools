@@ -28,7 +28,11 @@ export const state = {
   lastTagResolveKey: '',
   lastTorrentPath: '',
   screenshots: [],
-  screenshotsMeta: null
+  screenshotsMeta: null,
+  trackerId: '',
+  trackerName: '',
+  trackerData: null,
+  trackerMediaInfoText: ''
 };
 
 export const debugState = {

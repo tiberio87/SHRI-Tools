@@ -167,8 +167,8 @@ export function createMetadataTools(deps) {
   }
 
   function getResolution(videoTrack) {
-    const widthRaw = parseInt(videoTrack?.Width || 0, 10);
-    const heightRaw = parseInt(videoTrack?.Height || 0, 10);
+    const widthRaw = parseInt(String(videoTrack?.Width || '').replace(/[^\d]/g, ''), 10);
+    const heightRaw = parseInt(String(videoTrack?.Height || '').replace(/[^\d]/g, ''), 10);
     if (!widthRaw || !heightRaw) {
       return '';
     }

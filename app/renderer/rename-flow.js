@@ -17,11 +17,18 @@ export function createRenameFlow({
   updateVisibility,
   updateFormatServiceSuggest,
   getMediaInfoText,
-  previewRename
+  previewRename,
+  copyToClipboard
 }) {
   let previewTimer = null;
 
   async function showMediaInfoReport() {
+    if (state.kind === 'tracker') {
+      ui.mediaInfoText.textContent = state.trackerMediaInfoText || 'MediaInfo non disponibile.';
+      ui.mediaInfoPath.textContent = `Tracker: ${state.targetPath || ''}`;
+      openMediaInfoModal();
+      return;
+    }
     if (!state.mainVideo || state.mediaInfo?.error) {
       return;
     }
@@ -42,6 +49,106 @@ export function createRenameFlow({
       ui.warningList.innerHTML = '';
       updateRenameBadge(null);
       clearWizardRulesCheck();
+      return;
+    }
+    if (ui.applyRenameBtn) {
+      ui.applyRenameBtn.disabled = false;
+    }
+    if (state.kind === 'tracker') {
+      const form = getFormState();
+      const isEpisode = form.type === 'tv-episode' || form.type === 'anime-episode';
+      const baseName = renameTools.computeBaseName(form, isEpisode ? { episodeTitle: '' } : {});
+      if (ui.renameFileCheckbox) {
+        ui.renameFileCheckbox.checked = false;
+        ui.renameFileCheckbox.disabled = true;
+      }
+      if (ui.renameFolderCheckbox) {
+        ui.renameFolderCheckbox.checked = false;
+        ui.renameFolderCheckbox.disabled = true;
+      }
+      if (ui.applyRenameBtn) {
+        ui.applyRenameBtn.disabled = true;
+      }
+      ui.renamePlanList.innerHTML = '';
+      ui.warningList.innerHTML = '';
+      updateRenameBadge(null);
+      clearWizardRulesCheck();
+
+      const trackerLabel = document.createElement('div');
+      trackerLabel.className = 'plan-label';
+      trackerLabel.textContent = 'Tracker';
+      ui.renamePlanList.appendChild(trackerLabel);
+
+      const trackerInfo = document.createElement('div');
+      trackerInfo.className = 'plan-info';
+      const currentLine = document.createElement('div');
+      currentLine.className = 'plan-text old';
+      currentLine.textContent = state.trackerName || 'Titolo non disponibile';
+      trackerInfo.appendChild(currentLine);
+      ui.renamePlanList.appendChild(trackerInfo);
+
+      const suggestedLabel = document.createElement('div');
+      suggestedLabel.className = 'plan-label';
+      suggestedLabel.textContent = 'Titolo suggerito';
+      ui.renamePlanList.appendChild(suggestedLabel);
+
+      const suggestedInfo = document.createElement('div');
+      suggestedInfo.className = 'plan-info with-copy';
+      const suggestedLine = document.createElement('div');
+      suggestedLine.className = 'plan-text new';
+      suggestedLine.textContent = baseName || 'Compila i campi per generare il titolo.';
+      suggestedInfo.appendChild(suggestedLine);
+      const copySuggestedBtn = document.createElement('button');
+      copySuggestedBtn.type = 'button';
+      copySuggestedBtn.className = 'icon-button';
+      copySuggestedBtn.title = 'Copia titolo suggerito';
+      copySuggestedBtn.setAttribute('aria-label', 'Copia titolo suggerito');
+      copySuggestedBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <rect x="9" y="9" width="10" height="10" rx="2"></rect>
+          <rect x="5" y="5" width="10" height="10" rx="2"></rect>
+        </svg>
+      `;
+      copySuggestedBtn.addEventListener('click', () => {
+        const text = suggestedLine.textContent || '';
+        if (!text) {
+          showToast?.('Nessun titolo da copiare.', 'warning');
+          return;
+        }
+        if (copyToClipboard) {
+          copyToClipboard(text, 'Titolo suggerito copiato.');
+        } else {
+          navigator.clipboard?.writeText(text);
+          showToast?.('Titolo suggerito copiato.', 'success');
+        }
+      });
+      suggestedInfo.appendChild(copySuggestedBtn);
+      ui.renamePlanList.appendChild(suggestedInfo);
+
+      if (state.mediaInfo || state.trackerMediaInfoText) {
+        const infoHeader = document.createElement('div');
+        infoHeader.className = 'plan-label-row tracker-mediainfo';
+
+        const infoLabel = document.createElement('div');
+        infoLabel.className = 'plan-label';
+        infoLabel.textContent = 'MediaInfo (sintetico)';
+
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'status clickable';
+        infoBtn.textContent = 'Apri mediainfo completo';
+        infoBtn.addEventListener('click', async () => {
+          await showMediaInfoReport();
+        });
+
+        infoHeader.appendChild(infoLabel);
+        infoHeader.appendChild(infoBtn);
+        ui.renamePlanList.appendChild(infoHeader);
+
+        const info = document.createElement('pre');
+        info.className = 'plan-mediainfo tracker-mediainfo';
+        info.textContent = buildMediaInfoShort();
+        ui.renamePlanList.appendChild(info);
+      }
       return;
     }
 

@@ -419,6 +419,39 @@ async function verifyUnit3dKey(apiKey, baseUrl) {
   }
 }
 
+async function fetchUnit3dTorrent({ baseUrl, apiKey, torrentId }) {
+  if (!baseUrl || !apiKey) {
+    return { ok: false, error: 'Base URL o API key mancanti.' };
+  }
+  if (!torrentId) {
+    return { ok: false, error: 'ID torrent mancante.' };
+  }
+  const base = String(baseUrl).replace(/\/+$/, '');
+  const response = await fetch(`${base}/api/torrents/${encodeURIComponent(torrentId)}`, {
+    headers: {
+      authorization: `Bearer ${apiKey}`,
+      accept: 'application/json'
+    }
+  });
+  const text = await response.text();
+  const raw = text || '';
+  let payload = null;
+  try {
+    payload = raw ? JSON.parse(raw) : null;
+  } catch {
+    payload = null;
+  }
+  if (!response.ok) {
+    return {
+      ok: false,
+      status: response.status,
+      error: payload?.message || raw || `HTTP ${response.status}`,
+      raw
+    };
+  }
+  return { ok: true, status: response.status, data: payload, raw };
+}
+
 async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, data }) {
   if (!baseUrl || !apiKey) {
     return { ok: false, error: 'Base URL o API key mancanti.' };
@@ -2602,6 +2635,28 @@ ipcMain.handle('unit3d-upload', async (_event, payload) => {
     };
   } catch (error) {
     return { ok: false, error: error?.message || 'Errore upload.' };
+  }
+});
+
+ipcMain.handle('unit3d-fetch-torrent', async (_event, payload) => {
+  try {
+    const result = await fetchUnit3dTorrent(payload || {});
+    if (result.ok) {
+      return {
+        ok: true,
+        status: result.status || 0,
+        data: result.data || null,
+        raw: result.raw || ''
+      };
+    }
+    return {
+      ok: false,
+      status: result.status || 0,
+      error: result.error || 'Errore fetch torrent.',
+      raw: result.raw || ''
+    };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore fetch torrent.' };
   }
 });
 

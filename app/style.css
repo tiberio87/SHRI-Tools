@@ -1286,6 +1286,10 @@ body.light .badge.error {
   margin-top: 0;
 }
 
+.plan-label-row.tracker-mediainfo {
+  margin-top: auto;
+}
+
 .plan-info {
   padding: 8px 10px;
   border-radius: 8px;
@@ -1293,6 +1297,16 @@ body.light .badge.error {
   border: 1px solid var(--border-strong);
   color: var(--muted);
   word-break: break-all;
+}
+
+.plan-info.with-copy {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-info.with-copy .plan-text {
+  flex: 1;
 }
 
 .plan-items {

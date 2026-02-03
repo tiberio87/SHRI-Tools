@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
   openPath: (targetPath) => ipcRenderer.invoke('open-path', targetPath),
   createTorrent: (payload) => ipcRenderer.invoke('create-torrent', payload),
   unit3dUpload: (payload) => ipcRenderer.invoke('unit3d-upload', payload),
+  unit3dFetchTorrent: (payload) => ipcRenderer.invoke('unit3d-fetch-torrent', payload),
   unit3dDownloadTorrent: (payload) => ipcRenderer.invoke('unit3d-download-torrent', payload),
   qbitAddTorrent: (payload) => ipcRenderer.invoke('qbit-add-torrent', payload),
   qbitTest: (payload) => ipcRenderer.invoke('qbit-test', payload),

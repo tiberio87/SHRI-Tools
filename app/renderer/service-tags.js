@@ -205,7 +205,10 @@ export function createServiceTagTools({ ui, state, logDebug, metadataTools }) {
   }
 
   function updateTagSuggestion(settings) {
-    const path = state.mainVideo || state.targetPath;
+    const allowNoGroup = settings?.autoNoGroupTag !== false;
+    const path = state.kind === 'tracker'
+      ? (state.mainVideo || state.trackerName || state.targetPath)
+      : (state.mainVideo || state.targetPath);
     if (!path) {
       state.tagSuggestion = '';
       return;
@@ -213,8 +216,15 @@ export function createServiceTagTools({ ui, state, logDebug, metadataTools }) {
     state.tagSuggestion = metadataTools.extractGroupTagFromName(
       path,
       buildKnownGroupTags(settings),
-      { allowNoGroup: false }
+      { allowNoGroup }
     );
+    if (!state.tagSuggestion && allowNoGroup) {
+      const raw = String(path || '');
+      const looksLikeGroup = /[-_.]\s*[A-Za-z0-9]{2,}$/.test(raw);
+      if (!looksLikeGroup) {
+        state.tagSuggestion = 'NoGroup';
+      }
+    }
     if (state.tagSuggestion !== state.lastTagSuggestion) {
       logDebug?.('tag suggestion', {
         path,
