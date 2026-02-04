@@ -2848,6 +2848,61 @@ body.light .badge.error {
   background: var(--upload-id-click-bg-hover);
 }
 
+.upload-id-badge.mismatch {
+  border-color: rgba(240, 180, 94, 0.45);
+  background: rgba(240, 180, 94, 0.18);
+  color: var(--accent);
+  font-weight: 600;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-id-badge.mismatch .id-pill {
+  border: 1px solid rgba(240, 180, 94, 0.4);
+  background: rgba(240, 180, 94, 0.12);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload-id-badge.mismatch .id-pill:hover {
+  border-color: rgba(240, 180, 94, 0.7);
+  background: rgba(240, 180, 94, 0.2);
+}
+
+.upload-id-badge.mismatch .id-arrow {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.upload-id-badge.suggested {
+  border-color: var(--upload-id-click-border);
+  background: var(--upload-id-click-bg);
+  color: var(--text);
+  font-weight: 600;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.upload-id-badge.suggested .id-pill {
+  border: 1px solid var(--upload-id-click-border);
+  background: var(--upload-id-click-bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.upload-id-badge.suggested .id-pill:hover {
+  border-color: var(--upload-id-click-border-hover);
+  background: var(--upload-id-click-bg-hover);
+}
+
 .tab-button {
   border: 1px solid var(--border-muted);
   background: var(--surface-inline);

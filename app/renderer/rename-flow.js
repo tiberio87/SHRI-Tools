@@ -155,10 +155,11 @@ export function createRenameFlow({
       };
 
       const attrs = state.trackerData?.attributes || {};
-      const tmdbId = String(state.metadata?.tmdbId || attrs.tmdb_id || '').trim();
-      const imdbId = normalizeImdbId(state.metadata?.imdbId || attrs.imdb_id || '');
-      const tvdbId = String(state.metadata?.tvdbSeriesId || state.metadata?.tvdbId || attrs.tvdb_id || '').trim();
-      const malId = String(state.metadata?.malId || attrs.mal_id || '').trim().replace(/[^\d]/g, '');
+      const allowTrackerIds = !(state.trackerIdMismatch?.active && !state.trackerIdMismatch?.usedFallback);
+      const tmdbId = String(state.metadata?.tmdbId || (allowTrackerIds ? attrs.tmdb_id : '') || '').trim();
+      const imdbId = normalizeImdbId(state.metadata?.imdbId || (allowTrackerIds ? attrs.imdb_id : '') || '');
+      const tvdbId = String(state.metadata?.tvdbSeriesId || state.metadata?.tvdbId || (allowTrackerIds ? attrs.tvdb_id : '') || '').trim();
+      const malId = String(state.metadata?.malId || (allowTrackerIds ? attrs.mal_id : '') || '').trim().replace(/[^\d]/g, '');
       const ids = [];
       const isTvType = form.type.startsWith('tv') || form.type.startsWith('anime');
       const tmdbType = state.metadata?.tmdbType || (isTvType ? 'tv' : 'movie');
@@ -194,15 +195,97 @@ export function createRenameFlow({
           link: `https://myanimelist.net/anime/${malId}`
         });
       }
-      if (ids.length) {
+      const mismatch = state.trackerIdMismatch;
+      const shouldShowMismatch = Boolean(mismatch?.active);
+      if (ids.length || shouldShowMismatch) {
+        const mismatchWrap = document.createElement('div');
+        mismatchWrap.className = 'upload-ids';
         const idsWrap = document.createElement('div');
         idsWrap.className = 'upload-ids';
-        ids.forEach((item) => {
-          const badge = document.createElement(item.link ? 'button' : 'span');
-          badge.className = `upload-id-badge${item.link ? ' clickable' : ''}`;
-          if (item.link) {
-            badge.type = 'button';
-            badge.addEventListener('click', () => {
+        if (shouldShowMismatch) {
+          const formatImdbDisplay = (value) => {
+            const raw = String(value || '').trim();
+            if (!raw) {
+              return '';
+            }
+            const stripped = raw.toLowerCase().startsWith('tt') ? raw.slice(2) : raw;
+            const digits = stripped.replace(/[^\d]/g, '');
+            if (!digits) {
+              return '';
+            }
+            const padded = digits.length < 7 ? digits.padStart(7, '0') : digits;
+            return `tt${padded}`;
+          };
+          const mismatchBadge = document.createElement('span');
+          mismatchBadge.className = 'upload-id-badge mismatch';
+
+          const mismatchLabel = document.createElement('span');
+          mismatchLabel.className = 'label';
+          mismatchLabel.textContent = 'ID MISMATCH RILEVATO (TRACKER):';
+
+          mismatchBadge.appendChild(mismatchLabel);
+
+          if (mismatch.provided?.imdb) {
+            const imdbId = formatImdbDisplay(mismatch.provided.imdb);
+            const imdbBtn = document.createElement('button');
+            imdbBtn.type = 'button';
+            imdbBtn.className = 'id-pill external';
+            imdbBtn.textContent = `IMDb ${imdbId}`;
+            imdbBtn.setAttribute('data-external', `https://www.imdb.com/title/${imdbId}/`);
+            mismatchBadge.appendChild(imdbBtn);
+          }
+          if (mismatch.provided?.tmdb) {
+            const tmdbBtn = document.createElement('button');
+            tmdbBtn.type = 'button';
+            tmdbBtn.className = 'id-pill external';
+            tmdbBtn.textContent = `TMDb ${mismatch.provided.tmdb}`;
+            tmdbBtn.setAttribute('data-external', `https://www.themoviedb.org/${tmdbType}/${mismatch.provided.tmdb}`);
+            mismatchBadge.appendChild(tmdbBtn);
+          }
+          if (mismatch.provided?.tvdb) {
+            const tvdbBtn = document.createElement('button');
+            tvdbBtn.type = 'button';
+            tvdbBtn.className = 'id-pill external';
+            tvdbBtn.textContent = `TVDB ${mismatch.provided.tvdb}`;
+            tvdbBtn.setAttribute('data-external', `https://thetvdb.com/?tab=series&id=${mismatch.provided.tvdb}`);
+            mismatchBadge.appendChild(tvdbBtn);
+          }
+          if (mismatch.provided?.mal) {
+            const malBtn = document.createElement('button');
+            malBtn.type = 'button';
+            malBtn.className = 'id-pill external';
+            malBtn.textContent = `MAL ${mismatch.provided.mal}`;
+            malBtn.setAttribute('data-external', `https://myanimelist.net/anime/${mismatch.provided.mal}`);
+            mismatchBadge.appendChild(malBtn);
+          }
+
+          const reasonText = Array.isArray(mismatch.reasons) && mismatch.reasons.length
+            ? mismatch.reasons.join(', ')
+            : 'titolo/anno';
+          mismatchBadge.setAttribute(
+            'data-tooltip',
+            `ID non coerente con ${reasonText}. Usato fallback titolo/anno.`
+          );
+          mismatchWrap.appendChild(mismatchBadge);
+        }
+        if (mismatchWrap.children.length) {
+          ui.renamePlanList.appendChild(mismatchWrap);
+        }
+        if (ids.length) {
+          const suggestedBadge = document.createElement('span');
+          suggestedBadge.className = 'upload-id-badge suggested';
+
+          const suggestedLabel = document.createElement('span');
+          suggestedLabel.className = 'label';
+          suggestedLabel.textContent = 'ID SUGGERITI:';
+          suggestedBadge.appendChild(suggestedLabel);
+
+          ids.forEach((item) => {
+            const pill = document.createElement('button');
+            pill.type = 'button';
+            pill.className = 'id-pill suggested';
+            pill.textContent = `${item.label} ${item.value}`;
+            pill.addEventListener('click', () => {
               if (copyToClipboard) {
                 copyToClipboard(item.value, `${item.label} copiato.`);
               } else {
@@ -210,17 +293,12 @@ export function createRenameFlow({
                 showToast?.(`${item.label} copiato.`, 'success');
               }
             });
-          }
-          const label = document.createElement('span');
-          label.className = 'label';
-          label.textContent = item.label;
-          const value = document.createElement('span');
-          value.textContent = item.value;
-          badge.appendChild(label);
-          badge.appendChild(value);
-          idsWrap.appendChild(badge);
-        });
-        ui.renamePlanList.appendChild(idsWrap);
+            suggestedBadge.appendChild(pill);
+          });
+
+          idsWrap.appendChild(suggestedBadge);
+          ui.renamePlanList.appendChild(idsWrap);
+        }
       }
 
       if (state.mediaInfo || state.trackerMediaInfoText) {

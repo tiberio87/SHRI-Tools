@@ -325,6 +325,7 @@ export function createTrackerAnalysis({
     state.trackerId = payload?.id || '';
     state.trackerName = name;
     state.trackerVideoCodecFallback = '';
+    state.trackerIdMismatch = null;
     state.metadata = null;
     state.bdInfoRaw = '';
     state.bdInfoParsed = null;
@@ -477,6 +478,179 @@ export function createTrackerAnalysis({
       episode: guess.episode,
       typeHint
     });
+
+    const expectedYear = String(guess.year || attrs.release_year || '').trim();
+    const resolvedMeta = state.metadata || {};
+    const resolvedTitle = String(resolvedMeta.title || ui.titleInput.value || '').trim();
+    const resolvedYear = String(resolvedMeta.year || ui.yearInput.value || '').trim();
+    const trackerTitle = String(nameForGuess || name || '').trim();
+    const normalizeTitle = (value) => {
+      const cleaned = metadataTools.cleanSearchTitle(String(value || ''));
+      return cleaned
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim();
+    };
+    const titleLooksSimilar = (a, b) => {
+      const left = normalizeTitle(a);
+      const right = normalizeTitle(b);
+      if (!left || !right) {
+        return true;
+      }
+      if (left === right || left.includes(right) || right.includes(left)) {
+        return true;
+      }
+      const leftTokens = left.split(/\s+/).filter(Boolean);
+      const rightTokens = right.split(/\s+/).filter(Boolean);
+      if (!leftTokens.length || !rightTokens.length) {
+        return true;
+      }
+      const rightSet = new Set(rightTokens);
+      const overlap = leftTokens.filter((token) => rightSet.has(token)).length;
+      const ratio = overlap / Math.max(leftTokens.length, rightTokens.length);
+      return ratio >= 0.5;
+    };
+    const mismatchReasons = [];
+    if (expectedYear && resolvedYear && expectedYear !== resolvedYear) {
+      mismatchReasons.push('year');
+    }
+    if (trackerTitle && resolvedTitle && !titleLooksSimilar(trackerTitle, resolvedTitle)) {
+      mismatchReasons.push('title');
+    }
+    const idProvided = Boolean(attrs.imdb_id || attrs.tmdb_id);
+    if (idProvided && mismatchReasons.length) {
+      state.trackerIdMismatch = {
+        active: true,
+        reasons: mismatchReasons,
+        provided: {
+          imdb: attrs.imdb_id || '',
+          tmdb: attrs.tmdb_id || '',
+          tvdb: attrs.tvdb_id || '',
+          mal: attrs.mal_id || ''
+        },
+        resolved: {
+          title: resolvedTitle,
+          year: resolvedYear
+        },
+        expected: {
+          title: trackerTitle,
+          year: expectedYear
+        },
+        usedFallback: false
+      };
+      logDebug?.('tracker id mismatch', {
+        reasons: mismatchReasons,
+        provided: state.trackerIdMismatch.provided,
+        expected: state.trackerIdMismatch.expected,
+        resolved: state.trackerIdMismatch.resolved
+      });
+
+      const imdbBackup = ui.imdbInput.value;
+      ui.imdbInput.value = '';
+      ui.imdbInput.dataset.manual = 'false';
+
+      const anchorYear = expectedYear;
+      const parseYear = (value) => {
+        const parsed = Number.parseInt(String(value || ''), 10);
+        return Number.isFinite(parsed) ? parsed : null;
+      };
+      const isYearCoherent = (candidateYear) => {
+        if (!anchorYear) {
+          return true;
+        }
+        const anchor = parseYear(anchorYear);
+        const candidate = parseYear(candidateYear);
+        if (!anchor || !candidate) {
+          return false;
+        }
+        return Math.abs(candidate - anchor) <= 5;
+      };
+      const tryFallback = async (yearValue) => {
+        const yearBackup = ui.yearInput.value;
+        if (!yearValue) {
+          ui.yearInput.value = '';
+          ui.yearInput.dataset.manual = 'false';
+        }
+        await fetchMetadataAuto({
+          title: guess.title,
+          year: yearValue,
+          season: guess.season,
+          episode: guess.episode,
+          typeHint
+        });
+        if (!yearValue) {
+          ui.yearInput.value = yearBackup;
+        }
+        const fallbackTitle = String(state.metadata?.title || '').trim();
+        const fallbackYear = String(state.metadata?.year || '').trim();
+        const fallbackImdb = state.metadata?.imdbId || '';
+        const fallbackTmdb = state.metadata?.tmdbId || '';
+        const hasFallback = Boolean(fallbackTitle || fallbackImdb || fallbackTmdb);
+        const yearOk = isYearCoherent(fallbackYear);
+        return {
+          ok: hasFallback && yearOk,
+          title: fallbackTitle,
+          year: fallbackYear,
+          imdb: fallbackImdb,
+          tmdb: fallbackTmdb,
+          tvdb: state.metadata?.tvdbSeriesId || state.metadata?.tvdbId || '',
+          mal: state.metadata?.malId || ''
+        };
+      };
+
+      let fallbackResult = await tryFallback(guess.year || anchorYear);
+      if (!fallbackResult.ok) {
+        fallbackResult = await tryFallback('');
+      }
+
+      state.trackerIdMismatch.usedFallback = Boolean(fallbackResult.ok);
+      state.trackerIdMismatch.fallback = {
+        title: fallbackResult.title,
+        year: fallbackResult.year,
+        imdb: fallbackResult.imdb,
+        tmdb: fallbackResult.tmdb,
+        tvdb: fallbackResult.tvdb,
+        mal: fallbackResult.mal
+      };
+      if (fallbackResult.ok) {
+        if (fallbackResult.title) {
+          setInputAuto(ui.titleInput, fallbackResult.title);
+        }
+        if (fallbackResult.year) {
+          setInputAuto(ui.yearInput, fallbackResult.year);
+        }
+        if (fallbackResult.imdb) {
+          setInputAuto(ui.imdbInput, String(fallbackResult.imdb));
+        }
+        if (fallbackResult.tmdb) {
+          state.metadata = {
+            ...(state.metadata || {}),
+            tmdbId: String(fallbackResult.tmdb)
+          };
+        }
+      } else if (imdbBackup) {
+        ui.imdbInput.value = imdbBackup;
+      }
+      if (!fallbackResult.ok) {
+        const safeTitle = guess.title || trackerTitle || resolvedTitle;
+        if (safeTitle) {
+          setInputAuto(ui.titleInput, safeTitle);
+        }
+        if (anchorYear) {
+          setInputAuto(ui.yearInput, anchorYear);
+        }
+        state.metadata = {
+          ...(state.metadata || {}),
+          title: safeTitle,
+          year: anchorYear || '',
+          imdbId: '',
+          tmdbId: '',
+          tvdbSeriesId: '',
+          tvdbId: '',
+          malId: ''
+        };
+      }
+    }
 
     logDebug?.('tracker title suggestion inputs', {
       trackerId: state.trackerId || '',
