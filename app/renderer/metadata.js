@@ -271,7 +271,12 @@ export function createMetadataTools(deps) {
       return '';
     }
     const allowNoGroup = options?.allowNoGroup === true;
-    const base = stripExtension(getPathBaseName(filePath)).trim();
+    const isTrackerContext = options?.source === 'tracker';
+    const rawBase = getPathBaseName(filePath).trim();
+    const base = (isTrackerContext
+      ? rawBase
+      : stripExtension(rawBase)
+    ).trim();
     if (!base) {
       return '';
     }
@@ -310,6 +315,12 @@ export function createMetadataTools(deps) {
     }
 
     candidate = candidate.replace(/^[.\-]+|[.\-]+$/g, '').trim();
+    if (!candidate && isTrackerContext) {
+      const dashMatch = base.match(/-(?!.*-)\s*([A-Za-z0-9]{2,20})\s*$/);
+      if (dashMatch) {
+        candidate = dashMatch[1];
+      }
+    }
     if (!candidate || candidate.length < 2 || candidate.length > 20 || /\s/.test(candidate)) {
       if (/\s-\s/.test(base)) {
         logDebug?.('tag detect', { mode: 'spaced-dash', base });

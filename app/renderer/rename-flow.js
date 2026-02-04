@@ -104,6 +104,10 @@ export function createRenameFlow({
       suggestedLine.className = 'plan-text new';
       suggestedLine.textContent = baseName || 'Compila i campi per generare il titolo.';
       suggestedInfo.appendChild(suggestedLine);
+      logDebug?.('tracker title suggestion', {
+        tracker: state.trackerName || '',
+        suggested: baseName || ''
+      });
       const copySuggestedBtn = document.createElement('button');
       copySuggestedBtn.type = 'button';
       copySuggestedBtn.className = 'icon-button';

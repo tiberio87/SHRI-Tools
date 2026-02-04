@@ -114,6 +114,26 @@ export function createRenameTools(deps) {
       if (data.videoCodec) {
         tokens.push(data.videoCodec);
       }
+    } else if (format === 'HDTV') {
+      tokens.push('HDTV');
+      if (data.audioCodec) {
+        tokens.push(data.audioCodec);
+      }
+      if (data.audioChannels) {
+        tokens.push(data.audioChannels);
+      }
+      if (data.audioMeta) {
+        tokens.push(data.audioMeta);
+      }
+      tokens.push(...hdrTokens);
+      if (data.videoCodec) {
+        const normalizedCodec = data.videoCodec === 'HEVC'
+          ? 'H.265'
+          : data.videoCodec === 'AVC'
+            ? 'H.264'
+            : data.videoCodec;
+        tokens.push(normalizedCodec);
+      }
     } else if (format === 'Encode') {
       if (data.source) {
         tokens.push(data.source === 'DVD' ? 'DVDRip' : data.source);

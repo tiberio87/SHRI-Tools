@@ -206,18 +206,52 @@ export function createServiceTagTools({ ui, state, logDebug, metadataTools }) {
 
   function updateTagSuggestion(settings) {
     const allowNoGroup = settings?.autoNoGroupTag !== false;
-    const path = state.kind === 'tracker'
-      ? (state.mainVideo || state.trackerName || state.targetPath)
+    const isTracker = state.kind === 'tracker';
+    const trackerName = state.trackerName || '';
+    const fileName = state.mainVideo || '';
+    const path = isTracker
+      ? (trackerName || fileName || state.targetPath)
       : (state.mainVideo || state.targetPath);
     if (!path) {
       state.tagSuggestion = '';
       return;
     }
-    state.tagSuggestion = metadataTools.extractGroupTagFromName(
-      path,
-      buildKnownGroupTags(settings),
-      { allowNoGroup }
-    );
+    const knownTags = buildKnownGroupTags(settings);
+    if (isTracker) {
+      const tagFromTracker = trackerName
+        ? metadataTools.extractGroupTagFromName(trackerName, knownTags, {
+            allowNoGroup: false,
+            source: 'tracker'
+          })
+        : '';
+      const tagFromFile = fileName
+        ? metadataTools.extractGroupTagFromName(fileName, knownTags, { allowNoGroup: false })
+        : '';
+      if (tagFromTracker && tagFromTracker.toLowerCase() !== 'nogroup') {
+        state.tagSuggestion = tagFromTracker;
+      } else if (tagFromFile && tagFromFile.toLowerCase() !== 'nogroup') {
+        state.tagSuggestion = tagFromFile;
+      } else if (allowNoGroup) {
+        state.tagSuggestion = 'NoGroup';
+      } else {
+        state.tagSuggestion = '';
+      }
+      if (tagFromTracker && tagFromFile && tagFromTracker !== tagFromFile) {
+        logDebug?.('tag suggestion conflict', {
+          trackerName,
+          fileName,
+          trackerTag: tagFromTracker,
+          fileTag: tagFromFile,
+          chosen: state.tagSuggestion || ''
+        });
+      }
+    } else {
+      state.tagSuggestion = metadataTools.extractGroupTagFromName(
+        path,
+        knownTags,
+        { allowNoGroup }
+      );
+    }
     if (!state.tagSuggestion && allowNoGroup) {
       const raw = String(path || '');
       const looksLikeGroup = /[-_.]\s*[A-Za-z0-9]{2,}$/.test(raw);
