@@ -276,10 +276,6 @@ export function createMetadataTools(deps) {
       return '';
     }
 
-    if (/\s-\s/.test(base)) {
-      return allowNoGroup ? 'NoGroup' : '';
-    }
-
     if (NO_GROUP_PATTERN.test(base)) {
       logDebug?.('tag detect', { mode: 'invalid-token', base });
       return allowNoGroup ? 'NoGroup' : '';
@@ -314,20 +310,31 @@ export function createMetadataTools(deps) {
     }
 
     candidate = candidate.replace(/^[.\-]+|[.\-]+$/g, '').trim();
-    logDebug?.('tag detect', {
-      mode: 'suffix',
-      base,
-      rawCandidate: candidate
-    });
     if (!candidate || candidate.length < 2 || candidate.length > 20 || /\s/.test(candidate)) {
+      if (/\s-\s/.test(base)) {
+        logDebug?.('tag detect', { mode: 'spaced-dash', base });
+        return allowNoGroup ? 'NoGroup' : '';
+      }
+      logDebug?.('tag detect', { mode: 'suffix', base, rawCandidate: candidate });
       return allowNoGroup ? 'NoGroup' : '';
     }
     if (candidate.length <= 2 && !knownMap.has(candidate.toUpperCase())) {
+      if (/\s-\s/.test(base)) {
+        logDebug?.('tag detect', { mode: 'spaced-dash', base });
+        return allowNoGroup ? 'NoGroup' : '';
+      }
+      logDebug?.('tag detect', { mode: 'suffix', base, rawCandidate: candidate });
       return allowNoGroup ? 'NoGroup' : '';
     }
     if (isNoiseTag(candidate)) {
+      if (/\s-\s/.test(base)) {
+        logDebug?.('tag detect', { mode: 'spaced-dash', base });
+        return allowNoGroup ? 'NoGroup' : '';
+      }
+      logDebug?.('tag detect', { mode: 'suffix', base, rawCandidate: candidate });
       return allowNoGroup ? 'NoGroup' : '';
     }
+    logDebug?.('tag detect', { mode: 'suffix', base, rawCandidate: candidate });
     return candidate;
   }
 

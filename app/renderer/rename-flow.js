@@ -5,6 +5,7 @@ export function createRenameFlow({
   buildBdInfoShort,
   buildMediaInfoShort,
   getFormState,
+  logDebug,
   updateRenameBadge,
   clearWizardRulesCheck,
   updateWizardRulesCheck,
@@ -56,6 +57,7 @@ export function createRenameFlow({
     }
     if (state.kind === 'tracker') {
       const form = getFormState();
+      logDebug?.('form state', form);
       const isEpisode = form.type === 'tv-episode' || form.type === 'anime-episode';
       const baseName = renameTools.computeBaseName(form, {
         tokenStyle: 'title',

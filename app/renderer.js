@@ -120,6 +120,28 @@ function setHint(target, text) {
   target.textContent = text || '';
 }
 
+function updateVideoCodecMenu() {
+  if (!ui.videoCodecDropdownMenu) {
+    return;
+  }
+  const isRemuxOrDisc = /^(Remux|Full Disc)$/i.test(ui.formatSelect?.value || '');
+  const avcOption = ui.videoCodecDropdownMenu.querySelector('[data-conditional="avc-remux"]');
+  if (!avcOption) {
+    return;
+  }
+  avcOption.classList.toggle('hidden', !isRemuxOrDisc);
+  if (!isRemuxOrDisc && ui.videoCodecInput?.value === 'AVC') {
+    logDebug?.('video codec cleared (menu)', {
+      format: ui.formatSelect?.value || '',
+      prev: 'AVC'
+    });
+    ui.videoCodecInput.value = '';
+    if (ui.videoCodecSelectBtn) {
+      ui.videoCodecSelectBtn.textContent = 'Seleziona codec';
+    }
+  }
+}
+
 function stripConfigLine(line) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith('#')) {
@@ -1296,6 +1318,13 @@ function applyFormatSuggestion(suggested) {
 function applyNameSuggestions(format, service, source, repack, settingsOverride) {
   const settings = settingsOverride || getSettings();
   const serviceOptions = buildServiceOptions(settings);
+  logDebug?.('applyNameSuggestions start', {
+    format: format || '',
+    service: service || '',
+    source: source || '',
+    repack: repack || '',
+    prevVideoCodec: ui.videoCodecInput?.value || ''
+  });
 
   if (format) {
     setDropdownValue(ui.formatSelect, ui.formatSelectBtn, format, format);
@@ -1312,6 +1341,10 @@ function applyNameSuggestions(format, service, source, repack, settingsOverride)
   if (repack) {
     setDropdownValue(ui.repackSelect, ui.repackSelectBtn, repack, repack);
   }
+  logDebug?.('applyNameSuggestions end', {
+    format: ui.formatSelect?.value || '',
+    videoCodec: ui.videoCodecInput?.value || ''
+  });
   schedulePreview();
 }
 
@@ -1743,6 +1776,7 @@ const renameFlow = createRenameFlow({
   buildBdInfoShort: metadataTools.buildBdInfoShort,
   buildMediaInfoShort: metadataTools.buildMediaInfoShort,
   getFormState,
+  logDebug,
   updateRenameBadge,
   clearWizardRulesCheck,
   updateWizardRulesCheck,
@@ -2001,6 +2035,7 @@ async function loadPath(targetPath) {
   state.screenshots = [];
   state.lastTorrentPath = '';
   state.episodeMap = {};
+  state.lastTagSuggestion = '';
   state.trackerId = '';
   state.trackerName = '';
   state.trackerData = null;
@@ -2596,6 +2631,7 @@ setupDropdown(ui.videoCodecDropdown, ui.videoCodecSelectBtn, ui.videoCodecInput,
 setupDropdown(ui.audioCodecDropdown, ui.audioCodecSelectBtn, ui.audioCodecInput, ui.audioCodecDropdownMenu);
 setupDropdown(ui.audioChannelsDropdown, ui.audioChannelsSelectBtn, ui.audioChannelsInput, ui.audioChannelsDropdownMenu);
 setupDropdown(ui.tagDropdown, ui.tagInputBtn, ui.tagInput, ui.tagDropdownMenu);
+updateVideoCodecMenu();
 
 document.addEventListener('click', (event) => {
   const external = event.target.closest('[data-external]');
@@ -2782,8 +2818,34 @@ if (ui.torrentClientSelect) {
   });
   element.addEventListener('change', () => {
     if (element === ui.formatSelect && state.mediaInfo) {
+      logDebug?.('format change: reset video codec', {
+        format: ui.formatSelect.value || '',
+        prevVideoCodec: ui.videoCodecInput?.value || ''
+      });
       resetDropdown(ui.videoCodecInput, ui.videoCodecSelectBtn, 'Seleziona codec');
       metadataTools.fillFromMediaInfo();
+      if (
+        state.kind === 'tracker' &&
+        state.trackerVideoCodecFallback &&
+        !ui.videoCodecInput.value
+      ) {
+        if (ui.videoCodecSelectBtn) {
+          setDropdownAuto(
+            ui.videoCodecInput,
+            ui.videoCodecSelectBtn,
+            state.trackerVideoCodecFallback,
+            state.trackerVideoCodecFallback
+          );
+        } else {
+          setInputAuto(ui.videoCodecInput, state.trackerVideoCodecFallback);
+        }
+      }
+      logDebug?.('format change: after MediaInfo fill', {
+        videoCodec: ui.videoCodecInput?.value || ''
+      });
+    }
+    if (element === ui.formatSelect) {
+      updateVideoCodecMenu();
     }
     schedulePreview();
   });
@@ -2795,6 +2857,7 @@ applyTheme(loadTheme());
 applyUploadMode(initialSettings.uploadMode || 'integrated');
 updateAutoDetectControls();
 updateVisibility();
+updateVideoCodecMenu();
 refreshPreview();
 updateAppVersionLabel();
 uaMode?.updateUaControlsState?.();

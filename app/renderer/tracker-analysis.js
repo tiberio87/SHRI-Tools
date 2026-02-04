@@ -1,3 +1,6 @@
+import { LANG_MAP } from './constants.js';
+import { normalizeLangTag, getTrackLang, parseChannels, mapAudioCodec, scoreAudioTrack } from './media-utils.js';
+
 const SECTION_HEADER_PATTERN = /^(general|video|audio|text|menu)(\s+#\d+)?$/i;
 
 function parseTorrentId(value) {
@@ -178,6 +181,84 @@ function extractVideoCodecFromName(name, releaseFormat) {
   return '';
 }
 
+function extractSourceFromName(name) {
+  const upper = String(name || '').toUpperCase();
+  if (!upper) {
+    return '';
+  }
+  if (upper.includes('UHD') && (upper.includes('BLURAY') || upper.includes('BLU-RAY'))) {
+    return 'UHD BluRay';
+  }
+  if (upper.includes('BLURAY') || upper.includes('BLU-RAY')) {
+    return 'BluRay';
+  }
+  if (upper.includes('WEB-DL') || upper.includes('WEBDL')) {
+    return 'WEB-DL';
+  }
+  if (upper.includes('WEBRIP')) {
+    return 'WEBRip';
+  }
+  if (upper.includes('HDTV')) {
+    return 'HDTV';
+  }
+  if (upper.includes('DVD')) {
+    return 'DVD';
+  }
+  return '';
+}
+
+const LANGUAGE_VALUES = new Set(Object.values(LANG_MAP));
+const LANGUAGE_KEYS = new Set(Object.keys(LANG_MAP));
+
+function extractLangsFromName(name) {
+  const raw = String(name || '').toLowerCase();
+  if (!raw) {
+    return [];
+  }
+  const tokens = raw.split(/[^a-z]+/).filter(Boolean);
+  const langs = [];
+  for (const token of tokens) {
+    if (LANGUAGE_KEYS.has(token)) {
+      langs.push(normalizeLangTag(token));
+      continue;
+    }
+    if (token.length <= 3) {
+      const upper = token.toUpperCase();
+      if (LANGUAGE_VALUES.has(upper)) {
+        langs.push(upper);
+      }
+    }
+  }
+  return [...new Set(langs.filter(Boolean))];
+}
+
+function extractAudioFromName(name) {
+  const upper = String(name || '').toUpperCase();
+  if (!upper) {
+    return { codec: '', channels: '' };
+  }
+  let codec = '';
+  if (/DTS[\s._-]*HD[\s._-]*MA/.test(upper)) {
+    codec = 'DTS-HD MA';
+  } else if (/TRUEHD/.test(upper)) {
+    codec = 'TrueHD';
+  } else if (/(DDP|DD\+|E-?AC-?3)/.test(upper)) {
+    codec = 'DD+';
+  } else if (/\bDD\b/.test(upper)) {
+    codec = 'DD';
+  } else if (/\bAC3\b/.test(upper)) {
+    codec = 'AC3';
+  } else if (/\bDTS\b/.test(upper)) {
+    codec = 'DTS';
+  } else if (/\bAAC\b/.test(upper)) {
+    codec = 'AAC';
+  } else if (/\bFLAC\b/.test(upper)) {
+    codec = 'FLAC';
+  }
+  const channelMatch = upper.match(/\b(7\.1|5\.1|2\.0|1\.0)\b/);
+  return { codec, channels: channelMatch ? channelMatch[1] : '' };
+}
+
 export function createTrackerAnalysis({
   ui,
   state,
@@ -243,6 +324,7 @@ export function createTrackerAnalysis({
     state.trackerData = payload;
     state.trackerId = payload?.id || '';
     state.trackerName = name;
+    state.trackerVideoCodecFallback = '';
     state.metadata = null;
     state.bdInfoRaw = '';
     state.bdInfoParsed = null;
@@ -328,11 +410,63 @@ export function createTrackerAnalysis({
 
     if (mediaInfo) {
       metadataTools.fillFromMediaInfo();
-    } else {
-      const inferredVideo = extractVideoCodecFromName(nameForGuess || name, trackerFormat);
-      if (inferredVideo) {
-        setInputAuto(ui.videoCodecInput, inferredVideo);
+    }
+
+    const inferredVideo = extractVideoCodecFromName(nameForGuess || name, trackerFormat);
+    if (inferredVideo && !ui.videoCodecInput.value.trim()) {
+      setInputAuto(ui.videoCodecInput, inferredVideo);
+      state.trackerVideoCodecFallback = inferredVideo;
+      logDebug?.('tracker codec fallback', {
+        inferred: inferredVideo,
+        applied: ui.videoCodecInput.value || ''
+      });
+    }
+    const inferredSource = extractSourceFromName(nameForGuess || name);
+    if (inferredSource && !ui.sourceInput.value.trim()) {
+      setInputAuto(ui.sourceInput, inferredSource);
+    }
+
+    const audioTracks = Array.isArray(mediaInfo?.media?.track)
+      ? mediaInfo.media.track.filter((track) => track['@type'] === 'Audio')
+      : [];
+    const audioLangs = audioTracks
+      .map((track) => normalizeLangTag(getTrackLang(track)))
+      .filter(Boolean);
+    const nameLangs = extractLangsFromName(nameForGuess || name || fileName);
+    const finalLangs = audioLangs.length ? audioLangs : nameLangs;
+    if (finalLangs.length && (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false')) {
+      const computedLang = metadataTools.buildLanguageTag(finalLangs, ui.originalLanguageInput.value);
+      if (computedLang) {
+        setInputAuto(ui.languageTagInput, computedLang);
       }
+    }
+
+    let inferredAudioCodec = '';
+    let inferredAudioChannels = '';
+    if (audioTracks.length) {
+      const preferred = audioTracks.filter((track) => normalizeLangTag(getTrackLang(track)) === 'ITA');
+      const selectionPool = preferred.length ? preferred : audioTracks;
+      const best = selectionPool.reduce((bestTrack, track) => {
+        if (!bestTrack) {
+          return track;
+        }
+        return scoreAudioTrack(track) > scoreAudioTrack(bestTrack) ? track : bestTrack;
+      }, null);
+      if (best) {
+        inferredAudioCodec = mapAudioCodec(best);
+        inferredAudioChannels = parseChannels(best.Channels || best['Channel(s)'] || '');
+      }
+    }
+    if (!inferredAudioCodec || !inferredAudioChannels) {
+      const fromName = extractAudioFromName(nameForGuess || name);
+      inferredAudioCodec = inferredAudioCodec || fromName.codec;
+      inferredAudioChannels = inferredAudioChannels || fromName.channels;
+    }
+    if (inferredAudioCodec && !ui.audioCodecInput.value.trim()) {
+      setInputAuto(ui.audioCodecInput, inferredAudioCodec);
+    }
+    if (inferredAudioChannels && !ui.audioChannelsInput.value.trim()) {
+      setInputAuto(ui.audioChannelsInput, inferredAudioChannels);
     }
 
     updateVisibility();
@@ -367,7 +501,8 @@ export function createTrackerAnalysis({
         episode: ui.episodeInput.value.trim(),
         format: ui.formatSelect.value,
         resolution: ui.resolutionInput.value.trim(),
-        videoCodec: ui.videoCodecInput.value.trim()
+        videoCodec: ui.videoCodecInput.value.trim(),
+        source: ui.sourceInput.value.trim()
       }
     });
 
