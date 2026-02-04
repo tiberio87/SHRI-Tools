@@ -262,9 +262,12 @@ export function createRenameFlow({
           const reasonText = Array.isArray(mismatch.reasons) && mismatch.reasons.length
             ? mismatch.reasons.join(', ')
             : 'titolo/anno';
+          const fallbackNote = mismatch.usedFallback
+            ? 'Usato fallback titolo/anno.'
+            : 'Fallback non applicato.';
           mismatchBadge.setAttribute(
             'data-tooltip',
-            `ID non coerente con ${reasonText}. Usato fallback titolo/anno.`
+            `ID non coerente con ${reasonText}. ${fallbackNote}`
           );
           mismatchWrap.appendChild(mismatchBadge);
         }
