@@ -41,7 +41,7 @@ export function createRenameTools(deps) {
       if (data.season && data.episode) {
         const episodeEnd = data.episodeEnd ? pad2(data.episodeEnd) : '';
         const episodeToken = episodeEnd
-          ? `S${pad2(data.season)}E${pad2(data.episode)}-E${episodeEnd}`
+          ? `S${pad2(data.season)}E${pad2(data.episode)}E${episodeEnd}`
           : `S${pad2(data.season)}E${pad2(data.episode)}`;
         tokens.push(episodeToken);
       } else {
