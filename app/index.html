@@ -1208,10 +1208,6 @@
             <input id="uaUnattendedToggle" type="checkbox" />
             <span>Unattended</span>
           </label>
-          <label class="ua-arg-btn" data-tooltip="-tk TESTING: Upload su TESTING.">
-            <input id="uaTrackerTestingToggle" type="checkbox" />
-            <span>TESTING</span>
-          </label>
           <label class="ua-arg-btn" data-tooltip="-tk SHRI: Upload su SHRI.">
             <input id="uaTrackerShriToggle" type="checkbox" />
             <span>SHRI</span>
@@ -1251,6 +1247,28 @@
               <button id="uaServiceBtn" class="dropdown-trigger" type="button">Seleziona servizio</button>
               <div id="uaServiceMenu" class="dropdown-menu"></div>
               <input id="uaServiceInput" type="hidden" value="" />
+            </div>
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-t: Override release type.">
+              <input id="uaTypeToggle" type="checkbox" />
+              <span>Tipo</span>
+            </label>
+            <div id="uaTypeDropdown" class="dropdown ua-arg-dropdown">
+              <button id="uaTypeBtn" class="dropdown-trigger" type="button">Seleziona tipo</button>
+              <div id="uaTypeMenu" class="dropdown-menu"></div>
+              <input id="uaTypeInput" type="hidden" value="" />
+            </div>
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="--source: Override source string.">
+              <input id="uaSourceToggle" type="checkbox" />
+              <span>Sorgente</span>
+            </label>
+            <div id="uaSourceDropdown" class="dropdown ua-arg-dropdown">
+              <button id="uaSourceBtn" class="dropdown-trigger" type="button">Seleziona sorgente</button>
+              <div id="uaSourceMenu" class="dropdown-menu"></div>
+              <input id="uaSourceInput" type="hidden" value="" />
             </div>
           </div>
           <label class="ua-arg-btn" data-tooltip="-debug: Debug dettagliato.">

@@ -111,6 +111,8 @@ export function createUAMode({
       ui.uaInput.value = '';
     }
     ui.uploadAssistantModal.classList.remove('hidden');
+    updateUaTypeOptions();
+    updateUaSourceOptions();
     updateUaControlsState();
   };
 
@@ -531,14 +533,52 @@ export function createUAMode({
   };
 
   const updateUaControlsState = () => {
+    const tagEnabled = Boolean(ui.uaTagToggle?.checked);
     if (ui.uaTagInput) {
-      ui.uaTagInput.disabled = !ui.uaTagToggle?.checked;
+      ui.uaTagInput.disabled = false;
+      ui.uaTagInput.readOnly = !tagEnabled;
+      ui.uaTagInput.setAttribute('aria-disabled', String(!tagEnabled));
+      const group = ui.uaTagInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !tagEnabled);
+      }
     }
+    const screensEnabled = Boolean(ui.uaScreensToggle?.checked);
     if (ui.uaScreensInput) {
-      ui.uaScreensInput.disabled = !ui.uaScreensToggle?.checked;
+      ui.uaScreensInput.disabled = false;
+      ui.uaScreensInput.readOnly = !screensEnabled;
+      ui.uaScreensInput.setAttribute('aria-disabled', String(!screensEnabled));
+      const group = ui.uaScreensInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !screensEnabled);
+      }
     }
+    const serviceEnabled = Boolean(ui.uaServiceToggle?.checked);
     if (ui.uaServiceBtn) {
-      ui.uaServiceBtn.disabled = !ui.uaServiceToggle?.checked;
+      ui.uaServiceBtn.disabled = false;
+      ui.uaServiceBtn.setAttribute('aria-disabled', String(!serviceEnabled));
+      const group = ui.uaServiceBtn.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !serviceEnabled);
+      }
+    }
+    const typeEnabled = Boolean(ui.uaTypeToggle?.checked);
+    if (ui.uaTypeBtn) {
+      ui.uaTypeBtn.disabled = false;
+      ui.uaTypeBtn.setAttribute('aria-disabled', String(!typeEnabled));
+      const group = ui.uaTypeBtn.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !typeEnabled);
+      }
+    }
+    const sourceEnabled = Boolean(ui.uaSourceToggle?.checked);
+    if (ui.uaSourceBtn) {
+      ui.uaSourceBtn.disabled = false;
+      ui.uaSourceBtn.setAttribute('aria-disabled', String(!sourceEnabled));
+      const group = ui.uaSourceBtn.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !sourceEnabled);
+      }
     }
     if (ui.uaInput) {
       ui.uaInput.disabled = !uaRunning;
@@ -586,6 +626,96 @@ export function createUAMode({
     } else {
       ui.uaServiceInput.value = '';
       ui.uaServiceBtn.textContent = 'Seleziona servizio';
+    }
+  };
+
+  const buildUaTypeOptions = () => ([
+    { code: 'disc', label: 'Disc' },
+    { code: 'remux', label: 'Remux' },
+    { code: 'encode', label: 'Encode' },
+    { code: 'webdl', label: 'WEB-DL' },
+    { code: 'webrip', label: 'WEBRip' },
+    { code: 'hdtv', label: 'HDTV' },
+    { code: 'dvdrip', label: 'DVDRip' }
+  ]);
+
+  const buildUaSourceOptions = () => ([
+    { code: 'Blu-ray', label: 'Blu-ray' },
+    { code: 'BluRay', label: 'BluRay' },
+    { code: 'DVD', label: 'DVD' },
+    { code: 'DVD5', label: 'DVD5' },
+    { code: 'DVD9', label: 'DVD9' },
+    { code: 'HDDVD', label: 'HDDVD' },
+    { code: 'WEB', label: 'WEB' },
+    { code: 'HDTV', label: 'HDTV' },
+    { code: 'UHDTV', label: 'UHDTV' }
+  ]);
+
+  const updateUaTypeOptions = () => {
+    if (!ui.uaTypeMenu || !ui.uaTypeBtn || !ui.uaTypeInput) {
+      return;
+    }
+    const options = buildUaTypeOptions();
+    const current = ui.uaTypeInput.value;
+    ui.uaTypeMenu.innerHTML = '';
+
+    const blank = document.createElement('button');
+    blank.type = 'button';
+    blank.className = 'dropdown-item';
+    blank.dataset.value = '';
+    blank.textContent = 'Seleziona tipo';
+    ui.uaTypeMenu.appendChild(blank);
+
+    for (const option of options) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'dropdown-item';
+      item.dataset.value = option.code;
+      item.textContent = option.label;
+      ui.uaTypeMenu.appendChild(item);
+    }
+
+    const currentOption = options.find((option) => option.code === current);
+    if (currentOption) {
+      ui.uaTypeInput.value = current;
+      ui.uaTypeBtn.textContent = currentOption.label;
+    } else {
+      ui.uaTypeInput.value = '';
+      ui.uaTypeBtn.textContent = 'Seleziona tipo';
+    }
+  };
+
+  const updateUaSourceOptions = () => {
+    if (!ui.uaSourceMenu || !ui.uaSourceBtn || !ui.uaSourceInput) {
+      return;
+    }
+    const options = buildUaSourceOptions();
+    const current = ui.uaSourceInput.value;
+    ui.uaSourceMenu.innerHTML = '';
+
+    const blank = document.createElement('button');
+    blank.type = 'button';
+    blank.className = 'dropdown-item';
+    blank.dataset.value = '';
+    blank.textContent = 'Seleziona sorgente';
+    ui.uaSourceMenu.appendChild(blank);
+
+    for (const option of options) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'dropdown-item';
+      item.dataset.value = option.code;
+      item.textContent = option.label;
+      ui.uaSourceMenu.appendChild(item);
+    }
+
+    const currentOption = options.find((option) => option.code === current);
+    if (currentOption) {
+      ui.uaSourceInput.value = current;
+      ui.uaSourceBtn.textContent = currentOption.label;
+    } else {
+      ui.uaSourceInput.value = '';
+      ui.uaSourceBtn.textContent = 'Seleziona sorgente';
     }
   };
 
@@ -818,8 +948,6 @@ export function createUAMode({
     }
     if (ui.uaTrackerShriToggle?.checked) {
       args.push('-tk', 'SHRI');
-    } else if (ui.uaTrackerTestingToggle?.checked) {
-      args.push('-tk', 'TESTING');
     }
     if (ui.uaPersonalToggle?.checked) {
       args.push('-pr');
@@ -848,6 +976,18 @@ export function createUAMode({
         args.push('-serv', serviceValue);
       }
     }
+    if (ui.uaTypeToggle?.checked) {
+      const typeValue = ui.uaTypeInput?.value.trim();
+      if (typeValue) {
+        args.push('-t', typeValue);
+      }
+    }
+    if (ui.uaSourceToggle?.checked) {
+      const sourceValue = ui.uaSourceInput?.value.trim();
+      if (sourceValue) {
+        args.push('--source', sourceValue);
+      }
+    }
     if (ui.uaDebugToggle?.checked) {
       args.push('-debug');
     }
@@ -873,6 +1013,12 @@ export function createUAMode({
   };
 
   const bindEvents = () => {
+    const ensureUaToggle = (toggleEl) => {
+      if (toggleEl && !toggleEl.checked) {
+        toggleEl.checked = true;
+        updateUaControlsState();
+      }
+    };
     if (ui.appHealth) {
       ui.appHealth.addEventListener('click', () => {
         openUaHealthModal();
@@ -992,28 +1138,58 @@ export function createUAMode({
     if (ui.uaServiceToggle) {
       ui.uaServiceToggle.addEventListener('change', updateUaControlsState);
     }
-    if (ui.uaTrackerTestingToggle) {
-      ui.uaTrackerTestingToggle.addEventListener('change', () => {
-        if (ui.uaTrackerTestingToggle.checked && ui.uaTrackerShriToggle) {
-          ui.uaTrackerShriToggle.checked = false;
-        }
-      });
+    if (ui.uaTypeToggle) {
+      ui.uaTypeToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaSourceToggle) {
+      ui.uaSourceToggle.addEventListener('change', updateUaControlsState);
     }
     if (ui.uaTrackerShriToggle) {
       ui.uaTrackerShriToggle.addEventListener('change', () => {
-        if (ui.uaTrackerShriToggle.checked && ui.uaTrackerTestingToggle) {
-          ui.uaTrackerTestingToggle.checked = false;
-        }
       });
-    }
-    if (ui.uaTrackerTestingToggle) {
-      ui.uaTrackerTestingToggle.addEventListener('change', updateUaControlsState);
     }
     if (ui.uaTrackerShriToggle) {
       ui.uaTrackerShriToggle.addEventListener('change', updateUaControlsState);
     }
     if (ui.uaServiceDropdown && ui.uaServiceBtn && ui.uaServiceInput && ui.uaServiceMenu) {
       setupDropdown(ui.uaServiceDropdown, ui.uaServiceBtn, ui.uaServiceInput, ui.uaServiceMenu);
+    }
+    if (ui.uaTypeDropdown && ui.uaTypeBtn && ui.uaTypeInput && ui.uaTypeMenu) {
+      setupDropdown(ui.uaTypeDropdown, ui.uaTypeBtn, ui.uaTypeInput, ui.uaTypeMenu);
+    }
+    if (ui.uaSourceDropdown && ui.uaSourceBtn && ui.uaSourceInput && ui.uaSourceMenu) {
+      setupDropdown(ui.uaSourceDropdown, ui.uaSourceBtn, ui.uaSourceInput, ui.uaSourceMenu);
+    }
+    if (ui.uaTagInput) {
+      const activateTag = () => ensureUaToggle(ui.uaTagToggle);
+      ui.uaTagInput.addEventListener('focus', activateTag);
+      ui.uaTagInput.addEventListener('click', activateTag);
+    }
+    if (ui.uaScreensInput) {
+      const activateScreens = () => ensureUaToggle(ui.uaScreensToggle);
+      ui.uaScreensInput.addEventListener('focus', activateScreens);
+      ui.uaScreensInput.addEventListener('click', activateScreens);
+    }
+    if (ui.uaServiceBtn) {
+      const activateService = () => ensureUaToggle(ui.uaServiceToggle);
+      ui.uaServiceBtn.addEventListener('click', activateService);
+    }
+    if (ui.uaServiceDropdown) {
+      ui.uaServiceDropdown.addEventListener('mousedown', () => ensureUaToggle(ui.uaServiceToggle));
+    }
+    if (ui.uaTypeBtn) {
+      const activateType = () => ensureUaToggle(ui.uaTypeToggle);
+      ui.uaTypeBtn.addEventListener('click', activateType);
+    }
+    if (ui.uaTypeDropdown) {
+      ui.uaTypeDropdown.addEventListener('mousedown', () => ensureUaToggle(ui.uaTypeToggle));
+    }
+    if (ui.uaSourceBtn) {
+      const activateSource = () => ensureUaToggle(ui.uaSourceToggle);
+      ui.uaSourceBtn.addEventListener('click', activateSource);
+    }
+    if (ui.uaSourceDropdown) {
+      ui.uaSourceDropdown.addEventListener('mousedown', () => ensureUaToggle(ui.uaSourceToggle));
     }
     if (ui.uaScreensInput) {
       ui.uaScreensInput.addEventListener('wheel', (event) => {

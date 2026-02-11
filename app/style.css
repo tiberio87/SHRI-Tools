@@ -2404,6 +2404,18 @@ body.light .badge.error {
   gap: 0;
 }
 
+.ua-arg-group.is-disabled .ua-arg-input,
+.ua-arg-group.is-disabled .ua-arg-select,
+.ua-arg-group.is-disabled .dropdown-trigger {
+  background: var(--surface-card);
+  color: var(--muted);
+  border-color: var(--border);
+}
+
+.ua-arg-group.is-disabled .ua-arg-input::placeholder {
+  color: var(--muted);
+}
+
 .ua-arg-group .ua-arg-btn {
   min-width: 44px;
   border-radius: 10px 0 0 10px;
