@@ -209,7 +209,16 @@ export function createMetadataTools(deps) {
   }
 
   function buildLanguageTag(audioLangs, originalLangTag) {
-    const langs = [...new Set(audioLangs.filter(Boolean))];
+    const langs = [];
+    for (const rawLang of audioLangs || []) {
+      const normalized = normalizeLangTag(rawLang);
+      if (!normalized) {
+        continue;
+      }
+      if (!langs.includes(normalized)) {
+        langs.push(normalized);
+      }
+    }
     if (!langs.length) {
       return '';
     }
@@ -219,19 +228,18 @@ export function createMetadataTools(deps) {
       if (langs.includes('ITA')) {
         return `ITA${separator}MULTI`;
       }
-      const original = normalizeLangTag(originalLangTag);
-      if (original && langs.includes(original)) {
-        return `${original}${separator}MULTI`;
-      }
-      return `${langs[0]}${separator}MULTI`;
+      return 'MULTI';
     }
 
     if (langs.length === 1) {
       return langs[0];
     }
 
-    const sorted = [...langs].sort();
-    return sorted.join(separator);
+    if (langs.includes('ITA')) {
+      const other = langs.find((lang) => lang !== 'ITA') || '';
+      return other ? `ITA${separator}${other}` : 'ITA';
+    }
+    return langs.join(separator);
   }
 
   function extractYear(raw) {

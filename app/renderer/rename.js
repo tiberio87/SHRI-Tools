@@ -259,6 +259,36 @@ export function createRenameTools(deps) {
       isDir &&
       state.videoFiles.some((filePath) => /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(filePath || ''));
 
+    const getEpisodeSortInfo = (filePath) => {
+      const base = getPathBaseName(filePath);
+      const range = parseSeasonEpisodeRange(base);
+      const guess = guessMetadataFromName(filePath) || {};
+      const season = Number(guess.season || range.season || 0);
+      const episode = Number(guess.episode || range.episode || 0);
+      const hasSE = season > 0 && episode > 0;
+      return { hasSE, season, episode, base };
+    };
+
+    const sortedVideoFiles = isDir && !isDiscStructure
+      ? [...state.videoFiles].sort((a, b) => {
+        const aInfo = getEpisodeSortInfo(a);
+        const bInfo = getEpisodeSortInfo(b);
+        if (aInfo.hasSE && bInfo.hasSE) {
+          if (aInfo.season !== bInfo.season) {
+            return aInfo.season - bInfo.season;
+          }
+          if (aInfo.episode !== bInfo.episode) {
+            return aInfo.episode - bInfo.episode;
+          }
+          return aInfo.base.localeCompare(bInfo.base, undefined, { numeric: true, sensitivity: 'base' });
+        }
+        if (aInfo.hasSE !== bInfo.hasSE) {
+          return aInfo.hasSE ? -1 : 1;
+        }
+        return aInfo.base.localeCompare(bInfo.base, undefined, { numeric: true, sensitivity: 'base' });
+      })
+      : state.videoFiles;
+
     const folderName = isDir
       ? computeBaseName(form, {
           type: seasonType,
@@ -272,7 +302,7 @@ export function createRenameTools(deps) {
     if (isDir) {
       if (!isDiscStructure) {
         const seasonValue = form.season;
-        for (const filePath of state.videoFiles) {
+        for (const filePath of sortedVideoFiles) {
           const range = parseSeasonEpisodeRange(getPathBaseName(filePath));
           const guess = guessMetadataFromName(filePath);
           const season = guess.season || seasonValue;
