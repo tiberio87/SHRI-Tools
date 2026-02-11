@@ -155,14 +155,18 @@ function extractVideoCodecFromName(name, releaseFormat) {
   if (!upper) {
     return '';
   }
-  const isWeb = releaseFormat === 'WEB-DL' || releaseFormat === 'WEBRip';
+  const isWebDl = releaseFormat === 'WEB-DL';
+  const isWebRip = releaseFormat === 'WEBRip';
   const isEncode = releaseFormat === 'Encode';
   if (upper.includes('X265') || upper.includes('H.265') || upper.includes('HEVC')) {
     if (isEncode) {
       return 'x265';
     }
-    if (isWeb) {
+    if (isWebDl) {
       return 'H.265';
+    }
+    if (isWebRip) {
+      return 'x265';
     }
     return 'HEVC';
   }
@@ -170,8 +174,11 @@ function extractVideoCodecFromName(name, releaseFormat) {
     if (isEncode) {
       return 'x264';
     }
-    if (isWeb) {
+    if (isWebDl) {
       return 'H.264';
+    }
+    if (isWebRip) {
+      return 'x264';
     }
     return 'AVC';
   }

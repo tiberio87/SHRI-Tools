@@ -2,6 +2,7 @@ export function createRenameFlow({
   ui,
   state,
   renameTools,
+  parseSeasonEpisodeRange,
   buildBdInfoShort,
   buildMediaInfoShort,
   getFormState,
@@ -402,15 +403,34 @@ export function createRenameFlow({
         const item = document.createElement('div');
         item.className = 'plan-item rename';
 
+        const fromRow = document.createElement('div');
+        fromRow.className = 'plan-row';
+
         const fromLine = document.createElement('div');
         fromLine.className = 'plan-text old';
         fromLine.textContent = getPathBaseName(op.from);
+
+        const fromRange = parseSeasonEpisodeRange
+          ? parseSeasonEpisodeRange(getPathBaseName(op.from))
+          : { episodeEnd: '' };
+        const toRange = parseSeasonEpisodeRange
+          ? parseSeasonEpisodeRange(getPathBaseName(op.to))
+          : { episodeEnd: '' };
+        if (fromRange?.episodeEnd || toRange?.episodeEnd) {
+          const badge = document.createElement('span');
+          badge.className = 'badge plan-badge multi-episode';
+          badge.textContent = 'Multi-episode';
+          fromRow.appendChild(fromLine);
+          fromRow.appendChild(badge);
+        } else {
+          fromRow.appendChild(fromLine);
+        }
 
         const toLine = document.createElement('div');
         toLine.className = 'plan-text new';
         toLine.textContent = getPathBaseName(op.to);
 
-        item.appendChild(fromLine);
+        item.appendChild(fromRow);
         item.appendChild(toLine);
         itemsContainer.appendChild(item);
       }

@@ -1792,6 +1792,7 @@ const renameFlow = createRenameFlow({
   ui,
   state,
   renameTools,
+  parseSeasonEpisodeRange: metadataTools.parseSeasonEpisodeRange,
   buildBdInfoShort: metadataTools.buildBdInfoShort,
   buildMediaInfoShort: metadataTools.buildMediaInfoShort,
   getFormState,

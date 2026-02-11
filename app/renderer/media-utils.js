@@ -205,12 +205,23 @@ export function mapVideoCodec(videoTrack, releaseFormat) {
     }
   }
 
-  if (releaseFormat === 'WEB-DL' || releaseFormat === 'WEBRip') {
+  if (releaseFormat === 'WEB-DL') {
     if (formatRaw.includes('HEVC') || formatRaw.includes('H.265')) {
       return 'H.265';
     }
     if (formatRaw.includes('AVC') || formatRaw.includes('H.264')) {
       return 'H.264';
+    }
+    if (formatRaw.includes('AV1')) {
+      return 'AV1';
+    }
+  }
+  if (releaseFormat === 'WEBRip') {
+    if (formatRaw.includes('HEVC') || formatRaw.includes('H.265')) {
+      return 'x265';
+    }
+    if (formatRaw.includes('AVC') || formatRaw.includes('H.264')) {
+      return 'x264';
     }
     if (formatRaw.includes('AV1')) {
       return 'AV1';

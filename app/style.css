@@ -38,6 +38,9 @@
   --success-text: #0b1b18;
   --badge-bg: #121826;
   --badge-border: #2e374a;
+  --badge-multi-bg: #1b2334;
+  --badge-multi-border: #3c4c68;
+  --badge-multi-text: #a8c7ff;
   --auto-border: rgba(125, 214, 193, 0.7);
   --toast-info: #e3e7ef;
   --toast-info-border: #2a3448;
@@ -100,6 +103,9 @@ body.light {
   --success-text: #f4fffb;
   --badge-bg: #f2f4f8;
   --badge-border: #d3d8e2;
+  --badge-multi-bg: #e8f0ff;
+  --badge-multi-border: #b7c9e6;
+  --badge-multi-text: #2c5aa0;
   --auto-border: rgba(31, 125, 107, 0.6);
   --toast-info: #1e2430;
   --toast-info-border: #d6dae5;
@@ -1362,6 +1368,30 @@ body.light .badge.error {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.plan-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.plan-row .plan-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.plan-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.plan-badge.multi-episode {
+  background: var(--badge-multi-bg);
+  border-color: var(--badge-multi-border);
+  color: var(--badge-multi-text);
 }
 
 .plan-item.rename {
