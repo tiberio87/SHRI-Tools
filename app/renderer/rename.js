@@ -255,6 +255,10 @@ export function createRenameTools(deps) {
     const episodeType = form.type.includes('anime') ? 'anime-episode' : 'tv-episode';
     const useLangFolders = form.languageTagInFolders !== false;
     const useLangFiles = form.languageTagInFiles !== false;
+    const omitNoGroupInPaths = Boolean(ui.renameOmitNoGroupToggle?.checked);
+    const resolvedTag = omitNoGroupInPaths && String(form.tag || '').toLowerCase() === 'nogroup'
+      ? ''
+      : form.tag;
     const isDiscStructure =
       isDir &&
       state.videoFiles.some((filePath) => /[\\\/](BDMV[\\\/]+STREAM|VIDEO_TS)[\\\/]/i.test(filePath || ''));
@@ -293,7 +297,8 @@ export function createRenameTools(deps) {
       ? computeBaseName(form, {
           type: seasonType,
           separatorStyle: 'dots',
-          languageTag: useLangFolders ? form.languageTag : ''
+          languageTag: useLangFolders ? form.languageTag : '',
+          tag: resolvedTag
         })
       : '';
 
@@ -317,7 +322,8 @@ export function createRenameTools(deps) {
             episode,
             episodeEnd,
             episodeTitle: episodeEnd ? '' : (episodeTitle || form.episodeTitle),
-            languageTag: useLangFiles ? form.languageTag : ''
+            languageTag: useLangFiles ? form.languageTag : '',
+            tag: resolvedTag
           });
           if (!episode || !season) {
             warnings.push(`Stagione/episodio mancante per ${getPathBaseName(filePath)}`);
@@ -332,18 +338,20 @@ export function createRenameTools(deps) {
       let baseName = computeBaseName(form, {
         separatorStyle: 'dots',
         episodeEnd,
-        languageTag: useLangFiles ? form.languageTag : ''
+        languageTag: useLangFiles ? form.languageTag : '',
+        tag: resolvedTag
       });
       if (form.type === 'tv-episode' || form.type === 'anime-episode') {
         const key = episodeKey(form.season, form.episode);
         const mappedTitle = key && state.episodeMap[key] ? state.episodeMap[key] : '';
         if (mappedTitle && !episodeEnd) {
-          baseName = computeBaseName(form, {
-            separatorStyle: 'dots',
-            episodeEnd,
-            episodeTitle: mappedTitle,
-            languageTag: useLangFiles ? form.languageTag : ''
-          });
+            baseName = computeBaseName(form, {
+              separatorStyle: 'dots',
+              episodeEnd,
+              episodeTitle: mappedTitle,
+              languageTag: useLangFiles ? form.languageTag : '',
+              tag: resolvedTag
+            });
         } else if (!form.episodeTitle && !episodeEnd) {
           const guess = state.mainVideo ? guessMetadataFromName(state.mainVideo) : null;
           if (guess?.episodeTitle) {
@@ -351,7 +359,8 @@ export function createRenameTools(deps) {
               separatorStyle: 'dots',
               episodeEnd,
               episodeTitle: guess.episodeTitle,
-              languageTag: useLangFiles ? form.languageTag : ''
+              languageTag: useLangFiles ? form.languageTag : '',
+              tag: resolvedTag
             });
           }
         }

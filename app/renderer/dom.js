@@ -118,6 +118,7 @@ export const ui = {
   preferredLanguageSelect: document.getElementById('preferredLanguageSelect'),
   renameLangFoldersToggle: document.getElementById('renameLangFoldersToggle'),
   renameLangFilesToggle: document.getElementById('renameLangFilesToggle'),
+  renameOmitNoGroupToggle: document.getElementById('renameOmitNoGroupToggle'),
   autoApplyNameSuggestToggle: document.getElementById('autoApplyNameSuggestToggle'),
   settingsUploadAssistantPathInput: document.getElementById('settingsUploadAssistantPathInput'),
   browseUploadAssistantPathBtn: document.getElementById('browseUploadAssistantPathBtn'),

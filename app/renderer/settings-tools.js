@@ -11,6 +11,7 @@ const DEFAULT_SETTINGS = {
   autoNoGroupTag: true,
   renameLangInFolders: true,
   renameLangInFiles: true,
+  renameOmitNoGroupInPaths: false,
   autoApplyNameSuggestions: false,
   bdinfoPath: '',
   uploadMode: 'ua',
@@ -327,6 +328,9 @@ export function createSettingsTools({
     if (ui.renameLangFilesToggle) {
       ui.renameLangFilesToggle.checked = settings.renameLangInFiles !== false;
     }
+    if (ui.renameOmitNoGroupToggle) {
+      ui.renameOmitNoGroupToggle.checked = settings.renameOmitNoGroupInPaths === true;
+    }
     if (ui.autoApplyNameSuggestToggle) {
       ui.autoApplyNameSuggestToggle.checked = settings.autoApplyNameSuggestions === true;
     }
@@ -498,6 +502,7 @@ export function createSettingsTools({
       preferredLanguage: ui.preferredLanguageSelect.value,
       renameLangInFolders: Boolean(ui.renameLangFoldersToggle?.checked),
       renameLangInFiles: Boolean(ui.renameLangFilesToggle?.checked),
+      renameOmitNoGroupInPaths: Boolean(ui.renameOmitNoGroupToggle?.checked),
       autoApplyNameSuggestions: Boolean(ui.autoApplyNameSuggestToggle?.checked),
       bdinfoPath: ui.settingsBdinfoPathInput?.value.trim() || '',
       serviceList: ui.serviceListInput.value.trim(),
