@@ -344,6 +344,7 @@ export function createRulesCheckTools({
     const actualYear = guess.year || '';
     const actualSeason = guess.season || '';
     const actualEpisode = guess.episode || '';
+    const actualEpisodeEnd = guess.episodeEnd || '';
     const actualEpisodeTitle = guess.episodeTitle || '';
     const actualLanguages = extractLanguagesFromName(baseName);
     const actualResolution = extractResolutionFromName(baseName);
@@ -456,7 +457,7 @@ export function createRulesCheckTools({
       }
     }
     if (isEpisode) {
-      episodeOk = Boolean(actualEpisode);
+      episodeOk = Boolean(actualEpisode || actualEpisodeEnd);
       if (!episodeOk) {
         missing.push('Episodio');
       } else if (expectedEpisode && String(expectedEpisode) !== String(actualEpisode)) {
@@ -468,7 +469,7 @@ export function createRulesCheckTools({
     let episodeTitleOk = true;
     let episodeTitleMismatch = false;
     if (isEpisode) {
-      episodeTitleOk = Boolean(cleanedActualEpisodeTitle);
+      episodeTitleOk = Boolean(cleanedActualEpisodeTitle) || Boolean(actualEpisodeEnd);
       if (!episodeTitleOk) {
         missing.push('Titolo episodio');
       } else if (cleanedExpectedEpisodeTitle) {
@@ -583,7 +584,10 @@ export function createRulesCheckTools({
       badges.push({ label: 'Stagione', value: actualSeason, status: resolveRuleStatus(seasonOk, seasonMismatch) });
     }
     if (isEpisode) {
-      badges.push({ label: 'Episodio', value: actualEpisode, status: resolveRuleStatus(episodeOk, episodeMismatch) });
+      const episodeValue = actualEpisodeEnd
+        ? `${actualEpisode}-${actualEpisodeEnd}`
+        : actualEpisode;
+      badges.push({ label: 'Episodio', value: episodeValue, status: resolveRuleStatus(episodeOk, episodeMismatch) });
       badges.push({
         label: 'Titolo episodio',
         value: cleanedActualEpisodeTitle,

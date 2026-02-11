@@ -1764,6 +1764,7 @@ const renameTools = createRenameTools({
   ui,
   getFormState,
   guessMetadataFromName: metadataTools.guessMetadataFromName,
+  parseSeasonEpisodeRange: metadataTools.parseSeasonEpisodeRange,
   episodeKey: metadataTools.episodeKey,
   setHint,
   languageCodesPattern: LANGUAGE_CODES_PATTERN

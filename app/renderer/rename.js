@@ -15,6 +15,7 @@ export function createRenameTools(deps) {
     ui,
     getFormState,
     guessMetadataFromName,
+    parseSeasonEpisodeRange,
     episodeKey,
     setHint,
     languageCodesPattern
@@ -38,7 +39,11 @@ export function createRenameTools(deps) {
 
     if (isEpisode) {
       if (data.season && data.episode) {
-        tokens.push(`S${pad2(data.season)}E${pad2(data.episode)}`);
+        const episodeEnd = data.episodeEnd ? pad2(data.episodeEnd) : '';
+        const episodeToken = episodeEnd
+          ? `S${pad2(data.season)}E${pad2(data.episode)}-E${episodeEnd}`
+          : `S${pad2(data.season)}E${pad2(data.episode)}`;
+        tokens.push(episodeToken);
       } else {
         if (data.season) {
           tokens.push(`S${pad2(data.season)}`);
@@ -47,7 +52,7 @@ export function createRenameTools(deps) {
           tokens.push(`E${pad2(data.episode)}`);
         }
       }
-      if (data.episodeTitle) {
+      if (data.episodeTitle && !data.episodeEnd) {
         tokens.push(data.episodeTitle);
       }
       if (data.part) {
@@ -268,9 +273,11 @@ export function createRenameTools(deps) {
       if (!isDiscStructure) {
         const seasonValue = form.season;
         for (const filePath of state.videoFiles) {
+          const range = parseSeasonEpisodeRange(getPathBaseName(filePath));
           const guess = guessMetadataFromName(filePath);
           const season = guess.season || seasonValue;
           const episode = guess.episode;
+          const episodeEnd = guess.episodeEnd || range.episodeEnd || '';
           const key = episodeKey(season, episode);
           const episodeTitle = key && state.episodeMap[key] ? state.episodeMap[key] : guess.episodeTitle;
           const baseName = computeBaseName(form, {
@@ -278,7 +285,8 @@ export function createRenameTools(deps) {
             separatorStyle: 'dots',
             season,
             episode,
-            episodeTitle: episodeTitle || form.episodeTitle,
+            episodeEnd,
+            episodeTitle: episodeEnd ? '' : (episodeTitle || form.episodeTitle),
             languageTag: useLangFiles ? form.languageTag : ''
           });
           if (!episode || !season) {
@@ -288,24 +296,30 @@ export function createRenameTools(deps) {
         }
       }
     } else {
+      const episodeEnd = state.mainVideo
+        ? (guessMetadataFromName(state.mainVideo)?.episodeEnd || parseSeasonEpisodeRange(getPathBaseName(state.mainVideo)).episodeEnd || '')
+        : '';
       let baseName = computeBaseName(form, {
         separatorStyle: 'dots',
+        episodeEnd,
         languageTag: useLangFiles ? form.languageTag : ''
       });
       if (form.type === 'tv-episode' || form.type === 'anime-episode') {
         const key = episodeKey(form.season, form.episode);
         const mappedTitle = key && state.episodeMap[key] ? state.episodeMap[key] : '';
-        if (mappedTitle) {
+        if (mappedTitle && !episodeEnd) {
           baseName = computeBaseName(form, {
             separatorStyle: 'dots',
+            episodeEnd,
             episodeTitle: mappedTitle,
             languageTag: useLangFiles ? form.languageTag : ''
           });
-        } else if (!form.episodeTitle) {
+        } else if (!form.episodeTitle && !episodeEnd) {
           const guess = state.mainVideo ? guessMetadataFromName(state.mainVideo) : null;
           if (guess?.episodeTitle) {
             baseName = computeBaseName(form, {
               separatorStyle: 'dots',
+              episodeEnd,
               episodeTitle: guess.episodeTitle,
               languageTag: useLangFiles ? form.languageTag : ''
             });

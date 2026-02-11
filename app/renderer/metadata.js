@@ -349,6 +349,23 @@ export function createMetadataTools(deps) {
     return candidate;
   }
 
+  function parseSeasonEpisodeRange(text) {
+    if (!text) {
+      return { season: '', episode: '', episodeEnd: '', index: -1 };
+    }
+    const dashed =
+      text.match(/S[.\s_-]*(\d{1,2})[.\s_-]*E[.\s_-]*(\d{1,3})\s*[-–—]\s*E?(\d{1,3})/i) ||
+      text.match(/(\d{1,2})\s*[xX]\s*(\d{1,3})\s*[-–—]\s*(?:\1\s*[xX]\s*)?(\d{1,3})/i);
+    if (dashed) {
+      return { season: dashed[1], episode: dashed[2], episodeEnd: dashed[3], index: dashed.index };
+    }
+    const chained = text.match(/S[.\s_-]*(\d{1,2})[.\s_-]*E[.\s_-]*(\d{1,3})[.\s_-]*E[.\s_-]*(\d{1,3})/i);
+    if (chained) {
+      return { season: chained[1], episode: chained[2], episodeEnd: chained[3], index: chained.index };
+    }
+    return { season: '', episode: '', episodeEnd: '', index: -1 };
+  }
+
   function parseSeasonEpisode(text) {
     const match =
       text.match(/S[.\s_-]*(\d{1,2})[.\s_-]*E[.\s_-]*(\d{1,2})/i) ||
@@ -440,6 +457,10 @@ export function createMetadataTools(deps) {
       .replace(/[_\.]/g, ' ')
       .replace(/\s+/g, ' ')
       .trim();
+    const rangeMatch = parseSeasonEpisodeRange(cleaned);
+    if (rangeMatch.episodeEnd) {
+      return '';
+    }
     const match =
       cleaned.match(/S[.\s_-]*\d{1,2}[.\s_-]*E[.\s_-]*\d{1,2}/i) ||
       cleaned.match(/\d{1,2}\s*[xX]\s*\d{1,2}/i);
@@ -479,14 +500,19 @@ export function createMetadataTools(deps) {
     cleaned = cleaned.replace(/[_\.]/g, ' ');
     cleaned = cleaned.replace(/\b(?:stagione|stag|season)\s*\d+(?:\s*[.\-]\s*\d+)*\b/gi, ' ');
     cleaned = cleaned.replace(/\s+/g, ' ').trim();
-    const seasonEpisode = parseSeasonEpisode(cleaned);
+    const seasonEpisodeRange = parseSeasonEpisodeRange(cleaned);
+    const seasonEpisode = seasonEpisodeRange.episode
+      ? { season: seasonEpisodeRange.season, episode: seasonEpisodeRange.episode, index: seasonEpisodeRange.index }
+      : parseSeasonEpisode(cleaned);
     const bareEpisode = parseBareEpisode(cleaned);
     let cutIndex = cleaned.length;
     const hasFansubMarkers =
       /^\s*\[[^\]]+\]/.test(rawName) ||
       /\[[A-F0-9]{8}\]/i.test(rawName) ||
       /\b(?:BD|FLAC|MAIN10|X265|H\.?265|HEVC|AVC)\b/i.test(rawName);
-    if (seasonEpisode.index !== -1) {
+    if (seasonEpisodeRange.index !== -1) {
+      cutIndex = seasonEpisodeRange.index;
+    } else if (seasonEpisode.index !== -1) {
       cutIndex = seasonEpisode.index;
     } else if (bareEpisode.index !== -1 && bareEpisode.episode && hasFansubMarkers) {
       cutIndex = bareEpisode.index;
@@ -554,7 +580,10 @@ export function createMetadataTools(deps) {
   function guessMetadataFromName(filePath) {
     const base = getPathBaseName(filePath);
     const cleaned = stripExtension(base);
-    const seasonEpisode = parseSeasonEpisode(cleaned);
+    const seasonEpisodeRange = parseSeasonEpisodeRange(cleaned);
+    const seasonEpisode = seasonEpisodeRange.episode
+      ? { season: seasonEpisodeRange.season, episode: seasonEpisodeRange.episode, index: seasonEpisodeRange.index }
+      : parseSeasonEpisode(cleaned);
     const bareEpisode = seasonEpisode.episode ? { episode: '', index: -1 } : parseBareEpisode(cleaned);
     const seasonOnly = seasonEpisode.episode ? { season: '', index: -1 } : parseSeasonOnly(cleaned);
     const year = extractYear(cleaned);
@@ -632,11 +661,15 @@ export function createMetadataTools(deps) {
         title = numericCandidate;
       }
     }
+    if (seasonEpisodeRange.episodeEnd) {
+      episodeTitle = '';
+    }
     return {
       title,
       year,
       season: seasonEpisode.season || seasonOnly.season || (useBareEpisode ? '01' : ''),
       episode: seasonEpisode.episode || (useBareEpisode ? bareEpisode.episode : ''),
+      episodeEnd: seasonEpisodeRange.episodeEnd || '',
       episodeTitle
     };
   }
@@ -1424,6 +1457,7 @@ export function createMetadataTools(deps) {
     getHdrTokens,
     getResolution,
     guessMetadataFromName,
+    parseSeasonEpisodeRange,
     episodeKey
   };
 }
