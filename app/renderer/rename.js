@@ -277,7 +277,7 @@ export function createRenameTools(deps) {
           const guess = guessMetadataFromName(filePath);
           const season = guess.season || seasonValue;
           const episode = guess.episode;
-          const episodeEnd = guess.episodeEnd || range.episodeEnd || '';
+          const episodeEnd = form.multiEpisode ? (guess.episodeEnd || range.episodeEnd || '') : '';
           const key = episodeKey(season, episode);
           const episodeTitle = key && state.episodeMap[key] ? state.episodeMap[key] : guess.episodeTitle;
           const baseName = computeBaseName(form, {
@@ -296,7 +296,7 @@ export function createRenameTools(deps) {
         }
       }
     } else {
-      const episodeEnd = state.mainVideo
+      const episodeEnd = form.multiEpisode && state.mainVideo
         ? (guessMetadataFromName(state.mainVideo)?.episodeEnd || parseSeasonEpisodeRange(getPathBaseName(state.mainVideo)).episodeEnd || '')
         : '';
       let baseName = computeBaseName(form, {

@@ -401,6 +401,13 @@ export function createTrackerAnalysis({
     if (guess.episodeTitle) {
       setIfAuto(ui.episodeTitleInput, guess.episodeTitle);
     }
+    if (ui.multiEpisodeToggle && Object.prototype.hasOwnProperty.call(guess, 'episodeEnd')) {
+      const isMulti = Boolean(guess.episodeEnd);
+      setIfAuto(ui.multiEpisodeToggle, isMulti);
+      if (isMulti) {
+        setIfAuto(ui.episodeTitleInput, '');
+      }
+    }
 
     const imdbId = formatImdbId(attrs.imdb_id);
     if (imdbId) {

@@ -181,6 +181,13 @@ export function createAutoDetectFlow({
       if (guess.season && guess.typeHint === 'tv-season') {
         setIfAuto(ui.seasonInput, guess.season);
       }
+      if (ui.multiEpisodeToggle && guess.typeHint === 'tv-season' && state.videoFiles.length) {
+        const hasMulti = state.videoFiles.some((filePath) => {
+          const range = metadataTools.parseSeasonEpisodeRange(getPathBaseName(filePath));
+          return Boolean(range.episodeEnd);
+        });
+        setIfAuto(ui.multiEpisodeToggle, hasMulti);
+      }
     } else if (state.mainVideo) {
       const fileGuess = metadataTools.guessMetadataFromName(state.mainVideo);
       guess = {
@@ -199,6 +206,13 @@ export function createAutoDetectFlow({
         }
         if (guess.episodeTitle) {
           setIfAuto(ui.episodeTitleInput, guess.episodeTitle);
+        }
+        if (ui.multiEpisodeToggle && Object.prototype.hasOwnProperty.call(guess, 'episodeEnd')) {
+          const isMulti = Boolean(guess.episodeEnd);
+          setIfAuto(ui.multiEpisodeToggle, isMulti);
+          if (isMulti) {
+            setIfAuto(ui.episodeTitleInput, '');
+          }
         }
       } else {
         setIfAuto(ui.typeSelect, 'movie');

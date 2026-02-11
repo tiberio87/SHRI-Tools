@@ -1631,11 +1631,19 @@ uaMode = createUAMode({
 });
 
 function setIfAuto(input, value) {
-  if (!value) {
+  const isCheckbox = input.type === 'checkbox';
+  if (!isCheckbox && !value) {
     return;
   }
-  if (!input.dataset.manual || input.dataset.manual === 'false' || !input.value) {
-    input.value = value;
+  if (isCheckbox && typeof value !== 'boolean') {
+    return;
+  }
+  if (!input.dataset.manual || input.dataset.manual === 'false' || (!isCheckbox && !input.value)) {
+    if (isCheckbox) {
+      input.checked = value;
+    } else {
+      input.value = value;
+    }
     input.dataset.manual = 'false';
     input.dataset.auto = 'false';
   }
@@ -1649,6 +1657,12 @@ function updateVisibility() {
 
   ui.seasonEpisodeGroup.style.display = isSeason || isEpisode ? 'grid' : 'none';
   ui.episodeTitleGroup.style.display = isEpisode ? 'grid' : 'none';
+  if (ui.multiEpisodeToggleWrap) {
+    ui.multiEpisodeToggleWrap.classList.toggle('hidden', !isSeason);
+  }
+  if (ui.metadataRow) {
+    ui.metadataRow.classList.toggle('with-multi', isSeason);
+  }
 
   const showService = format === 'WEB-DL' || format === 'WEBRip';
   const showSource = format === 'Encode' || format === 'Remux' || format === 'Full Disc';
@@ -1702,8 +1716,11 @@ function getFormState() {
     return hasItalianSubs ? '[SUBS]' : '';
   })();
 
+  const type = ui.typeSelect.value;
+  const isSeason = type === 'tv-season' || type === 'anime-season';
+
   return {
-    type: ui.typeSelect.value,
+    type,
     format: ui.formatSelect.value,
     title: ui.titleInput.value.trim(),
     year: ui.yearInput.value.trim(),
@@ -1711,6 +1728,7 @@ function getFormState() {
     season: ui.seasonInput.value,
     episode: ui.episodeInput.value,
     episodeTitle: ui.episodeTitleInput.value.trim(),
+    multiEpisode: (isSeason && ui.multiEpisodeToggle?.checked) || false,
     part: ui.partInput.value.trim(),
     languageTag: ui.languageTagInput.value.trim(),
     languageTagInFolders,
@@ -2765,6 +2783,16 @@ if (ui.transmissionSavePathInput) {
   });
 }
 
+if (ui.multiEpisodeToggle) {
+  ui.multiEpisodeToggle.addEventListener('change', () => {
+    if (ui.multiEpisodeToggle.checked) {
+      if (!ui.episodeTitleInput.dataset.manual || ui.episodeTitleInput.dataset.manual === 'false') {
+        setInputAuto(ui.episodeTitleInput, '');
+      }
+    }
+  });
+}
+
 if (ui.torrentClientSelect) {
   ui.torrentClientSelect.addEventListener('change', () => {
     const settings = getSettings();
@@ -2804,6 +2832,7 @@ if (ui.torrentClientSelect) {
   ui.tagInput,
   ui.renameFileCheckbox,
   ui.renameFolderCheckbox,
+  ui.multiEpisodeToggle,
   ui.imdbInput,
   ui.tvdbInput,
   ui.malInput

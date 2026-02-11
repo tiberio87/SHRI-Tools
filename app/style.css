@@ -501,6 +501,14 @@ body:not(.light) .theme-toggle .icon-moon {
   align-items: center;
 }
 
+.metadata-row {
+  grid-template-columns: minmax(80px, 0.55fr) minmax(80px, 0.55fr) minmax(80px, 0.55fr) minmax(200px, 1.35fr);
+}
+
+.metadata-row.with-multi {
+  grid-template-columns: minmax(80px, 0.55fr) minmax(80px, 0.55fr) minmax(80px, 0.55fr) minmax(250px, 1.8fr);
+}
+
 .format-row {
   grid-template-columns: minmax(95px, 1fr) minmax(100px, 1fr) minmax(150px, 1fr) minmax(105px, 1fr) minmax(100px, 1fr);
 }
@@ -815,6 +823,33 @@ textarea::placeholder {
 .manual-field textarea {
   border-color: var(--manual-border);
   background: var(--surface-manual);
+}
+
+.inline-field-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.inline-field-row select {
+  min-width: 0;
+}
+
+.inline-toggle {
+  max-width: 150px;
+}
+
+.inline-toggle .checkbox.inline.compact {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.inline-toggle .checkbox.inline.compact span {
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .manual-field.checkbox {

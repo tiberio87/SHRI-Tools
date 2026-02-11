@@ -245,7 +245,7 @@
               <button id="autoDetectBtn" class="secondary">Rileva</button>
             </div>
           </div>
-          <div class="row">
+          <div class="row metadata-row">
             <div class="field">
               <label for="imdbInput">IMDb ID (fallback)</label>
               <input id="imdbInput" type="text" placeholder="tt1234567" />
@@ -260,13 +260,21 @@
             </div>
             <div class="field manual-field">
               <label for="typeSelect">Tipo</label>
-              <select id="typeSelect">
-                <option value="movie">Film</option>
-                <option value="tv-season">Serie TV (Stagione)</option>
-                <option value="tv-episode">Serie TV (Episodio)</option>
-                <option value="anime-season">Anime (Stagione)</option>
-                <option value="anime-episode">Anime (Episodio)</option>
-              </select>
+              <div class="inline-field-row">
+                <select id="typeSelect">
+                  <option value="movie">Film</option>
+                  <option value="tv-season">Serie TV (Stagione)</option>
+                  <option value="tv-episode">Serie TV (Episodio)</option>
+                  <option value="anime-season">Anime (Stagione)</option>
+                  <option value="anime-episode">Anime (Episodio)</option>
+                </select>
+                <div id="multiEpisodeToggleWrap" class="inline-toggle hidden">
+                  <label class="checkbox inline compact">
+                    <input id="multiEpisodeToggle" type="checkbox" />
+                    <span>Multi-episode files</span>
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
           <div class="row">
