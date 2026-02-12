@@ -271,6 +271,7 @@ export const AUDIO_CODEC_SCORE = {
   'DTS:X': 90,
   'TrueHD': 88,
   'DTS-HD MA': 86,
+  'PCM': 82,
   'FLAC': 80,
   'DTS-HD HRA': 75,
   'DTS': 70,
@@ -286,7 +287,7 @@ export const STOP_WORDS = new Set([
   'WEB', 'WEBDL', 'WEB-DL', 'WEBRIP', 'WEBRIP',
   'BLURAY', 'BLU-RAY', 'REMUX', 'UHD', 'HDR', 'HDR10', 'HDR10+', 'HDR10PLUS', 'DV', 'DOVI',
   'X264', 'X265', 'H264', 'H265', 'HEVC', 'AVC', 'AV1',
-  'DTS', 'DTS-HD', 'DTSHD', 'TRUEHD', 'AAC', 'DD', 'DDP', 'EAC3', 'AC3', 'FLAC',
+  'DTS', 'DTS-HD', 'DTSHD', 'TRUEHD', 'PCM', 'LPCM', 'AAC', 'DD', 'DDP', 'EAC3', 'AC3', 'FLAC',
   'ATMOS', 'AURO3D', 'IMAX', 'EXTENDED', 'REPACK', 'PROPER', 'RERIP',
   'MULTI', 'ITA', 'ENG', 'FRE', 'GER', 'SPA', 'POR', 'JPN', 'RUS', 'CHI', 'KOR', 'UKR', 'NLD', 'POL', 'SWE'
 ]);

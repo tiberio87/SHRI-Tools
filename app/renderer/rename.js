@@ -8,6 +8,12 @@ import {
   sanitizeName,
   stripExtension
 } from './path-utils.js';
+import {
+  detectAudioMeta,
+  mapAudioCodec,
+  parseChannels,
+  pickBestItalianAudioTrack
+} from './media-utils.js';
 
 export function createRenameTools(deps) {
   const {
@@ -20,6 +26,40 @@ export function createRenameTools(deps) {
     setHint,
     languageCodesPattern
   } = deps;
+
+  function getAudioOverrides() {
+    if (!state.mediaInfo) {
+      return {};
+    }
+    const best = pickBestItalianAudioTrack(state.mediaInfo);
+    if (!best) {
+      return {};
+    }
+    const overrides = {};
+    const codecManual = ui.audioCodecInput?.dataset?.manual === 'true' && ui.audioCodecInput?.value;
+    const channelsManual = ui.audioChannelsInput?.dataset?.manual === 'true' && ui.audioChannelsInput?.value;
+    const metaManual = ui.audioMetaInput?.dataset?.manual === 'true' && ui.audioMetaInput?.value;
+
+    if (!codecManual) {
+      const mapped = mapAudioCodec(best);
+      if (mapped) {
+        overrides.audioCodec = mapped;
+      }
+    }
+    if (!channelsManual) {
+      const channels = parseChannels(best.Channels || best['Channel(s)'] || '');
+      if (channels) {
+        overrides.audioChannels = channels;
+      }
+    }
+    if (!metaManual) {
+      const meta = detectAudioMeta(best);
+      if (meta) {
+        overrides.audioMeta = meta;
+      }
+    }
+    return overrides;
+  }
 
   function computeBaseName(form, overrides = {}) {
     const data = { separatorStyle: 'spaces', ...form, ...overrides };
@@ -249,6 +289,7 @@ export function createRenameTools(deps) {
 
     const warnings = [];
     const form = getFormState();
+    const audioOverride = getAudioOverrides();
     const isDir = state.kind === 'dir';
     const isSeason = isDir || form.type.includes('season');
     const seasonType = form.type.includes('anime') ? 'anime-season' : 'tv-season';
@@ -298,7 +339,8 @@ export function createRenameTools(deps) {
           type: seasonType,
           separatorStyle: 'dots',
           languageTag: useLangFolders ? form.languageTag : '',
-          tag: resolvedTag
+          tag: resolvedTag,
+          ...audioOverride
         })
       : '';
 
@@ -323,7 +365,8 @@ export function createRenameTools(deps) {
             episodeEnd,
             episodeTitle: episodeEnd ? '' : (episodeTitle || form.episodeTitle),
             languageTag: useLangFiles ? form.languageTag : '',
-            tag: resolvedTag
+            tag: resolvedTag,
+            ...audioOverride
           });
           if (!episode || !season) {
             warnings.push(`Stagione/episodio mancante per ${getPathBaseName(filePath)}`);
@@ -339,7 +382,8 @@ export function createRenameTools(deps) {
         separatorStyle: 'dots',
         episodeEnd,
         languageTag: useLangFiles ? form.languageTag : '',
-        tag: resolvedTag
+        tag: resolvedTag,
+        ...audioOverride
       });
       if (form.type === 'tv-episode' || form.type === 'anime-episode') {
         const key = episodeKey(form.season, form.episode);
@@ -350,7 +394,8 @@ export function createRenameTools(deps) {
               episodeEnd,
               episodeTitle: mappedTitle,
               languageTag: useLangFiles ? form.languageTag : '',
-              tag: resolvedTag
+              tag: resolvedTag,
+              ...audioOverride
             });
         } else if (!form.episodeTitle && !episodeEnd) {
           const guess = state.mainVideo ? guessMetadataFromName(state.mainVideo) : null;
@@ -360,7 +405,8 @@ export function createRenameTools(deps) {
               episodeEnd,
               episodeTitle: guess.episodeTitle,
               languageTag: useLangFiles ? form.languageTag : '',
-              tag: resolvedTag
+              tag: resolvedTag,
+              ...audioOverride
             });
           }
         }
@@ -487,6 +533,7 @@ export function createRenameTools(deps) {
     buildRenameTargets,
     buildTorrentWarnings,
     computeBaseName,
+    getAudioOverrides,
     getMissingRenameRequirements,
     getTorrentNameSuggestion
   };

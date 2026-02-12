@@ -31,6 +31,7 @@ export function createUploadKit(deps) {
     computeBaseName,
     copyToClipboard,
     getFormState,
+    getAudioOverrides,
     getMissingRenameRequirements,
     getPathBaseName,
     loadSettings,
@@ -317,12 +318,14 @@ export function createUploadKit(deps) {
     const seasonType = baseForm.type.includes('anime') ? 'anime-season' : 'tv-season';
     const type = isDir ? seasonType : baseForm.type;
     const dropEpisodeTitle = type === 'tv-episode' || type === 'anime-episode';
+    const audioOverrides = typeof getAudioOverrides === 'function' ? getAudioOverrides() : {};
     const baseName = computeBaseName(form, {
       type,
       separatorStyle: 'spaces',
       episodeTitle: dropEpisodeTitle ? '' : form.episodeTitle,
       allowNoGroupTag: settings.autoNoGroupTag !== false,
-      tokenStyle: 'title'
+      tokenStyle: 'title',
+      ...audioOverrides
     });
     return { title: baseName, fallback };
   }

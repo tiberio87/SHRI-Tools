@@ -2135,6 +2135,7 @@ async function loadPath(targetPath) {
 const uploadKit = createUploadKit({
   buildMediaInfoShort: metadataTools.buildMediaInfoShort,
   computeBaseName: renameTools.computeBaseName,
+  getAudioOverrides: renameTools.getAudioOverrides,
   copyToClipboard,
   getFormState,
   getMissingRenameRequirements: renameTools.getMissingRenameRequirements,

@@ -64,6 +64,9 @@ export function mapAudioCodec(track) {
   if (combined.includes('TRUEHD')) {
     return 'TrueHD';
   }
+  if (combined.includes('LPCM') || combined.includes('PCM')) {
+    return 'PCM';
+  }
   if (combined.includes('E-AC-3') || combined.includes('EAC3') || combined.includes('DD+')) {
     return 'DD+';
   }
@@ -105,6 +108,66 @@ export function scoreAudioTrack(track) {
   const bitrateMatch = String(track?.BitRate || '').match(/\d+/);
   const bitrateValue = bitrateMatch ? parseInt(bitrateMatch[0], 10) : 0;
   return scoreBase * 1000 + channelsValue * 10 + bitrateValue / 1000000;
+}
+
+function getChannelCount(track) {
+  const match = String(track?.Channels || track?.['Channel(s)'] || '').match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+function getBitrateValue(track) {
+  const raw = track?.BitRate || track?.['BitRate/String'] || track?.BitRate_String || '';
+  const match = String(raw || '').match(/\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+}
+
+function isLosslessAudio(track) {
+  const compression = String(track?.Compression_Mode || '').toLowerCase();
+  if (compression === 'lossless') {
+    return true;
+  }
+  const formatCombined = `${track?.Format || ''} ${track?.Format_Commercial || track?.Format_Commercial_IfAny || ''}`.toUpperCase();
+  return /TRUEHD|DTS-HD MA|FLAC|PCM|LPCM/.test(formatCombined);
+}
+
+export function pickBestItalianAudioTrack(mediaInfo) {
+  const audioTracks = getAudioTracks(mediaInfo);
+  if (!audioTracks.length) {
+    return null;
+  }
+  const cleanTracks = audioTracks.filter((track) => {
+    const title = String(track?.Title || track?.title || '').toLowerCase();
+    return !title.includes('commentary');
+  });
+  if (!cleanTracks.length) {
+    return null;
+  }
+  const italianTracks = cleanTracks.filter((track) => normalizeLangTag(getTrackLang(track)) === 'ITA');
+  const pool = italianTracks.length ? italianTracks : cleanTracks;
+
+  return pool.reduce((best, track) => {
+    if (!best) {
+      return track;
+    }
+    const bestKey = [
+      isLosslessAudio(best) ? 1 : 0,
+      getChannelCount(best),
+      detectAudioMeta(best) === 'Atmos' ? 1 : 0,
+      getBitrateValue(best)
+    ];
+    const trackKey = [
+      isLosslessAudio(track) ? 1 : 0,
+      getChannelCount(track),
+      detectAudioMeta(track) === 'Atmos' ? 1 : 0,
+      getBitrateValue(track)
+    ];
+    for (let i = 0; i < trackKey.length; i += 1) {
+      if (trackKey[i] !== bestKey[i]) {
+        return trackKey[i] > bestKey[i] ? track : best;
+      }
+    }
+    return best;
+  }, null);
 }
 
 export function getVideoTrack(mediaInfo) {

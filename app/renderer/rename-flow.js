@@ -60,10 +60,12 @@ export function createRenameFlow({
       const form = getFormState();
       logDebug?.('form state', form);
       const isEpisode = form.type === 'tv-episode' || form.type === 'anime-episode';
+      const audioOverrides = renameTools.getAudioOverrides ? renameTools.getAudioOverrides() : {};
       const baseName = renameTools.computeBaseName(form, {
         tokenStyle: 'title',
         separatorStyle: 'spaces',
-        ...(isEpisode ? { episodeTitle: '' } : {})
+        ...(isEpisode ? { episodeTitle: '' } : {}),
+        ...audioOverrides
       });
       if (ui.renameFileCheckbox) {
         ui.renameFileCheckbox.checked = false;
