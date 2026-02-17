@@ -9,20 +9,17 @@ import {
 import { renderBbcodePreview } from './bbcode.js';
 import { getParentPath } from './path-utils.js';
 import {
-  formatBitrate,
-  formatBytes,
-  formatDuration,
   formatLangName,
   getAudioTracks,
   getGeneralTrack,
   getTrackLang,
   getTrackValue,
   getVideoTrack,
+  pickBestItalianAudioTrack,
+  detectAudioMeta,
   mapAudioCodec,
   mapVideoCodec,
-  normalizeLangTag,
-  parseChannels,
-  scoreAudioTrack
+  parseChannels
 } from './media-utils.js';
 
 export function createUploadKit(deps) {
@@ -255,16 +252,19 @@ export function createUploadKit(deps) {
     if (form.resolution) {
       parts.push(form.resolution);
     }
-    if (form.format === 'WEB-DL' || form.format === 'WEBRip') {
-      if (form.service) {
-        parts.push(form.service);
-      }
-      parts.push(form.format);
-    } else if (form.source) {
-      parts.push(form.source);
+    let source = String(form.source || '');
+    if (!source && (form.format === 'WEB-DL' || form.format === 'WEBRip')) {
+      source = form.format;
+    }
+    if (source) {
+      parts.push(source.replace('Blu-ray', 'BluRay').replace('Web', 'WEB-DL'));
     }
 
-    const videoCodec = String(form.videoCodec || '');
+    let videoCodec = String(form.videoCodec || '');
+    if (!videoCodec && state.mediaInfo) {
+      const video = getVideoTrack(state.mediaInfo) || {};
+      videoCodec = mapVideoCodec(video, form.format);
+    }
     if (videoCodec) {
       const upper = videoCodec.toUpperCase();
       if (upper.includes('HEVC') || upper.includes('H.265')) {
@@ -281,22 +281,42 @@ export function createUploadKit(deps) {
       parts.push(hdrLabel);
     }
 
-    const audioParts = [];
-    if (form.audioCodec) {
-      audioParts.push(form.audioCodec);
-    }
-    if (form.audioChannels) {
-      audioParts.push(form.audioChannels);
-    }
-    if (form.audioMeta) {
-      audioParts.push(form.audioMeta);
-    }
-    if (audioParts.length) {
-      parts.push(audioParts.join(' '));
+    const bestAudio = state.mediaInfo ? pickBestItalianAudioTrack(state.mediaInfo) : null;
+    if (bestAudio) {
+      const audioBits = [];
+      const audioCodec = mapAudioCodec(bestAudio);
+      if (audioCodec) {
+        audioBits.push(audioCodec);
+      }
+      const channels = parseChannels(bestAudio.Channels || bestAudio['Channel(s)'] || '');
+      if (channels) {
+        audioBits.push(channels);
+      }
+      const audioMeta = detectAudioMeta(bestAudio);
+      if (audioMeta) {
+        audioBits.push(audioMeta);
+      }
+      if (audioBits.length) {
+        parts.push(audioBits.join(' '));
+      }
     }
 
-    if (form.languageTag) {
-      parts.push(form.languageTag);
+    const audioTracks = state.mediaInfo ? getAudioTracks(state.mediaInfo) : [];
+    const audioLangs = audioTracks
+      .map((track) => formatLangName(getTrackLang(track)))
+      .filter(Boolean);
+    if (audioLangs.includes('Italiano')) {
+      parts.push('Italiano');
+    } else if (audioLangs.includes('Inglese')) {
+      parts.push('Inglese');
+    } else if (audioLangs.length) {
+      parts.push(audioLangs[0].title ? audioLangs[0].title() : audioLangs[0]);
+    } else if (form.languageTag) {
+      if (/ITA/i.test(form.languageTag)) {
+        parts.push('Italiano');
+      } else if (/ENG/i.test(form.languageTag)) {
+        parts.push('Inglese');
+      }
     }
 
     return parts.filter(Boolean).join(' ');
@@ -978,19 +998,13 @@ export function createUploadKit(deps) {
     if (!items.length) {
       return '[center]Nessuno screenshot disponibile[/center]';
     }
-    const rows = [];
-    for (let index = 0; index < items.length; index += 2) {
-      const row = items.slice(index, index + 2).join(' ');
-      rows.push(`[center]${row}[/center]`);
-    }
-    let grid = rows.join('\n').trim();
-    if (state.screenshotsMeta?.tonemapped) {
-      grid = `${grid}\n[center][i]Screenshot tonemappati (HDR -> SDR).[/i][/center]`;
-    }
-    return grid;
+    const row1 = items.length >= 2 ? `${items.slice(0, 2).join(' ')} \n` : `${items.join(' ')} \n`;
+    const row2 = items.length > 2 ? `${items.slice(2, 4).join(' ')} \n` : '';
+    const row3 = items.length > 4 ? `${items.slice(4, 6).join(' ')} \n` : '';
+    return `[center]${row1}${row2}${row3}[/center]`;
   }
 
-  function buildSyntheticMediaInfo() {
+  function buildSyntheticMediaInfo(form) {
     if (!state.mediaInfo) {
       return null;
     }
@@ -999,45 +1013,95 @@ export function createUploadKit(deps) {
     const audioTracks = getAudioTracks(state.mediaInfo);
     const textTracks = (state.mediaInfo?.media?.track || []).filter((track) => track['@type'] === 'Text');
 
-    const bestItalian = audioTracks.filter((track) => normalizeLangTag(getTrackLang(track)) === 'ITA');
-    const audioCandidates = bestItalian.length ? bestItalian : audioTracks;
-    const bestAudio = audioCandidates.reduce((best, track) => {
-      if (!best) {
-        return track;
+    const bestAudio = pickBestItalianAudioTrack(state.mediaInfo) || (audioTracks.length ? audioTracks[0] : null);
+
+    const fileName = state.mainVideo ? getPathBaseName(state.mainVideo) : String(general.FileName || 'file.mkv');
+    const fileSizeRaw = getTrackValue(general, ['FileSize', 'FileSize/String', 'FileSize_String']);
+    const fileSizeNum = Number(fileSizeRaw);
+    const fileSize = Number.isFinite(fileSizeNum) ? `${(fileSizeNum / (1024 ** 3)).toFixed(1)} GiB` : String(fileSizeRaw || '');
+    const durationRaw = getTrackValue(general, ['Duration']);
+    const durationSec = Number(durationRaw) || 0;
+    const hours = Math.floor(durationSec / 3600);
+    const minutes = Math.floor((durationSec % 3600) / 60);
+    const duration = hours > 0 ? `${hours} h ${minutes} min` : `${minutes} min`;
+    const totalBitrateRaw = getTrackValue(general, ['OverallBitRate', 'OverallBitRate/String', 'OverallBitRate_String']);
+    const totalBitrateNum = Number(totalBitrateRaw);
+    const totalBitrate = Number.isFinite(totalBitrateNum) ? `${(totalBitrateNum / 1000000).toFixed(1)} Mb/s` : String(totalBitrateRaw || '');
+    const chapterRaw = getTrackValue(general, ['MenuCount', 'Menu_Count', 'CountOfElements', 'Chapters']);
+    const chapters = Number(chapterRaw) > 0 ? 'Si' : 'No';
+
+    const videoFormat = getTrackValue(video, ['Format', 'Format_String', 'Format/Info']) || 'N/A';
+    const videoFormatUpper = String(videoFormat || '').toUpperCase();
+    let videoCodec = videoFormat;
+    if (videoFormatUpper.includes('HEVC')) {
+      videoCodec = 'x265';
+    } else if (videoFormatUpper.includes('AVC') || videoFormatUpper.includes('H.264')) {
+      videoCodec = 'x264';
+    } else if (videoFormatUpper.includes('MPEG VIDEO') || videoFormatUpper.includes('MPEG-2')) {
+      videoCodec = 'MPEG-2';
+    } else if (videoFormatUpper.includes('VC-1') || videoFormatUpper.includes('VC1')) {
+      videoCodec = 'VC-1';
+    }
+    const bitDepthValue = getTrackValue(video, ['BitDepth', 'Bit_depth']) || 10;
+    const bitDepth = `${bitDepthValue} bits`;
+    const videoBitrateRaw = getTrackValue(video, ['BitRate', 'BitRate/String', 'BitRate_Maximum']);
+    const videoBitrateNum = Number(videoBitrateRaw);
+    const videoBitrate = Number.isFinite(videoBitrateNum) ? `${(videoBitrateNum / 1000000).toFixed(1)} Mb/s` : String(videoBitrateRaw || '');
+    const resolution = form?.resolution || 'N/A';
+    const aspectRaw = getTrackValue(video, ['DisplayAspectRatio', 'DisplayAspectRatio/String']);
+    const aspectFloat = Number(aspectRaw) || 0;
+    let aspect = 'N/A';
+    if (aspectFloat) {
+      if (aspectFloat >= 1.77 && aspectFloat <= 1.79) {
+        aspect = '16:9';
+      } else if (aspectFloat >= 1.32 && aspectFloat <= 1.34) {
+        aspect = '4:3';
+      } else if (aspectFloat >= 2.35 && aspectFloat <= 2.45) {
+        aspect = '2.39:1';
+      } else {
+        aspect = `${aspectFloat.toFixed(2)}:1`;
       }
-      return scoreAudioTrack(track) > scoreAudioTrack(best) ? track : best;
-    }, null);
+    }
 
-    const fileName = state.mainVideo ? getPathBaseName(state.mainVideo) : '';
-    const fileSizeRaw = getTrackValue(general, ['FileSize_String', 'FileSize/String', 'FileSize']);
-    const fileSize = Number.isFinite(Number(fileSizeRaw)) ? formatBytes(fileSizeRaw) : fileSizeRaw;
-    const durationRaw = getTrackValue(general, ['Duration/String3', 'Duration/String2', 'Duration/String', 'Duration']);
-    const duration = Number.isFinite(Number(durationRaw)) ? formatDuration(durationRaw) : durationRaw;
-    const totalBitrateRaw = getTrackValue(general, ['OverallBitRate/String', 'OverallBitRate', 'OverallBitRate_String']);
-    const totalBitrate = Number.isFinite(Number(totalBitrateRaw)) ? formatBitrate(totalBitrateRaw) : totalBitrateRaw;
-    const chapters = getTrackValue(general, ['MenuCount', 'Menu_Count', 'CountOfElements', 'Chapters']) || 'N/A';
+    const audioFormat = bestAudio ? getTrackValue(bestAudio, ['Format']) : 'N/A';
+    let audioName = bestAudio ? getTrackValue(bestAudio, ['Format_Commercial_IfAny', 'Title']) : '';
+    if (!audioName && bestAudio) {
+      const audioMap = {
+        'E-AC-3': 'Dolby Digital Plus',
+        'AC-3': 'Dolby Digital',
+        TrueHD: 'Dolby TrueHD',
+        'MLP FBA': 'Dolby TrueHD',
+        'DTS-HD MA': 'DTS-HD Master Audio',
+        AAC: 'Advanced Audio Codec'
+      };
+      audioName = audioMap[String(bestAudio.Format || '')] || String(bestAudio.Format || '');
+    }
+    let audioChannels = bestAudio ? String(bestAudio.Channels || bestAudio['Channel(s)'] || '') : '';
+    if (audioChannels === '6') {
+      audioChannels = '5.1';
+    } else if (audioChannels === '8') {
+      audioChannels = '7.1';
+    } else if (audioChannels === '2') {
+      audioChannels = '2.0';
+    } else {
+      audioChannels = parseChannels(audioChannels);
+    }
+    const audioBitrateRaw = bestAudio ? getTrackValue(bestAudio, ['BitRate', 'BitRate/String']) : '';
+    const audioBitrateNum = Number(audioBitrateRaw);
+    const audioBitrate = Number.isFinite(audioBitrateNum) ? `${Math.round(audioBitrateNum / 1000)} kb/s` : '0 kb/s';
+    const audioLang = bestAudio ? formatLangName(getTrackLang(bestAudio)) || 'Inglese' : 'Inglese';
 
-    const videoFormat = getTrackValue(video, ['Format', 'Format_String', 'Format/Info']);
-    const videoCodec = mapVideoCodec(video, ui.formatSelect.value);
-    const bitDepth = getTrackValue(video, ['BitDepth', 'Bit_depth']);
-    const videoBitrateRaw = getTrackValue(video, ['BitRate/String', 'BitRate', 'BitRate_Maximum']);
-    const videoBitrate = Number.isFinite(Number(videoBitrateRaw)) ? formatBitrate(videoBitrateRaw) : videoBitrateRaw;
-    const width = getTrackValue(video, ['Width']);
-    const height = getTrackValue(video, ['Height']);
-    const resolution = width && height ? `${width}x${height}` : '';
-    const aspect = getTrackValue(video, ['DisplayAspectRatio/String', 'DisplayAspectRatio']);
-
-    const audioFormat = bestAudio ? mapAudioCodec(bestAudio) : '';
-    const audioName = bestAudio ? getTrackValue(bestAudio, ['Title', 'CommercialName', 'Format']) : '';
-    const audioChannels = bestAudio ? parseChannels(bestAudio.Channels || bestAudio['Channel(s)'] || '') : '';
-    const audioBitrateRaw = bestAudio ? getTrackValue(bestAudio, ['BitRate/String', 'BitRate']) : '';
-    const audioBitrate = Number.isFinite(Number(audioBitrateRaw)) ? formatBitrate(audioBitrateRaw) : audioBitrateRaw;
-    const audioLang = bestAudio ? formatLangName(getTrackLang(bestAudio)) : '';
-
-    const subLangs = textTracks
-      .map((track) => formatLangName(getTrackLang(track)))
-      .filter(Boolean);
-    const subs = subLangs.length ? [...new Set(subLangs)].join(', ') : 'Nessuno';
+    let subs = 'Assenti';
+    if (textTracks.length) {
+      const subLangs = new Set();
+      textTracks.forEach((track) => {
+        const name = formatLangName(getTrackLang(track));
+        if (name) {
+          subLangs.add(name);
+        }
+      });
+      subs = subLangs.size ? [...subLangs].sort().join(', ') : 'Assenti';
+    }
 
     return {
       fn: fileName,
@@ -1045,9 +1109,9 @@ export function createUploadKit(deps) {
       dur: duration,
       totalBr: totalBitrate,
       chap: chapters,
-      vidFormat: videoFormat || videoCodec,
-      codec: videoCodec || videoFormat,
-      depth: bitDepth ? `${bitDepth} bit` : '',
+      vidFormat: videoFormat,
+      codec: videoCodec,
+      depth: bitDepth,
       vidBr: videoBitrate,
       res: resolution,
       asp: aspect,
@@ -1068,40 +1132,51 @@ export function createUploadKit(deps) {
     }
     const type = state.metadata?.tmdbType || (form.type.startsWith('tv') || form.type.startsWith('anime') ? 'tv' : 'movie');
     const imdbSlug = imdbId ? (imdbId.startsWith('tt') ? imdbId : `tt${imdbId}`) : '';
-    let lines = '[size=13][b][color=#e8024b][ LINKS ][/color][/b][/size]\n';
+    let lines = '\n[size=13][b][color=#e8024b]--- LINKS ---[/color][/b][/size]\n';
     if (imdbSlug) {
       lines += `[size=11][color=#FFFFFF]IMDb: https://www.imdb.com/title/${imdbSlug}/[/color][/size]\n`;
     }
     if (tmdbId) {
       lines += `[size=11][color=#FFFFFF]TMDb: https://www.themoviedb.org/${type}/${tmdbId}[/color][/size]\n`;
     }
+    lines += '\n';
     return lines;
   }
 
   function buildReleaseNotesSection(form) {
     const tag = (form.tag || '').replace(/^-/, '').trim();
-    const tonemapNote = state.screenshotsMeta?.tonemapped
-      ? 'Screenshot tonemappati (HDR -> SDR).'
-      : '';
+    const tonemapNote = state.screenshotsMeta?.tonemapped ? 'Screenshot tonemappati (HDR -> SDR).' : '';
     const manualNotes = ui.uploadReleaseNotesInput?.value.trim();
     const isIsland = tag.toLowerCase() === 'island';
     const baseNotes = manualNotes || (isIsland
-      ? 'Questa e una release interna pubblicata in esclusiva su ShareIsland.\nSi prega di non ricaricare questa release su tracker pubblici o privati. Si prega di mantenerla in seed il piu a lungo possibile. Grazie!'
+      ? 'Questa è una release interna pubblicata in esclusiva su Shareisland.\nSi prega di non ricaricare questa release su tracker pubblici o privati. Si prega di mantenerla in seed il più a lungo possibile. Grazie!'
       : 'Nulla da aggiungere.');
-    const notes = tonemapNote ? `${baseNotes}\n${tonemapNote}` : baseNotes;
-    return `[size=13][b][color=#e8024b][ RELEASE NOTES ][/color][/b][/size]\n[size=11][color=#FFFFFF]${notes}[/color][/size]`;
+    let notes = baseNotes;
+    if (isIsland) {
+      if (tonemapNote) {
+        notes = `${baseNotes}\n${tonemapNote}`;
+      }
+    } else if (tonemapNote) {
+      notes = tonemapNote;
+    }
+    return `[size=13][b][color=#e8024b]--- RELEASE NOTES ---[/color][/b][/size]\n[size=11][color=#FFFFFF]${notes}[/color][/size]`;
   }
 
   function buildShoutouts(form) {
     const tag = (form.tag || '').replace(/^-/, '').trim();
-    if (tag) {
+    if (tag && !['nogroup', 'nogrp', 'unknown', 'unk'].includes(tag.toLowerCase())) {
       return `SHOUTOUTS : ${tag}`;
     }
     const shouts = [
       'The Scene never dies',
+      'Arrr! Powered by Rum & Bandwidth',
       'Seed or walk the plank!',
-      'Released by Nobody - claimed by Everybody',
-      'From the depths of the digital seas'
+      'Released by Nobody — claimed by Everybody',
+      'From the depths of the digital seas',
+      'Where bits are free and rum flows endlessly',
+      "Pirates don't ask, they share",
+      'For the glory of the Scene!',
+      'Scene is the paradise'
     ];
     return `SHOUTOUTS : ${shouts[Math.floor(Math.random() * shouts.length)]}`;
   }
@@ -1109,10 +1184,10 @@ export function createUploadKit(deps) {
   function buildCategoryHeader(form) {
     if (form.type.startsWith('tv') || form.type.startsWith('anime')) {
       return form.type.includes('season')
-        ? '[ SERIE TV (STAGIONE) ]'
-        : '[ SERIE TV (EPISODIO) ]';
+        ? '--- SERIE TV (STAGIONE) ---'
+        : '--- SERIE TV (EPISODIO) ---';
     }
-    return '[ FILM ]';
+    return '--- FILM ---';
   }
 
   function buildUploadDescription(form) {
@@ -1132,9 +1207,9 @@ export function createUploadKit(deps) {
 
     const useBdInfo = shouldUseBdInfo(form);
     const bdinfoSummary = useBdInfo ? getBdInfoSummaryText() : '';
-    const synthetic = useBdInfo ? null : buildSyntheticMediaInfo();
+    const synthetic = useBdInfo ? null : buildSyntheticMediaInfo(form);
     const mediainfoSection = synthetic
-      ? `[code][size=13][b][color=#da8d49]MEDIAINFO SINTENTICO[/color][/b][/size]
+      ? `[size=13][b][color=#da8d49]INFO GENERALI[/color][/b][/size]
 [size=11][color=#FFFFFF]Nome File       : ${synthetic.fn}[/color][/size]
 [size=11][color=#FFFFFF]Dimensioni File : ${synthetic.size}[/color][/size]
 [size=11][color=#FFFFFF]Durata          : ${synthetic.dur}[/color][/size]
@@ -1144,7 +1219,7 @@ export function createUploadKit(deps) {
 [size=13][b][color=#da8d49]VIDEO[/color][/b][/size]
 [size=11][color=#FFFFFF]Formato         : ${synthetic.vidFormat}[/color][/size]
 [size=11][color=#FFFFFF]Compressore     : ${synthetic.codec}[/color][/size]
-[size=11][color=#FFFFFF]Profondita Bit  : ${synthetic.depth}[/color][/size]
+[size=11][color=#FFFFFF]Profondità Bit  : ${synthetic.depth}[/color][/size]
 [size=11][color=#FFFFFF]Bitrate         : ${synthetic.vidBr}[/color][/size]
 [size=11][color=#FFFFFF]Risoluzione     : ${synthetic.res}[/color][/size]
 [size=11][color=#FFFFFF]Rapporto        : ${synthetic.asp}[/color][/size]
@@ -1157,44 +1232,36 @@ export function createUploadKit(deps) {
 [size=11][color=#FFFFFF]Lingua          : ${synthetic.lang}[/color][/size]
 
 [size=13][b][color=#da8d49]SOTTOTITOLI[/color][/b][/size]
-[size=11][color=#FFFFFF]${synthetic.subs}[/color][/size][/code]`
+[size=11][color=#FFFFFF]${synthetic.subs}[/color][/size]
+
+`
       : '';
     const bdinfoSection = useBdInfo
-      ? `[code][size=13][b][color=#da8d49]BDINFO[/color][/b][/size]
-[size=11][color=#FFFFFF]${bdinfoSummary || 'BDInfo non disponibile.'}[/color][/size][/code]`
+      ? `[size=13][b][color=#da8d49]BDINFO[/color][/b][/size]
+[size=11][color=#FFFFFF]${bdinfoSummary || 'BDInfo non disponibile.'}[/color][/size]
+
+`
       : '';
 
-    const infoBlock = infoLine
-      ? `[center][size=13][color=#ffffff]${infoLine}[/color][/size][/center]`
-      : '';
-    const summaryBlock = `[center][size=13][b][color=#e8024b][ RIASSUNTO ][/color][/b][/size][/center]
-[center][size=13]${summary}[/size][/center]`;
-    const screensBlock = `[center][size=13][b][color=#e8024b][ SCREENSHOT ][/color][/b][/size][/center]
-${screens}`;
-    const extras = [
-      linksSection,
-      releaseNotesSection,
-      `[size=13][b][color=#e8024b][ SHOUTOUTS ][/color][/b][/size]\n[size=11][color=#FFFFFF]${shoutouts}[/color][/size]`
-    ]
-      .filter(Boolean)
-      .join('\n\n');
-    const extrasBlock = extras ? `[center]\n${extras}\n[/center]` : '';
-    const downloadBlock = '[size=13][color=#0592a3][size=16][b][center]BUON DOWNLOAD![/center][/b][/size][/color][/size]';
-
-    return `${logoSection}[center][size=13][b][color=#e8024b]${categoryHeader}[/color][/b][/size][/center]
+    return `[code]
+${logoSection}[center][size=13][b][color=#e8024b]${categoryHeader}[/color][/b][/size][/center]
 [center][size=13][b][color=#ffffff]${title}[/color][/b][/size][/center]
-${infoBlock}
+[center][size=13][color=#ffffff]${infoLine}[/color][/size][/center]
 
-${summaryBlock}
+[center][size=13][b][color=#e8024b]--- RIASSUNTO ---[/color][/b][/size][/center]
+${summary}
 
-${screensBlock}
-${extrasBlock}
+[center][size=13][b][color=#e8024b]--- SCREENS ---[/color][/b][/size][/center]
+${screens}
+${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSection}
 
-${useBdInfo ? bdinfoSection : mediainfoSection}
+[size=13][b][color=#e8024b]--- SHOUTOUTS ---[/color][/b][/size]
+[size=11][color=#FFFFFF]${shoutouts}[/color][/size]
 
-${downloadBlock}
+[size=13][color=#0592a3][size=16][b]BUON DOWNLOAD![/b][/size][/color][/size]
 
-[right][size=8]Generated by SHRI-Tools[/size][/right]`;
+[right][size=8]Generated by SHRI-Tools[/size][/right]
+[/code]`;
   }
 
   function buildUploadWarnings(form, settings) {

@@ -113,6 +113,7 @@ export function createUAMode({
     ui.uploadAssistantModal.classList.remove('hidden');
     updateUaTypeOptions();
     updateUaSourceOptions();
+    updateUaResolutionOptions();
     updateUaControlsState();
   };
 
@@ -580,6 +581,75 @@ export function createUAMode({
         group.classList.toggle('is-disabled', !sourceEnabled);
       }
     }
+    const resEnabled = Boolean(ui.uaResToggle?.checked);
+    if (ui.uaResBtn) {
+      ui.uaResBtn.disabled = false;
+      ui.uaResBtn.setAttribute('aria-disabled', String(!resEnabled));
+      const group = ui.uaResBtn.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !resEnabled);
+      }
+    }
+    const tmdbEnabled = Boolean(ui.uaTmdbToggle?.checked);
+    if (ui.uaTmdbInput) {
+      ui.uaTmdbInput.disabled = false;
+      ui.uaTmdbInput.readOnly = !tmdbEnabled;
+      ui.uaTmdbInput.setAttribute('aria-disabled', String(!tmdbEnabled));
+      const group = ui.uaTmdbInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !tmdbEnabled);
+      }
+    }
+    const imdbEnabled = Boolean(ui.uaImdbToggle?.checked);
+    if (ui.uaImdbInput) {
+      ui.uaImdbInput.disabled = false;
+      ui.uaImdbInput.readOnly = !imdbEnabled;
+      ui.uaImdbInput.setAttribute('aria-disabled', String(!imdbEnabled));
+      const group = ui.uaImdbInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !imdbEnabled);
+      }
+    }
+    const tvdbEnabled = Boolean(ui.uaTvdbToggle?.checked);
+    if (ui.uaTvdbInput) {
+      ui.uaTvdbInput.disabled = false;
+      ui.uaTvdbInput.readOnly = !tvdbEnabled;
+      ui.uaTvdbInput.setAttribute('aria-disabled', String(!tvdbEnabled));
+      const group = ui.uaTvdbInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !tvdbEnabled);
+      }
+    }
+    const malEnabled = Boolean(ui.uaMalToggle?.checked);
+    if (ui.uaMalInput) {
+      ui.uaMalInput.disabled = false;
+      ui.uaMalInput.readOnly = !malEnabled;
+      ui.uaMalInput.setAttribute('aria-disabled', String(!malEnabled));
+      const group = ui.uaMalInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !malEnabled);
+      }
+    }
+    const seasonEnabled = Boolean(ui.uaSeasonToggle?.checked);
+    if (ui.uaSeasonInput) {
+      ui.uaSeasonInput.disabled = false;
+      ui.uaSeasonInput.readOnly = !seasonEnabled;
+      ui.uaSeasonInput.setAttribute('aria-disabled', String(!seasonEnabled));
+      const group = ui.uaSeasonInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !seasonEnabled);
+      }
+    }
+    const episodeEnabled = Boolean(ui.uaEpisodeToggle?.checked);
+    if (ui.uaEpisodeInput) {
+      ui.uaEpisodeInput.disabled = false;
+      ui.uaEpisodeInput.readOnly = !episodeEnabled;
+      ui.uaEpisodeInput.setAttribute('aria-disabled', String(!episodeEnabled));
+      const group = ui.uaEpisodeInput.closest('.ua-arg-group');
+      if (group) {
+        group.classList.toggle('is-disabled', !episodeEnabled);
+      }
+    }
     if (ui.uaInput) {
       ui.uaInput.disabled = !uaRunning;
     }
@@ -651,6 +721,20 @@ export function createUAMode({
     { code: 'UHDTV', label: 'UHDTV' }
   ]);
 
+  const buildUaResolutionOptions = () => ([
+    { code: '2160p', label: '2160p' },
+    { code: '1080p', label: '1080p' },
+    { code: '1080i', label: '1080i' },
+    { code: '720p', label: '720p' },
+    { code: '576p', label: '576p' },
+    { code: '576i', label: '576i' },
+    { code: '480p', label: '480p' },
+    { code: '480i', label: '480i' },
+    { code: '8640p', label: '8640p' },
+    { code: '4320p', label: '4320p' },
+    { code: 'other', label: 'Other' }
+  ]);
+
   const updateUaTypeOptions = () => {
     if (!ui.uaTypeMenu || !ui.uaTypeBtn || !ui.uaTypeInput) {
       return;
@@ -716,6 +800,40 @@ export function createUAMode({
     } else {
       ui.uaSourceInput.value = '';
       ui.uaSourceBtn.textContent = 'Seleziona sorgente';
+    }
+  };
+
+  const updateUaResolutionOptions = () => {
+    if (!ui.uaResMenu || !ui.uaResBtn || !ui.uaResInput) {
+      return;
+    }
+    const options = buildUaResolutionOptions();
+    const current = ui.uaResInput.value;
+    ui.uaResMenu.innerHTML = '';
+
+    const blank = document.createElement('button');
+    blank.type = 'button';
+    blank.className = 'dropdown-item';
+    blank.dataset.value = '';
+    blank.textContent = 'Seleziona risoluzione';
+    ui.uaResMenu.appendChild(blank);
+
+    for (const option of options) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'dropdown-item';
+      item.dataset.value = option.code;
+      item.textContent = option.label;
+      ui.uaResMenu.appendChild(item);
+    }
+
+    const currentOption = options.find((option) => option.code === current);
+    if (currentOption) {
+      ui.uaResInput.value = current;
+      ui.uaResBtn.textContent = currentOption.label;
+    } else {
+      ui.uaResInput.value = '';
+      ui.uaResBtn.textContent = 'Seleziona risoluzione';
     }
   };
 
@@ -958,6 +1076,12 @@ export function createUAMode({
     if (ui.uaWebdvToggle?.checked) {
       args.push('-edition', 'Hybrid');
     }
+    if (ui.uaEditionRepackToggle?.checked) {
+      args.push('-edition', 'Repack');
+    }
+    if (ui.uaNoSeedToggle?.checked) {
+      args.push('-ns');
+    }
     if (ui.uaTagToggle?.checked) {
       const tagValue = ui.uaTagInput?.value.trim();
       if (tagValue) {
@@ -986,6 +1110,48 @@ export function createUAMode({
       const sourceValue = ui.uaSourceInput?.value.trim();
       if (sourceValue) {
         args.push('--source', sourceValue);
+      }
+    }
+    if (ui.uaResToggle?.checked) {
+      const resValue = ui.uaResInput?.value.trim();
+      if (resValue) {
+        args.push('-res', resValue);
+      }
+    }
+    if (ui.uaTmdbToggle?.checked) {
+      const tmdbValue = ui.uaTmdbInput?.value.trim();
+      if (tmdbValue) {
+        args.push('-tmdb', tmdbValue);
+      }
+    }
+    if (ui.uaImdbToggle?.checked) {
+      const imdbValue = ui.uaImdbInput?.value.trim();
+      if (imdbValue) {
+        args.push('-imdb', imdbValue);
+      }
+    }
+    if (ui.uaTvdbToggle?.checked) {
+      const tvdbValue = ui.uaTvdbInput?.value.trim();
+      if (tvdbValue) {
+        args.push('-tvdb', tvdbValue);
+      }
+    }
+    if (ui.uaMalToggle?.checked) {
+      const malValue = ui.uaMalInput?.value.trim();
+      if (malValue) {
+        args.push('-mal', malValue);
+      }
+    }
+    if (ui.uaSeasonToggle?.checked) {
+      const seasonValue = ui.uaSeasonInput?.value.trim();
+      if (seasonValue) {
+        args.push('-season', seasonValue);
+      }
+    }
+    if (ui.uaEpisodeToggle?.checked) {
+      const episodeValue = ui.uaEpisodeInput?.value.trim();
+      if (episodeValue) {
+        args.push('-episode', episodeValue);
       }
     }
     if (ui.uaDebugToggle?.checked) {
@@ -1017,6 +1183,45 @@ export function createUAMode({
       if (toggleEl && !toggleEl.checked) {
         toggleEl.checked = true;
         updateUaControlsState();
+      }
+    };
+    const getUaTooltip = () => {
+      let el = document.querySelector('.ua-tooltip-floating');
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'ua-tooltip-floating';
+        document.body.appendChild(el);
+      }
+      return el;
+    };
+    const positionUaTooltip = (target, tooltipEl) => {
+      const text = target.getAttribute('data-tooltip') || '';
+      if (!text) {
+        tooltipEl.style.opacity = '0';
+        return;
+      }
+      tooltipEl.textContent = text;
+      tooltipEl.style.opacity = '1';
+      const rect = target.getBoundingClientRect();
+      const tipRect = tooltipEl.getBoundingClientRect();
+      const margin = 8;
+      let left = rect.left + rect.width / 2 - tipRect.width / 2;
+      left = Math.max(margin, Math.min(left, window.innerWidth - tipRect.width - margin));
+      let top = rect.top - tipRect.height - 10;
+      if (top < margin) {
+        top = rect.bottom + 10;
+      }
+      tooltipEl.style.left = `${left}px`;
+      tooltipEl.style.top = `${top}px`;
+    };
+    const showUaTooltip = (target) => {
+      const tooltipEl = getUaTooltip();
+      positionUaTooltip(target, tooltipEl);
+    };
+    const hideUaTooltip = () => {
+      const tooltipEl = document.querySelector('.ua-tooltip-floating');
+      if (tooltipEl) {
+        tooltipEl.style.opacity = '0';
       }
     };
     if (ui.appHealth) {
@@ -1144,6 +1349,27 @@ export function createUAMode({
     if (ui.uaSourceToggle) {
       ui.uaSourceToggle.addEventListener('change', updateUaControlsState);
     }
+    if (ui.uaResToggle) {
+      ui.uaResToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaTmdbToggle) {
+      ui.uaTmdbToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaImdbToggle) {
+      ui.uaImdbToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaTvdbToggle) {
+      ui.uaTvdbToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaMalToggle) {
+      ui.uaMalToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaSeasonToggle) {
+      ui.uaSeasonToggle.addEventListener('change', updateUaControlsState);
+    }
+    if (ui.uaEpisodeToggle) {
+      ui.uaEpisodeToggle.addEventListener('change', updateUaControlsState);
+    }
     if (ui.uaTrackerShriToggle) {
       ui.uaTrackerShriToggle.addEventListener('change', () => {
       });
@@ -1159,6 +1385,9 @@ export function createUAMode({
     }
     if (ui.uaSourceDropdown && ui.uaSourceBtn && ui.uaSourceInput && ui.uaSourceMenu) {
       setupDropdown(ui.uaSourceDropdown, ui.uaSourceBtn, ui.uaSourceInput, ui.uaSourceMenu);
+    }
+    if (ui.uaResDropdown && ui.uaResBtn && ui.uaResInput && ui.uaResMenu) {
+      setupDropdown(ui.uaResDropdown, ui.uaResBtn, ui.uaResInput, ui.uaResMenu);
     }
     if (ui.uaTagInput) {
       const activateTag = () => ensureUaToggle(ui.uaTagToggle);
@@ -1190,6 +1419,57 @@ export function createUAMode({
     }
     if (ui.uaSourceDropdown) {
       ui.uaSourceDropdown.addEventListener('mousedown', () => ensureUaToggle(ui.uaSourceToggle));
+    }
+    if (ui.uaResBtn) {
+      const activateRes = () => ensureUaToggle(ui.uaResToggle);
+      ui.uaResBtn.addEventListener('click', activateRes);
+    }
+    if (ui.uaResDropdown) {
+      ui.uaResDropdown.addEventListener('mousedown', () => ensureUaToggle(ui.uaResToggle));
+    }
+    if (ui.uaTmdbInput) {
+      const activateTmdb = () => ensureUaToggle(ui.uaTmdbToggle);
+      ui.uaTmdbInput.addEventListener('focus', activateTmdb);
+      ui.uaTmdbInput.addEventListener('click', activateTmdb);
+    }
+    if (ui.uaImdbInput) {
+      const activateImdb = () => ensureUaToggle(ui.uaImdbToggle);
+      ui.uaImdbInput.addEventListener('focus', activateImdb);
+      ui.uaImdbInput.addEventListener('click', activateImdb);
+    }
+    if (ui.uaTvdbInput) {
+      const activateTvdb = () => ensureUaToggle(ui.uaTvdbToggle);
+      ui.uaTvdbInput.addEventListener('focus', activateTvdb);
+      ui.uaTvdbInput.addEventListener('click', activateTvdb);
+    }
+    if (ui.uaMalInput) {
+      const activateMal = () => ensureUaToggle(ui.uaMalToggle);
+      ui.uaMalInput.addEventListener('focus', activateMal);
+      ui.uaMalInput.addEventListener('click', activateMal);
+    }
+    if (ui.uaSeasonInput) {
+      const activateSeason = () => ensureUaToggle(ui.uaSeasonToggle);
+      ui.uaSeasonInput.addEventListener('focus', activateSeason);
+      ui.uaSeasonInput.addEventListener('click', activateSeason);
+    }
+    if (ui.uaEpisodeInput) {
+      const activateEpisode = () => ensureUaToggle(ui.uaEpisodeToggle);
+      ui.uaEpisodeInput.addEventListener('focus', activateEpisode);
+      ui.uaEpisodeInput.addEventListener('click', activateEpisode);
+    }
+    if (ui.uploadAssistantModal) {
+      ui.uploadAssistantModal.querySelectorAll('.ua-arg-btn[data-tooltip]').forEach((btn) => {
+        if (btn.dataset.tooltipBound === '1') {
+          return;
+        }
+        btn.dataset.tooltipBound = '1';
+        btn.addEventListener('mouseenter', () => showUaTooltip(btn));
+        btn.addEventListener('focus', () => showUaTooltip(btn));
+        btn.addEventListener('mouseleave', hideUaTooltip);
+        btn.addEventListener('blur', hideUaTooltip);
+      });
+      ui.uploadAssistantModal.addEventListener('scroll', hideUaTooltip, true);
+      window.addEventListener('resize', hideUaTooltip);
     }
     if (ui.uaScreensInput) {
       ui.uaScreensInput.addEventListener('wheel', (event) => {

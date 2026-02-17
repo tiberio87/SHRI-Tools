@@ -1230,6 +1230,14 @@
             <input id="uaWebdvToggle" type="checkbox" />
             <span>Hybrid</span>
           </label>
+          <label class="ua-arg-btn" data-tooltip="-edition Repack: Edizione Repack.">
+            <input id="uaEditionRepackToggle" type="checkbox" />
+            <span>Repack</span>
+          </label>
+          <label class="ua-arg-btn" data-tooltip="-ns: No seed. Non aggiunge il torrent al client.">
+            <input id="uaNoSeedToggle" type="checkbox" />
+            <span>No seed</span>
+          </label>
           <div class="ua-arg-group">
             <label class="ua-arg-btn" data-tooltip="-g: Tag gruppo forzato.">
               <input id="uaTagToggle" type="checkbox" />
@@ -1276,6 +1284,59 @@
               <div id="uaSourceMenu" class="dropdown-menu"></div>
               <input id="uaSourceInput" type="hidden" value="" />
             </div>
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-res: Override resolution.">
+              <input id="uaResToggle" type="checkbox" />
+              <span>Risoluzione</span>
+            </label>
+            <div id="uaResDropdown" class="dropdown ua-arg-dropdown">
+              <button id="uaResBtn" class="dropdown-trigger" type="button">Seleziona risoluzione</button>
+              <div id="uaResMenu" class="dropdown-menu"></div>
+              <input id="uaResInput" type="hidden" value="" />
+            </div>
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-tmdb, --tmdb: TMDb id (movie/123 o tv/123), anche URL.">
+              <input id="uaTmdbToggle" type="checkbox" />
+              <span>TMDb</span>
+            </label>
+            <input id="uaTmdbInput" class="ua-arg-input" type="text" placeholder="movie/123 o URL" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-imdb, --imdb: IMDb id.">
+              <input id="uaImdbToggle" type="checkbox" />
+              <span>IMDb</span>
+            </label>
+            <input id="uaImdbInput" class="ua-arg-input" type="text" placeholder="tt1234567" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-tvdb, --tvdb: TVDB id.">
+              <input id="uaTvdbToggle" type="checkbox" />
+              <span>TVDB</span>
+            </label>
+            <input id="uaTvdbInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="12345" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-mal, --mal: MAL id.">
+              <input id="uaMalToggle" type="checkbox" />
+              <span>MAL</span>
+            </label>
+            <input id="uaMalInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="12345" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-season, --season: Season (manual).">
+              <input id="uaSeasonToggle" type="checkbox" />
+              <span>Season</span>
+            </label>
+            <input id="uaSeasonInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="09" />
+          </div>
+          <div class="ua-arg-group">
+            <label class="ua-arg-btn" data-tooltip="-episode, --episode: Episode (manual).">
+              <input id="uaEpisodeToggle" type="checkbox" />
+              <span>Episode</span>
+            </label>
+            <input id="uaEpisodeInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="10" />
           </div>
           <label class="ua-arg-btn" data-tooltip="-debug: Debug dettagliato.">
             <input id="uaDebugToggle" type="checkbox" />

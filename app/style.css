@@ -299,7 +299,7 @@ body.light {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 8px);
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--tooltip-shift, 0px)));
   padding: 6px 10px;
   border-radius: 10px;
   border: 1px solid var(--border-strong);
@@ -323,7 +323,7 @@ body.light {
   position: absolute;
   left: 50%;
   bottom: calc(100% + 2px);
-  transform: translateX(-50%);
+  transform: translateX(calc(-50% + var(--tooltip-shift, 0px)));
   border: 6px solid transparent;
   border-top-color: var(--surface-modal);
   opacity: 0;
@@ -338,6 +338,42 @@ body.light {
 .suggest-apply[data-tooltip]:hover::after,
 .suggest-apply[data-tooltip]:hover::before {
   opacity: 1;
+}
+
+.ua-args .ua-arg-btn[data-tooltip]::after,
+.ua-args .ua-arg-btn[data-tooltip]::before {
+  content: none;
+}
+
+.ua-tooltip-measure {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+.ua-tooltip-floating {
+  position: fixed;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-modal);
+  box-shadow: 0 10px 20px var(--shadow);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.08s ease;
+  z-index: 9999;
 }
 
 .upload-mode-toggle {
@@ -2055,7 +2091,8 @@ body.light .badge.error {
   flex-direction: column;
   gap: 8px;
   flex: 1;
-  overflow: auto;
+  overflow-y: auto;
+  overflow-x: visible;
   padding-right: 6px;
 }
 
