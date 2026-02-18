@@ -1,3 +1,4 @@
+// Rules check: normalize tokens and compare against naming rules for warnings.
 import { LANG_MAP, UNIT3D_RESOLUTION_ID } from './constants.js';
 import { getPathBaseName, stripExtension } from './path-utils.js';
 
@@ -12,6 +13,7 @@ function normalizeForMatch(value) {
     .replace(/[^a-z0-9]/gi, '');
 }
 
+// Codec normalization is used only for rule matching, not for final naming.
 function normalizeVideoCodec(value) {
   const raw = normalizeForMatch(value);
   if (!raw) {

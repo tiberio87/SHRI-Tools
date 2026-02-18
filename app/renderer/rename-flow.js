@@ -1,3 +1,4 @@
+// Rename flow: build rename plan, preview, and apply for file/folder or tracker analysis.
 export function createRenameFlow({
   ui,
   state,
@@ -57,6 +58,7 @@ export function createRenameFlow({
       ui.applyRenameBtn.disabled = false;
     }
     if (state.kind === 'tracker') {
+      // Tracker analysis is preview-only: disable rename actions and show suggested name.
       const form = getFormState();
       logDebug?.('form state', form);
       const isEpisode = form.type === 'tv-episode' || form.type === 'anime-episode';

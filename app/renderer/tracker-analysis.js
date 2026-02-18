@@ -1,6 +1,7 @@
 import { LANG_MAP } from './constants.js';
 import { normalizeLangTag, getTrackLang, parseChannels, mapAudioCodec, scoreAudioTrack } from './media-utils.js';
 
+// Tracker analysis (Unit3D): fetch payload, parse MediaInfo, and build title suggestion.
 const SECTION_HEADER_PATTERN = /^(general|video|audio|text|menu)(\s+#\d+)?$/i;
 
 function parseTorrentId(value) {
@@ -624,6 +625,7 @@ export function createTrackerAnalysis({
           };
         };
 
+        // Fallbacks try to recover correct ids/title when tracker ids look mismatched.
         let fallbackResult = await tryFallback(guess.year || anchorYear);
         if (!fallbackResult.ok) {
           fallbackResult = await tryFallback('');

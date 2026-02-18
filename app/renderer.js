@@ -1,3 +1,4 @@
+// ===== Imports =====
 import { ui } from './renderer/dom.js';
 import { state, debugState } from './renderer/state.js';
 import {
@@ -36,6 +37,7 @@ import { createAutoDetectFlow } from './renderer/auto-detect.js';
 import { createTrackerAnalysis } from './renderer/tracker-analysis.js';
 import { createDupeCheckTools } from './renderer/dupe-check.js';
 
+// ===== Module state & runtime flags =====
 let currentTorrentRequestId = null;
 let settingsSnapshot = '';
 let settingsDirty = false;
@@ -52,6 +54,7 @@ let manualDetectFromInputs = async () => {};
 const torrentLogLines = [];
 const WIZARD_STEP_COUNT = 3;
 
+// ===== Upload mode handling =====
 function applyUploadMode(mode, persist = false) {
   const normalized = mode === 'ua' ? 'ua' : 'integrated';
   document.body.dataset.uploadMode = normalized;
@@ -80,6 +83,7 @@ function applyUploadMode(mode, persist = false) {
     uaMode?.checkUaVersion?.();
   }
 }
+// ===== Core services (logger/theme/feedback) =====
 const LANGUAGE_CODES_PATTERN = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
   .filter(Boolean)
   .map((value) => String(value).toUpperCase())
@@ -92,6 +96,7 @@ const { applyTheme, loadTheme, saveTheme } = createThemeTools({
 const { showToast, copyToClipboard, openConfirmModal, bindConfirmHandlers } =
   createFeedbackTools({ ui });
 
+// ===== UI helper functions =====
 function setMediaInfoBadgeVisible(isVisible) {
   ui.mediaInfoBadge.classList.toggle('hidden', !isVisible);
   ui.mediaInfoBadge.classList.toggle('clickable', isVisible);
@@ -143,6 +148,7 @@ function updateVideoCodecMenu() {
   }
 }
 
+// ===== UA config parsing helpers =====
 function stripConfigLine(line) {
   const trimmed = line.trim();
   if (!trimmed || trimmed.startsWith('#')) {
@@ -1287,6 +1293,7 @@ function setInputAuto(input, value) {
   setAutoFieldState(input, true);
 }
 
+// ===== Dropdown utilities =====
 function setupDropdown(dropdown, trigger, input, menu) {
   if (!dropdown || !trigger || !input || !menu) {
     return;
@@ -1797,6 +1804,7 @@ function getResolvedTag() {
   return resolved;
 }
 
+// ===== Flow factories (rename / auto-detect / tracker) =====
 const renameTools = createRenameTools({
   state,
   ui,
@@ -1879,6 +1887,7 @@ const trackerAnalysis = createTrackerAnalysis({
 });
 trackerAnalysis.init();
 
+// ===== BDInfo handling =====
 function getDiscRootPath(targetPath, mainVideo) {
   const candidate = String(mainVideo || targetPath || '');
   const match = candidate.match(/^(.*?)[\\/](BDMV|VIDEO_TS)[\\/]/i);
@@ -2042,6 +2051,7 @@ async function scanSelectedBdInfoPlaylist() {
   await fetchBdInfo(state.targetPath, state.bdInfoSelectedPlaylist);
 }
 
+// ===== Source scanning & load =====
 async function loadPath(targetPath) {
   const scan = await window.api.scanPath(targetPath);
   if (!scan) {
@@ -2152,6 +2162,7 @@ async function loadPath(targetPath) {
   schedulePreview();
 }
 
+// ===== Upload wizard integration =====
 const uploadKit = createUploadKit({
   buildMediaInfoShort: metadataTools.buildMediaInfoShort,
   computeBaseName: renameTools.computeBaseName,
@@ -2171,6 +2182,7 @@ const uploadKit = createUploadKit({
 });
 uploadKit.initUploadKitEvents();
 
+// ===== Event bindings =====
 ui.selectFileBtn.addEventListener('click', async () => {
   const filePath = await window.api.selectFile();
   if (filePath) {
@@ -2918,6 +2930,7 @@ if (ui.torrentClientSelect) {
   });
 });
 
+// ===== App bootstrap =====
 const initialSettings = loadSettings();
 applySettingsToUI(initialSettings);
 applyTheme(loadTheme());

@@ -1,3 +1,4 @@
+// Shared mutable state for renderer modules; keep in sync with UI lifecycle.
 export const state = {
   targetPath: null,
   kind: null,
@@ -35,6 +36,7 @@ export const state = {
   trackerMediaInfoText: ''
 };
 
+// In-memory debug log (UI only, not persisted).
 export const debugState = {
   enabled: true,
   buffer: [],

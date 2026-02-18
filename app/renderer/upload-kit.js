@@ -1,3 +1,4 @@
+// Upload wizard/integrated mode: build payloads, BBCode, and Unit3D upload flow.
 import { ui } from './dom.js';
 import { state } from './state.js';
 import {
@@ -407,6 +408,7 @@ export function createUploadKit(deps) {
     return String(parsed);
   }
 
+  // IMDb ids are stored without "tt" in tracker payload/inputs.
   function normalizeImdbValue(value) {
     if (value === undefined || value === null || value === '') {
       return '0';
@@ -917,6 +919,7 @@ export function createUploadKit(deps) {
       resolvedSettings.unit3dTypeOverrides,
       (key) => key.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
     );
+    // Local mapping + settings overrides to match tracker typeId.
     const typeMap = { ...SHRI_TYPE_ID, ...typeOverrides };
     const typeId = typeKey ? typeMap[typeKey] : '';
     const resolutionOverrides = parseOverrideMap(

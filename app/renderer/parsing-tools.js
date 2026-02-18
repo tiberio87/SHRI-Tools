@@ -1,3 +1,4 @@
+// Parsing helpers: detect format/source/repack from names and MediaInfo/structure.
 import { state } from './state.js';
 import {
   getAudioTracks,
@@ -42,6 +43,7 @@ function getDiscSourceHint(width, height) {
   return { source: '', sourceReason: '' };
 }
 
+// Token priority matters: earlier matches win (e.g., WEB-DL vs WEBRip).
 function detectFormatFromName(name) {
   const upper = String(name || '').toUpperCase();
   if (/\bDVD[-.\s]?RIP\b/.test(upper) || /\bDVDRIP\b/.test(upper)) {

@@ -1,3 +1,5 @@
+// ===== Imports & globals =====
+// Electron main process: IPC + filesystem + media analysis + tracker API integration.
 const { app, BrowserWindow, dialog, ipcMain, Menu, shell, globalShortcut } = require('electron');
 const path = require('path');
 const os = require('os');
@@ -26,6 +28,7 @@ function appendFormField(form, key, value) {
 const { mediaInfoFactory } = require('mediainfo.js');
 const { readFile } = require('fs/promises');
 
+// ===== Constants =====
 const VIDEO_EXTS = new Set([
   '.mkv',
   '.mp4',
@@ -43,6 +46,7 @@ const MAX_TORRENT_SIZE = 2 * 1024 * 1024;
 const MAX_PIECES_TARGET = 100000;
 const TINY_GIF_BASE64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 
+// ===== Runtime state =====
 let mediaInfoInstance = null;
 let mediaInfoTextInstance = null;
 let createTorrentModule = null;
@@ -53,6 +57,7 @@ let uaSender = null;
 let uaUpdateProcess = null;
 let uaUpdateSender = null;
 
+// ===== UA process helpers =====
 function getMainSender() {
   return uaSender || BrowserWindow.getFocusedWindow()?.webContents || BrowserWindow.getAllWindows()[0]?.webContents;
 }
@@ -101,6 +106,7 @@ function sendUaUpdateExit(code = 0, signal = '') {
   uaUpdateSender = null;
 }
 
+// ===== Process execution helpers =====
 function stripAnsi(text) {
   return String(text || '').replace(/\x1b\[[0-9;]*m/g, '');
 }
@@ -223,6 +229,7 @@ function runCommandWithTimeout(command, args, options = {}) {
   });
 }
 
+// ===== MediaInfo helpers =====
 async function getMediaInfo() {
   if (!mediaInfoInstance) {
     mediaInfoInstance = await mediaInfoFactory({ format: 'object' });
@@ -405,6 +412,7 @@ async function verifyPtscreensKey(apiKey) {
   }
 }
 
+// ===== Unit3D API helpers =====
 async function verifyUnit3dKey(apiKey, baseUrl) {
   const base = (baseUrl || 'https://shareisland.org').replace(/\/+$/, '');
   const response = await fetch(`${base}/api/user`, {
@@ -517,6 +525,7 @@ async function searchUnit3dDuplicates({
     return { ok: true, status: response.status, data: payload, raw };
   };
 
+  // UA-style dupe search: use name filter for season packs and fallback for ShareIsland.
   const initialName = seasonValue ? ` ${seasonValue}` : '';
   let result = await fetchWithName(initialName);
 
@@ -653,6 +662,7 @@ async function downloadUnit3dTorrent({ baseUrl, apiKey, downloadUrl, outputDir, 
   return { ok: true, outputPath, status: response.status };
 }
 
+// ===== Torrent client integrations =====
 async function loginQbittorrent(baseUrl, username, password) {
   const form = new URLSearchParams();
   form.set('username', username);
@@ -908,6 +918,7 @@ function normalizeHttpError(text, status) {
   return cleaned.length > 200 ? `${cleaned.slice(0, 200)}…` : cleaned;
 }
 
+// ===== Screenshot pipeline (FFmpeg/FFprobe) =====
 function resolveFfprobePath(ffmpegPath) {
   if (!ffmpegPath) {
     return '';
@@ -1140,6 +1151,7 @@ async function collectVideoFiles(rootPath, maxDepth = 3) {
   return results;
 }
 
+// ===== Torrent creation helpers =====
 async function getTotalSize(targetPath) {
   const stats = await fs.stat(targetPath);
   if (stats.isFile()) {
@@ -1281,6 +1293,7 @@ async function pickMainVideo(videoFiles) {
   return best;
 }
 
+// ===== Metadata providers (OMDb/TMDb/TVDb/AniList) =====
 async function fetchJson(url, options = {}) {
   const response = await fetch(url, options);
   if (!response.ok) {
@@ -1852,6 +1865,7 @@ app.on('will-quit', () => {
   globalShortcut.unregisterAll();
 });
 
+// ===== IPC handlers =====
 ipcMain.handle('select-file', async () => {
   const result = await dialog.showOpenDialog({
     properties: ['openFile'],

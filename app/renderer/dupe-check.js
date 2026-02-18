@@ -1,3 +1,4 @@
+// Dupe check UI logic (UA parity): build search mapping, call API, filter and render results.
 import {
   UNIT3D_CATEGORY_ID,
   SHRI_TYPE_ID,
@@ -62,6 +63,7 @@ function getSearchMapping(form, settings) {
     settings.unit3dTypeOverrides,
     (key) => key.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   );
+  // Local mapping + user overrides to match tracker-specific typeId.
   const typeMap = { ...SHRI_TYPE_ID, ...typeOverrides };
   const typeId = typeKey ? typeMap[typeKey] || '' : '';
   const resolutionOverrides = parseOverrideMap(
@@ -93,6 +95,7 @@ function buildDupeItems(rawItems, baseUrl) {
     const internal = Boolean(attrs.internal ?? entry?.internal);
     const details = String(attrs.details_link || entry?.link || '').trim();
     const id = entry?.id || attrs.id;
+    // Unit3D payloads can be flat or nested; normalize ids to digits only.
     const tmdbId = normalizeNumericId(attrs.tmdb_id || attrs.tmdbId || entry?.tmdb_id || entry?.tmdbId);
     const imdbId = normalizeNumericId(attrs.imdb_id || attrs.imdbId || entry?.imdb_id || entry?.imdbId);
     const tvdbId = normalizeNumericId(attrs.tvdb_id || attrs.tvdbId || entry?.tvdb_id || entry?.tvdbId);

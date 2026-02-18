@@ -1,3 +1,4 @@
+// BBCode rendering helpers (preview only; output still sent as BBCode).
 function escapeHtml(input) {
   return String(input)
     .replace(/&/g, '&amp;')

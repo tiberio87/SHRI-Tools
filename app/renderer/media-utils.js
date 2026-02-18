@@ -1,3 +1,4 @@
+// MediaInfo helpers: normalize codec/lang and choose best audio track for naming.
 import { AUDIO_CODEC_SCORE, LANG_MAP } from './constants.js';
 
 export function normalizeLangTag(raw) {
@@ -130,6 +131,7 @@ function isLosslessAudio(track) {
   return /TRUEHD|DTS-HD MA|FLAC|PCM|LPCM/.test(formatCombined);
 }
 
+// Audio track selection is rule-driven: prefer ITA, then lossless, then channels/Atmos/bitrate.
 export function pickBestItalianAudioTrack(mediaInfo) {
   const audioTracks = getAudioTracks(mediaInfo);
   if (!audioTracks.length) {

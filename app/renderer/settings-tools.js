@@ -1,5 +1,7 @@
+// Settings UI + localStorage persistence for app and upload configuration.
 import { ANNOUNCE_BASE, SETTINGS_STORAGE_KEY } from './constants.js';
 
+// Default settings for a clean install (merged with stored values).
 const DEFAULT_SETTINGS = {
   omdbKey: '',
   tmdbKey: '',

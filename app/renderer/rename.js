@@ -1,3 +1,4 @@
+// Rename builder: assemble tokens for file/folder names following rules.
 import {
   applyFolderRenamePath,
   getParentPath,
@@ -27,6 +28,7 @@ export function createRenameTools(deps) {
     languageCodesPattern
   } = deps;
 
+  // Prefer best ITA audio unless user manually overrides codec/channels/meta.
   function getAudioOverrides() {
     if (!state.mediaInfo) {
       return {};
@@ -61,6 +63,7 @@ export function createRenameTools(deps) {
     return overrides;
   }
 
+  // Token order is aligned to rules in docs/RULES.txt.
   function computeBaseName(form, overrides = {}) {
     const data = { separatorStyle: 'spaces', ...form, ...overrides };
     const tokens = [];

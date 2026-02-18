@@ -1,3 +1,4 @@
+// Upload Assistant modal: build CLI args, run UA process, and stream logs.
 export function createUAMode({
   ui,
   state,
@@ -1046,6 +1047,7 @@ export function createUAMode({
     }
   };
 
+  // Build UA args from toggles/inputs; toggles are the single source of truth.
   const buildUploadAssistantArgs = () => {
     const settings = loadSettings();
     const baseDir = String(settings.uploadAssistantPath || '').trim();

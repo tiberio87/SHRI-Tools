@@ -1,3 +1,4 @@
+// Metadata helpers: normalize titles, derive ids, and extract key tokens from MediaInfo.
 import { STOP_WORDS } from './constants.js';
 import {
   detectAudioMeta,

@@ -1,3 +1,4 @@
+// Auto-detect flow: parse names, set inputs, and fetch metadata when possible.
 export function createAutoDetectFlow({
   ui,
   state,
@@ -181,6 +182,7 @@ export function createAutoDetectFlow({
       if (guess.season && guess.typeHint === 'tv-season') {
         setIfAuto(ui.seasonInput, guess.season);
       }
+      // Auto-detect multi-episode season packs by scanning file names.
       if (ui.multiEpisodeToggle && guess.typeHint === 'tv-season' && state.videoFiles.length) {
         const hasMulti = state.videoFiles.some((filePath) => {
           const range = metadataTools.parseSeasonEpisodeRange(getPathBaseName(filePath));
