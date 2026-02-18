@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('api', {
   unit3dUpload: (payload) => ipcRenderer.invoke('unit3d-upload', payload),
   unit3dFetchTorrent: (payload) => ipcRenderer.invoke('unit3d-fetch-torrent', payload),
   unit3dDownloadTorrent: (payload) => ipcRenderer.invoke('unit3d-download-torrent', payload),
+  unit3dSearchDuplicates: (payload) => ipcRenderer.invoke('unit3d-search-duplicates', payload),
   qbitAddTorrent: (payload) => ipcRenderer.invoke('qbit-add-torrent', payload),
   qbitTest: (payload) => ipcRenderer.invoke('qbit-test', payload),
   transmissionAddTorrent: (payload) => ipcRenderer.invoke('transmission-add-torrent', payload),

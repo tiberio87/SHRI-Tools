@@ -34,6 +34,7 @@ import { setupSourceDragDrop } from './renderer/drag-drop.js';
 import { createRenameFlow } from './renderer/rename-flow.js';
 import { createAutoDetectFlow } from './renderer/auto-detect.js';
 import { createTrackerAnalysis } from './renderer/tracker-analysis.js';
+import { createDupeCheckTools } from './renderer/dupe-check.js';
 
 let currentTorrentRequestId = null;
 let settingsSnapshot = '';
@@ -806,11 +807,22 @@ function setWizardStep(index) {
   }
   if (clamped === 0) {
     updateWizardRulesCheck(getFormState());
+    dupeCheck?.runWizardDupeCheck?.();
   } else if (clamped === 1) {
     prepareTorrentStep();
   } else if (clamped === 2) {
     uploadKit?.prepareUploadKitStep?.();
   }
+}
+
+async function confirmWizardAdvance(targetStep) {
+  if (wizardStepIndex !== 0 || targetStep <= 0) {
+    return true;
+  }
+  if (!dupeCheck?.hasDupes?.()) {
+    return true;
+  }
+  return openConfirmModal('Sono stati trovati possibili duplicati. Vuoi continuare?');
 }
 
 function openUploadWizard(step = 0) {
@@ -1611,6 +1623,14 @@ const {
   buildServiceOptions,
   loadSettings
 });
+const dupeCheck = createDupeCheckTools({
+  ui,
+  state,
+  loadSettings,
+  getFormState,
+  showToast,
+  logDebug
+});
 
 uaMode = createUAMode({
   ui,
@@ -2402,6 +2422,15 @@ if (ui.uploadWizardSteps) {
     if (!Number.isFinite(step)) {
       return;
     }
+    if (step > wizardStepIndex) {
+      confirmWizardAdvance(step).then((proceed) => {
+        if (!proceed) {
+          return;
+        }
+        setWizardStep(step);
+      });
+      return;
+    }
     setWizardStep(step);
   });
 }
@@ -2412,7 +2441,13 @@ if (ui.wizardPrevBtn) {
 }
 if (ui.wizardNextBtn) {
   ui.wizardNextBtn.addEventListener('click', () => {
-    setWizardStep(Number(wizardStepIndex) + 1);
+    const nextStep = Number(wizardStepIndex) + 1;
+    confirmWizardAdvance(nextStep).then((proceed) => {
+      if (!proceed) {
+        return;
+      }
+      setWizardStep(nextStep);
+    });
   });
 }
 if (ui.themeToggle) {

@@ -2086,6 +2086,111 @@ body.light .badge.error {
   font-size: 11px;
 }
 
+.wizard-dupe-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface-inline);
+}
+
+.wizard-dupe-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.wizard-dupe-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wizard-dupe-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--surface);
+}
+
+.wizard-dupe-status.ok {
+  border-color: rgba(125, 214, 193, 0.6);
+  color: #7dd6c1;
+}
+
+.wizard-dupe-status.warn {
+  border-color: rgba(255, 198, 99, 0.7);
+  color: #ffc663;
+}
+
+.wizard-dupe-status.error {
+  border-color: rgba(255, 138, 138, 0.6);
+  color: #ff8a8a;
+}
+
+.wizard-dupe-status.loading {
+  border-color: rgba(120, 180, 255, 0.5);
+  color: #7ab4ff;
+}
+
+.wizard-dupe-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.wizard-dupe-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px dashed var(--border-strong);
+  background: var(--surface);
+}
+
+.wizard-dupe-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+.wizard-dupe-name:hover {
+  text-decoration: underline;
+}
+
+.wizard-dupe-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.wizard-dupe-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .ua-modal .ua-body {
   display: flex;
   flex-direction: column;

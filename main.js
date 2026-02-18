@@ -452,6 +452,91 @@ async function fetchUnit3dTorrent({ baseUrl, apiKey, torrentId }) {
   return { ok: true, status: response.status, data: payload, raw };
 }
 
+async function searchUnit3dDuplicates({
+  baseUrl,
+  apiKey,
+  tmdbId,
+  categoryId,
+  typeId,
+  resolutionId,
+  season
+}) {
+  if (!baseUrl || !apiKey) {
+    return { ok: false, error: 'Base URL o API key mancanti.' };
+  }
+  if (!tmdbId) {
+    return { ok: false, error: 'TMDb ID mancante.' };
+  }
+  const base = String(baseUrl).replace(/\/+$/, '');
+  const seasonValue = String(season || '').trim();
+  const baseParams = new URLSearchParams();
+  baseParams.append('tmdbId', String(tmdbId));
+  if (categoryId) {
+    baseParams.append('categories[]', String(categoryId));
+  }
+  baseParams.append('perPage', '100');
+  const resValue = String(resolutionId || '').trim();
+  if (resValue) {
+    if (resValue === '3' || resValue === '4') {
+      baseParams.append('resolutions[]', '3');
+      baseParams.append('resolutions[]', '4');
+    } else {
+      baseParams.append('resolutions[]', resValue);
+    }
+  }
+  const typeValue = String(typeId || '').trim();
+  if (typeValue) {
+    baseParams.append('types[]', typeValue);
+  }
+
+  const fetchWithName = async (nameValue) => {
+    const params = new URLSearchParams(baseParams);
+    params.append('name', nameValue);
+    const response = await fetch(`${base}/api/torrents/filter?${params.toString()}`, {
+      headers: {
+        authorization: `Bearer ${apiKey}`,
+        accept: 'application/json'
+      }
+    });
+    const text = await response.text();
+    const raw = text || '';
+    let payload = null;
+    try {
+      payload = raw ? JSON.parse(raw) : null;
+    } catch {
+      payload = null;
+    }
+    if (!response.ok) {
+      return {
+        ok: false,
+        status: response.status,
+        error: payload?.message || raw || `HTTP ${response.status}`,
+        raw
+      };
+    }
+    return { ok: true, status: response.status, data: payload, raw };
+  };
+
+  const initialName = seasonValue ? ` ${seasonValue}` : '';
+  let result = await fetchWithName(initialName);
+
+  const allowSeasonFallback = Boolean(seasonValue)
+    && /shareisland\.org$/i.test(base);
+  const hasResults = Array.isArray(result?.data?.data) && result.data.data.length > 0;
+  if (allowSeasonFallback && !hasResults) {
+    const numericSeason = seasonValue.match(/^\d+$/)
+      ? seasonValue.padStart(2, '0')
+      : seasonValue.replace(/^S/i, '');
+    const fallbackName = `S${numericSeason}`;
+    const fallbackResult = await fetchWithName(fallbackName);
+    if (fallbackResult?.ok) {
+      result = fallbackResult;
+    }
+  }
+
+  return result;
+}
+
 async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, data }) {
   if (!baseUrl || !apiKey) {
     return { ok: false, error: 'Base URL o API key mancanti.' };
@@ -2657,6 +2742,28 @@ ipcMain.handle('unit3d-fetch-torrent', async (_event, payload) => {
     };
   } catch (error) {
     return { ok: false, error: error?.message || 'Errore fetch torrent.' };
+  }
+});
+
+ipcMain.handle('unit3d-search-duplicates', async (_event, payload) => {
+  try {
+    const result = await searchUnit3dDuplicates(payload || {});
+    if (result.ok) {
+      return {
+        ok: true,
+        status: result.status || 0,
+        data: result.data || null,
+        raw: result.raw || ''
+      };
+    }
+    return {
+      ok: false,
+      status: result.status || 0,
+      error: result.error || 'Errore verifica duplicati.',
+      raw: result.raw || ''
+    };
+  } catch (error) {
+    return { ok: false, error: error?.message || 'Errore verifica duplicati.' };
   }
 });
 

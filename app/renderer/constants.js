@@ -12,7 +12,7 @@ export const SHRI_TYPE_ID = {
   DISC: '26',
   REMUX: '7',
   WEBDL: '27',
-  WEBRIP: '15',
+  WEBRIP: '51',
   HDTV: '33',
   ENCODE: '15',
   DVDRIP: '15',
