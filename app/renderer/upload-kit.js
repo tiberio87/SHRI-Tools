@@ -1152,7 +1152,7 @@ export function createUploadKit(deps) {
     const manualNotes = ui.uploadReleaseNotesInput?.value.trim();
     const isIsland = tag.toLowerCase() === 'island';
     const baseNotes = manualNotes || (isIsland
-      ? 'Questa è una release interna pubblicata in esclusiva su Shareisland.\nSi prega di non ricaricare questa release su tracker pubblici o privati. Si prega di mantenerla in seed il più a lungo possibile. Grazie!'
+      ? 'Release Shareisland 🏴‍☠️\nFalla girare, condividila e contribuisci a mantenerla viva restando in seed il più possibile.\nGrazie per il supporto!'
       : 'Nulla da aggiungere.');
     let notes = baseNotes;
     if (isIsland) {
