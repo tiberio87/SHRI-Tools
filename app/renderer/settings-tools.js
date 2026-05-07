@@ -145,16 +145,16 @@ export function createSettingsTools({
       : String(settings?.qbitSavePath || '').trim();
     const disableMapping = Boolean(savePath);
     if (ui.qbitPathMapLocalInput) {
-      ui.qbitPathMapLocalInput.disabled = !isTransmission && disableMapping;
+      ui.qbitPathMapLocalInput.disabled = false;
     }
     if (ui.qbitPathMapRemoteInput) {
-      ui.qbitPathMapRemoteInput.disabled = !isTransmission && disableMapping;
+      ui.qbitPathMapRemoteInput.disabled = false;
     }
     if (ui.transmissionPathMapLocalInput) {
-      ui.transmissionPathMapLocalInput.disabled = isTransmission && disableMapping;
+      ui.transmissionPathMapLocalInput.disabled = false;
     }
     if (ui.transmissionPathMapRemoteInput) {
-      ui.transmissionPathMapRemoteInput.disabled = isTransmission && disableMapping;
+      ui.transmissionPathMapRemoteInput.disabled = false;
     }
     if (ui.qbitMappingHint) {
       ui.qbitMappingHint.textContent = disableMapping

@@ -663,27 +663,73 @@ async function downloadUnit3dTorrent({ baseUrl, apiKey, downloadUrl, outputDir, 
 }
 
 // ===== Torrent client integrations =====
-async function loginQbittorrent(baseUrl, username, password) {
-  const form = new URLSearchParams();
-  form.set('username', username);
-  form.set('password', password);
-  const response = await fetch(`${baseUrl}/api/v2/auth/login`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/x-www-form-urlencoded'
-    },
-    body: form
+
+// Use Node.js native http/https for login to avoid Electron's Chromium session
+// intercepting Set-Cookie headers before they reach the fetch response object.
+const _http = require('http');
+const _https = require('https');
+
+function _httpRequest(url, options, body) {
+  return new Promise((resolve, reject) => {
+    const mod = url.protocol === 'https:' ? _https : _http;
+    const req = mod.request({
+      hostname: url.hostname,
+      port: url.port || (url.protocol === 'https:' ? 443 : 80),
+      path: url.pathname + (url.search || ''),
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      rejectUnauthorized: false
+    }, (res) => {
+      let data = '';
+      res.on('data', chunk => { data += chunk; });
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: data }));
+    });
+    req.on('error', reject);
+    if (body) req.write(body);
+    req.end();
   });
-  const text = await response.text();
-  if (!response.ok || !text.toLowerCase().includes('ok')) {
-    return { ok: false, error: normalizeHttpError(text, response.status) };
+}
+
+async function loginQbittorrent(baseUrl, username, password) {
+  const body = new URLSearchParams({ username, password }).toString();
+  let res;
+  try {
+    res = await _httpRequest(new URL(`${baseUrl}/api/v2/auth/login`), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/x-www-form-urlencoded',
+        'content-length': Buffer.byteLength(body),
+        'referer': baseUrl,
+        'origin': baseUrl
+      }
+    }, body);
+  } catch (err) {
+    return { ok: false, error: err.message };
   }
-  const cookie = response.headers.get('set-cookie') || '';
-  const match = cookie.match(/SID=([^;]+)/);
+  if (res.status === 403) {
+    return { ok: false, error: 'IP bannato per troppi tentativi falliti.' };
+  }
+  // qBittorrent >= 5.2.0 returns 204 No Content on success (empty body)
+  // Older versions return 200 with "Ok." text
+  if (res.status !== 200 && res.status !== 204) {
+    return { ok: false, error: normalizeHttpError(res.body, res.status) };
+  }
+  if (res.status === 200 && !res.body.toLowerCase().includes('ok')) {
+    return { ok: false, error: normalizeHttpError(res.body, res.status) };
+  }
+  // res.headers['set-cookie'] is always an array in Node.js http module
+  // qBittorrent >= 5.2.0 uses cookie name: QBT_SID_<port> (e.g. QBT_SID_8080)
+  // Older versions use: SID
+  const setCookies = res.headers['set-cookie'] || [];
+  const sidEntry = setCookies.find(c => /(?:QBT_)?SID(?:_\d+)?=/i.test(c));
+  if (!sidEntry) {
+    return { ok: false, error: 'Cookie SID non trovato.' };
+  }
+  const match = sidEntry.match(/((?:QBT_)?SID(?:_\d+)?)=([^;]+)/i);
   if (!match) {
     return { ok: false, error: 'Cookie SID non trovato.' };
   }
-  return { ok: true, cookie: `SID=${match[1]}` };
+  return { ok: true, cookie: `${match[1]}=${match[2]}` };
 }
 
 async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused }) {
@@ -717,11 +763,29 @@ async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath,
     },
     body: form
   });
+  // qBittorrent >= 5.2.0 returns 204 No Content on success (empty body)
   const text = await response.text();
-  if (!response.ok || !text.toLowerCase().includes('ok')) {
-    return { ok: false, error: normalizeHttpError(text, response.status) };
+  // qBit 5.2.0 returns JSON {success_count, failure_count, ...} or 204 No Content
+  // Older versions return plain "Ok."
+  if (response.status === 204) {
+    return { ok: true, message: 'Torrent aggiunto con successo.' };
   }
-  return { ok: true, message: text || 'Ok.' };
+  if (response.ok) {
+    try {
+      const json = JSON.parse(text);
+      if (json.failure_count > 0) {
+        return { ok: false, error: `qBittorrent: ${json.failure_count} torrent non aggiunto.` };
+      }
+      return { ok: true, message: 'Torrent aggiunto con successo.' };
+    } catch {
+      // plain text response (older qBit)
+      if (text.toLowerCase().includes('ok')) {
+        return { ok: true, message: 'Torrent aggiunto con successo.' };
+      }
+      return { ok: false, error: normalizeHttpError(text, response.status) };
+    }
+  }
+  return { ok: false, error: normalizeHttpError(text, response.status) };
 }
 
 function buildQbitBaseUrl(host, port, useHttps) {
