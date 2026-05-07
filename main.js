@@ -6,7 +6,7 @@ const os = require('os');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const { spawn } = require('child_process');
-const { buildUaScreenshotTimes } = require('./app/screenshot-times');
+const { buildUaScreenshotTimes, buildUaScreenshotTimesDebug } = require('./app/screenshot-times');
 
 function createFormData() {
   if (!global.FormData) {
@@ -1996,8 +1996,20 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
   const outputDir = path.join(app.getPath('temp'), 'shri-tools', 'screenshots', String(Date.now()));
   await fs.mkdir(outputDir, { recursive: true });
 
+  sendProgress({
+    stage: 'debug',
+    message: `[screens:init] video="${videoPath}" count=${count} primaryHost=${primaryHost} fallbackHost=${fallbackHost} imgbbKey=${imgbbKey ? 'present' : 'missing'} ptscreensKey=${ptscreensKey ? 'present' : 'missing'} isDisc=${payload?.isDisc || false} category=${payload?.category || 'Movie'} seekMode=${payload?.seekMode || 'fast'} skipFrame=${payload?.skipFrame || '(none)'} outputDir="${outputDir}"`
+  });
+
   try {
-    const duration = await getVideoDurationSeconds(ffprobePath, videoPath);
+    let duration;
+    try {
+      duration = await getVideoDurationSeconds(ffprobePath, videoPath);
+      sendProgress({ stage: 'debug', message: `[screens:duration] ${duration.toFixed(3)}s` });
+    } catch (err) {
+      sendProgress({ stage: 'debug', message: `[screens:duration:error] ${err.message || err}` });
+      throw err;
+    }
     let mediaInfo = null;
     try {
       mediaInfo = await analyzeMedia(videoPath);
@@ -2006,7 +2018,11 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
     }
     const videoTrack = getVideoTrack(mediaInfo);
     const frameRate = parseFrameRate(videoTrack, 24);
-    const times = buildUaScreenshotTimes({
+    sendProgress({
+      stage: 'debug',
+      message: `[screens:video] ${videoTrack?.Width || '?'}x${videoTrack?.Height || '?'} PAR=${videoTrack?.PixelAspectRatio || '?'} DAR=${videoTrack?.DisplayAspectRatio || '?'} fps=${frameRate}`
+    });
+    const timesDebug = buildUaScreenshotTimesDebug({
       durationSeconds: duration,
       frameRate,
       count,
@@ -2014,13 +2030,19 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       category: payload?.category || 'Movie',
       retakeCount: payload?.retakeCount || 0
     });
-    if (!times.length) {
-      times.push(...buildScreenshotTimes(duration, count));
-    }
+    const times = timesDebug.times;
     sendProgress({
       stage: 'debug',
-      message: `Screenshot times: ${times.map((t) => Number(t).toFixed(3)).join(', ')}`
+      message: `[screens:times] requested=${count} totalScreens=${timesDebug.totalScreens} totalFrames=${timesDebug.totalFrames} startFrame=${timesDebug.startFrame} endFrame=${timesDebug.endFrame} usableFrames=${timesDebug.usableFrames} frameInterval=${timesDebug.frameInterval} category=${timesDebug.category} isDisc=${timesDebug.isDisc} retake=${timesDebug.retakeCount} computed=${times.length} times=[${times.map((t) => Number(t).toFixed(3)).join(', ')}]`
     });
+    const usedFallbackTimes = !times.length;
+    if (usedFallbackTimes) {
+      times.push(...buildScreenshotTimes(duration, count));
+      sendProgress({
+        stage: 'debug',
+        message: `[screens:times:fallback] frameRate=${frameRate} duration=${duration} → fallback times=[${times.map((t) => Number(t).toFixed(3)).join(', ')}]`
+      });
+    }
     const totalShots = times.length;
     const totalSteps = totalShots * 2;
     let stepIndex = 0;
@@ -2040,6 +2062,11 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
     let tonemapEnabled = detectHdr(mediaInfo);
     let tonemapApplied = false;
 
+    sendProgress({
+      stage: 'debug',
+      message: `[screens:scale] source=${width}x${height} PAR=${par.toFixed(4)} DAR=${dar.toFixed(4)} scaled=${scaledWidth}x${scaledHeight} needsScale=${needsScale} hdr=${tonemapEnabled} seekMode=${payload?.seekMode || 'fast'} skipFrame=${payload?.skipFrame || '(none)'}`
+    });
+
     const images = [];
     let index = 0;
     for (const time of times) {
@@ -2053,20 +2080,48 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         skipFrame: payload?.skipFrame || '',
         seekMode: payload?.seekMode || ''
       };
+      let captureError = null;
       try {
         await captureScreenshot(ffmpegPath, videoPath, filePath, time, options);
         tonemapApplied = tonemapApplied || tonemapEnabled;
+        sendProgress({
+          stage: 'debug',
+          message: `[screens:capture:ok] #${index} t=${Number(time).toFixed(3)}s file="${fileName}"`
+        });
       } catch (error) {
+        captureError = error;
         if (tonemapEnabled) {
-          tonemapEnabled = false;
-          await captureScreenshot(ffmpegPath, videoPath, filePath, time, {
-            scaleWidth: needsScale ? scaledWidth : 0,
-            scaleHeight: needsScale ? scaledHeight : 0,
-            tonemap: false,
-            skipFrame: payload?.skipFrame || '',
-            seekMode: payload?.seekMode || ''
+          sendProgress({
+            stage: 'debug',
+            message: `[screens:capture:tonemap-retry] #${index} t=${Number(time).toFixed(3)}s err="${error.message || error}"`
           });
+          tonemapEnabled = false;
+          try {
+            await captureScreenshot(ffmpegPath, videoPath, filePath, time, {
+              scaleWidth: needsScale ? scaledWidth : 0,
+              scaleHeight: needsScale ? scaledHeight : 0,
+              tonemap: false,
+              skipFrame: payload?.skipFrame || '',
+              seekMode: payload?.seekMode || ''
+            });
+            captureError = null;
+            sendProgress({
+              stage: 'debug',
+              message: `[screens:capture:ok-no-tonemap] #${index} t=${Number(time).toFixed(3)}s`
+            });
+          } catch (err2) {
+            captureError = err2;
+            sendProgress({
+              stage: 'debug',
+              message: `[screens:capture:fail] #${index} t=${Number(time).toFixed(3)}s err="${err2.message || err2}"`
+            });
+            throw err2;
+          }
         } else {
+          sendProgress({
+            stage: 'debug',
+            message: `[screens:capture:fail] #${index} t=${Number(time).toFixed(3)}s err="${error.message || error}"`
+          });
           throw error;
         }
       }
@@ -2083,9 +2138,18 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         ptscreensKey
       });
       if (upload.ok) {
+        sendProgress({
+          stage: 'debug',
+          message: `[screens:upload:ok] #${index} host=${upload.host} url="${upload.displayUrl || upload.rawUrl || ''}"`
+        });
         try {
           await fs.unlink(filePath);
         } catch {}
+      } else {
+        sendProgress({
+          stage: 'debug',
+          message: `[screens:upload:fail] #${index} host=${upload.host} err="${upload.error || 'unknown'}"`
+        });
       }
       stepIndex += 1;
       sendProgress({
@@ -2107,9 +2171,15 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       });
     }
 
+    const okCount = images.filter((img) => img.ok).length;
+    sendProgress({
+      stage: 'debug',
+      message: `[screens:done] ok=${okCount}/${images.length} tonemapped=${tonemapApplied}`
+    });
     sendProgress({ progress: 1, stage: 'done', current: totalShots, total: totalShots });
     return { ok: true, outputDir, images, tonemapped: tonemapApplied };
   } catch (error) {
+    sendProgress({ stage: 'debug', message: `[screens:fatal] ${error.message || error}` });
     sendProgress({ stage: 'error', error: String(error) });
     return { ok: false, error: String(error) };
   }

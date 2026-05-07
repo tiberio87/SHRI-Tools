@@ -1989,11 +1989,25 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (result?.ok) {
       state.screenshots = result.images || [];
       state.screenshotsMeta = { tonemapped: Boolean(result.tonemapped) };
-      ui.screensHint.textContent = `Screenshot caricati: ${state.screenshots.filter((s) => s.ok).length}/${state.screenshots.length}`;
+      const okImages = state.screenshots.filter((s) => s.ok);
+      logDebug?.('screens: result', {
+        total: state.screenshots.length,
+        ok: okImages.length,
+        tonemapped: result.tonemapped || false,
+        images: state.screenshots.map((s, i) => ({
+          n: i + 1,
+          ok: s.ok,
+          host: s.host || '',
+          url: s.displayUrl || s.rawUrl || '',
+          error: s.error || ''
+        }))
+      });
+      ui.screensHint.textContent = `Screenshot caricati: ${okImages.length}/${state.screenshots.length}`;
       ui.uploadDescText.textContent = buildUploadDescription(getFormState());
       setScreensProgress(1);
       setScreensStage('done');
     } else {
+      logDebug?.('screens: error', { error: result?.error || 'unknown' });
       ui.screensHint.textContent = result?.error || 'Errore durante la generazione.';
       setScreensStage('error', { error: result?.error });
     }
@@ -2181,6 +2195,9 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         }
         if (screensProgressRequestId && data.requestId && data.requestId !== screensProgressRequestId) {
           return;
+        }
+        if (data.stage === 'debug' && data.message) {
+          logDebug?.(data.message);
         }
         if (typeof data.progress === 'number') {
           setScreensProgress(data.progress);
