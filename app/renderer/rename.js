@@ -15,6 +15,7 @@ import {
   parseChannels,
   pickBestItalianAudioTrack
 } from './media-utils.js';
+import { extractTokensPresent } from './parsing-tools.js';
 
 export function createRenameTools(deps) {
   const {
@@ -25,7 +26,8 @@ export function createRenameTools(deps) {
     parseSeasonEpisodeRange,
     episodeKey,
     setHint,
-    languageCodesPattern
+    languageCodesPattern,
+    getServiceCodes
   } = deps;
 
   // Prefer best ITA audio unless user manually overrides codec/channels/meta.
@@ -291,7 +293,25 @@ export function createRenameTools(deps) {
     }
 
     const warnings = [];
-    const form = getFormState();
+    const rawForm = getFormState();
+    // Auto-detect service code from the original filename when the form field is empty.
+    // This ensures tokens like NF, AMZN, HMAX, ATVP, DSNP are never silently dropped.
+    const form = (() => {
+      if (rawForm.service) {
+        return rawForm;
+      }
+      const originalPath = state.mainVideo || state.targetPath || '';
+      const originalBaseName = stripExtension(getPathBaseName(originalPath));
+      if (!originalBaseName) {
+        return rawForm;
+      }
+      const serviceCodes = getServiceCodes ? getServiceCodes() : [];
+      if (!serviceCodes.length) {
+        return rawForm;
+      }
+      const detected = extractTokensPresent(originalBaseName, serviceCodes)[0] || '';
+      return detected ? { ...rawForm, service: detected } : rawForm;
+    })();
     const audioOverride = getAudioOverrides();
     const isDir = state.kind === 'dir';
     const isSeason = isDir || form.type.includes('season');
