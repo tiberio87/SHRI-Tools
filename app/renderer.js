@@ -1813,7 +1813,8 @@ const renameTools = createRenameTools({
   parseSeasonEpisodeRange: metadataTools.parseSeasonEpisodeRange,
   episodeKey: metadataTools.episodeKey,
   setHint,
-  languageCodesPattern: LANGUAGE_CODES_PATTERN
+  languageCodesPattern: LANGUAGE_CODES_PATTERN,
+  getServiceCodes: () => buildServiceOptions(getSettings()).map((item) => item.code)
 });
 
 const renameFlow = createRenameFlow({
