@@ -2,6 +2,8 @@
 # Local scratchpad
 BRAINSTORMING/
 !.gitignore
+!.github/
+!.github/**
 !app/
 !app/**
 !assets/
