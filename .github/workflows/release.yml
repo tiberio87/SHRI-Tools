@@ -26,8 +26,6 @@ jobs:
 
       - name: Build portable EXE
         run: npm run dist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload EXE to release
         uses: softprops/action-gh-release@v2
