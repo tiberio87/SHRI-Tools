@@ -1996,14 +1996,17 @@ ipcMain.handle('check-update', async () => {
     const resp = await fetch('https://api.github.com/repos/tiberio87/SHRI-Tools/releases/latest', {
       headers: { 'User-Agent': 'SHRI-Tools-updater' }
     });
-    if (!resp.ok) return { hasUpdate: false };
+    if (!resp.ok) {
+      const errText = await resp.text().catch(() => '');
+      return { hasUpdate: false, error: `HTTP ${resp.status}`, detail: errText.slice(0, 200) };
+    }
     const data = await resp.json();
     const latest = String(data.tag_name || '').replace(/^v/, '');
     const current = app.getVersion();
     const hasUpdate = latest && compareVersions(latest, current) > 0;
-    return { hasUpdate: !!hasUpdate, latestVersion: latest, releaseUrl: data.html_url || '' };
-  } catch {
-    return { hasUpdate: false };
+    return { hasUpdate: !!hasUpdate, latestVersion: latest, currentVersion: current, releaseUrl: data.html_url || '' };
+  } catch (err) {
+    return { hasUpdate: false, error: String(err?.message || err) };
   }
 });
 

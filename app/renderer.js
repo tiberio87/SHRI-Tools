@@ -957,12 +957,19 @@ async function updateAppVersionLabel() {
 }
 
 async function checkForAppUpdate() {
-  if (!window.api?.checkUpdate) return;
+  if (!window.api?.checkUpdate) {
+    console.warn('[update] window.api.checkUpdate non disponibile');
+    return;
+  }
   try {
     const result = await window.api.checkUpdate();
+    console.log('[update] risultato check:', JSON.stringify(result));
     if (!result?.hasUpdate) return;
     const banner = document.getElementById('updateBanner');
-    if (!banner) return;
+    if (!banner) {
+      console.warn('[update] elemento #updateBanner non trovato');
+      return;
+    }
     const text = document.getElementById('updateBannerText');
     const dlBtn = document.getElementById('updateBannerDownload');
     const dismissBtn = document.getElementById('updateBannerDismiss');
@@ -974,8 +981,8 @@ async function checkForAppUpdate() {
       dismissBtn.addEventListener('click', () => banner.classList.add('hidden'));
     }
     banner.classList.remove('hidden');
-  } catch {
-    // silenzioso — il check fallisce senza disturbare l'utente
+  } catch (err) {
+    console.error('[update] errore:', err);
   }
 }
 
