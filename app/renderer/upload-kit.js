@@ -2114,6 +2114,14 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         copyToClipboard(ui.uploadDescText.textContent, 'Descrizione copiata.');
       });
     }
+    if (ui.saveUploadDescBtn) {
+      ui.saveUploadDescBtn.addEventListener('click', async () => {
+        const content = ui.uploadDescText?.textContent || '';
+        if (!content || content === '-') return;
+        const result = await window.api?.saveFile({ defaultName: 'bbcode.txt', content });
+        if (result?.saved) showToast('BBCode salvato.', 'success');
+      });
+    }
     if (ui.uploadReleaseNotesInput) {
       ui.uploadReleaseNotesInput.addEventListener('input', () => {
         refreshUploadDescription();

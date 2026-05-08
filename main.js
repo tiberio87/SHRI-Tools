@@ -1962,6 +1962,17 @@ ipcMain.handle('select-any-file', async () => {
 
 ipcMain.handle('app-version', () => app.getVersion());
 
+ipcMain.handle('save-file', async (_event, { defaultName, content }) => {
+  const safeName = String(defaultName || 'export').replace(/[/\\:*?"<>|]/g, '_');
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    defaultPath: safeName,
+    filters: [{ name: 'Text', extensions: ['txt'] }]
+  });
+  if (canceled || !filePath) return { saved: false };
+  await fs.writeFile(filePath, content, 'utf8');
+  return { saved: true, filePath };
+});
+
 function compareVersions(a, b) {
   const pa = String(a).split('.').map(Number);
   const pb = String(b).split('.').map(Number);

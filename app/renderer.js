@@ -2681,6 +2681,14 @@ ui.clearDebugBtn.addEventListener('click', () => {
   debugState.buffer = [];
   updateDebugLogView();
 });
+if (ui.saveDebugBtn) {
+  ui.saveDebugBtn.addEventListener('click', async () => {
+    const content = debugState.buffer.length ? debugState.buffer.join('\n') : '';
+    if (!content) return;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    await window.api?.saveFile({ defaultName: `shri-log-${stamp}.txt`, content });
+  });
+}
 ui.debugModal.addEventListener('click', (event) => {
   if (event.target.classList.contains('modal-backdrop')) {
     closeDebugModal();
