@@ -2040,6 +2040,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
 
   const outputDir = path.join(app.getPath('temp'), 'shri-tools', 'screenshots', String(Date.now()));
   const screensOutputDir = String(payload?.screensOutputDir || '').trim();
+  const screensJobTitle = String(payload?.screensJobTitle || '').trim();
   const useJobDir = Boolean(screensOutputDir);
   const effectiveOutputDir = useJobDir ? screensOutputDir : outputDir;
   await fs.mkdir(effectiveOutputDir, { recursive: true });
@@ -2231,7 +2232,8 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         .map((img, i) => `[${i + 1}] ${img.displayUrl || img.rawUrl}${img.viewerUrl ? `  viewer: ${img.viewerUrl}` : ''}`);
       if (urlLines.length) {
         try {
-          await fs.writeFile(path.join(effectiveOutputDir, 'screens-urls.txt'), urlLines.join('\n'), 'utf8');
+          const urlFileName = screensJobTitle ? `${screensJobTitle}.screens-urls.txt` : 'screens-urls.txt';
+          await fs.writeFile(path.join(effectiveOutputDir, urlFileName), urlLines.join('\n'), 'utf8');
         } catch {}
       }
     }
