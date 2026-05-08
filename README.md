@@ -1,6 +1,6 @@
 # SHRI-Tools
 
-Applicazione desktop (Electron) per la gestione completa delle release su tracker **Unit3D**: rinomina file/cartelle secondo le rules del tracker, generazione BBCode, upload integrato, integrazione con Upload Assistant (UA) e analisi di torrent gia` pubblicati.
+Applicazione desktop (Electron) per la gestione completa delle release su tracker **Unit3D**: rinomina file/cartelle secondo le rules del tracker, generazione BBCode, upload integrato e analisi di torrent gia` pubblicati.
 
 ---
 
@@ -28,19 +28,14 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Upload diretto al tracker + invio al client torrent (qBittorrent / Transmission).
 - Compatibile con **qBittorrent 5.2.0+** (gestione cookie `QBT_SID_<porta>`, header CSRF, risposta HTTP 204).
 
-### 3. Modalita` Upload Assistant (UA)
-- Finestra per lanciare UA con argomenti precompilati.
-- Toggle per tag gruppo, screenshots, servizio, tipo, source, ID, stagione/episodio, ecc.
-- Log in tempo reale e controllo esecuzione (start/stop).
-
-### 4. Analisi Tracker
+### 3. Analisi Tracker
 - Inserisci un link Unit3D e ottieni:
   - titolo suggerito secondo le rules,
   - MediaInfo sintetico,
   - badge ID meta copiabili,
   - segnalazione mismatch ID.
 
-### 5. Generazione Screenshot
+### 4. Generazione Screenshot
 - Cattura automatica dei frame tramite FFmpeg con tempi ottimizzati.
 - Supporto HDR con tonemapping automatico (fallback senza tonemap se necessario).
 - Upload su imgBB o PTScreens con fallback automatico.
@@ -54,7 +49,6 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 |---|---|
 | **File/Cartella** | Analisi locale e rinomina |
 | **Upload Wizard Integrata** | Upload completo gestito da SHRI-Tools |
-| **Upload Assistant** | Esecuzione UA con argomenti guidati |
 | **Analisi Tracker** | Analisi torrent gia` presenti sul tracker |
 
 ---
@@ -62,7 +56,6 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 ## Impostazioni (panoramica)
 
 ### Generali (valide in tutte le modalita`)
-- **Modalita` upload predefinita**: Integrata o Upload Assistant.
 - **TMDb key**: auto-matching e metadata film/serie.
 - **TVDb key**: auto-matching per serie/episodi.
 - **OMDb key**: fallback metadata via IMDb.
@@ -100,10 +93,6 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Host / Porta / HTTPS, Username / Password.
 - Save path, Auto-start.
 - Path mapping locale/remoto.
-
-### Modalita` Upload Assistant (UA)
-- **Path UA**: cartella di installazione di Upload Assistant.
-- **Health check UA**: verifica requisiti e configurazione.
 
 ### Impostazioni avanzate
 - Override ID Unit3D (category/type/resolution) se l'istanza ha ID diversi dagli standard SHRI.

@@ -30,7 +30,6 @@ import { createFeedbackTools } from './renderer/feedback.js';
 import { createServiceTagTools } from './renderer/service-tags.js';
 import { createSettingsTools } from './renderer/settings-tools.js';
 import { createRulesCheckTools } from './renderer/rules-check.js';
-import { createUAMode } from './renderer/ua-mode.js';
 import { setupSourceDragDrop } from './renderer/drag-drop.js';
 import { createRenameFlow } from './renderer/rename-flow.js';
 import { createAutoDetectFlow } from './renderer/auto-detect.js';
@@ -43,7 +42,6 @@ let settingsSnapshot = '';
 let settingsDirty = false;
 let wizardStepIndex = 0;
 let torrentGenerator = 'node';
-let uaMode;
 let refreshPreview = async () => {};
 let schedulePreview = () => {};
 let showMediaInfoReport = async () => {};
@@ -54,35 +52,6 @@ let manualDetectFromInputs = async () => {};
 const torrentLogLines = [];
 const WIZARD_STEP_COUNT = 3;
 
-// ===== Upload mode handling =====
-function applyUploadMode(mode, persist = false) {
-  const normalized = mode === 'ua' ? 'ua' : 'integrated';
-  document.body.dataset.uploadMode = normalized;
-  if (ui.uploadModeToggle) {
-    ui.uploadModeToggle.textContent =
-      normalized === 'ua' ? 'Modalita Upload Assistant' : 'Modalita Integrata';
-  }
-  if (ui.openUploadAssistantBtn) {
-    ui.openUploadAssistantBtn.classList.toggle('push-right', normalized === 'ua');
-  }
-  if (ui.reopenLastUploadBtn) {
-    ui.reopenLastUploadBtn.classList.toggle('push-right', normalized === 'integrated');
-  }
-  if (persist) {
-    const settings = loadSettings();
-    settings.uploadMode = normalized;
-    saveSettings(settings);
-    updateAppHealthStatus(settings);
-    updateSettingsVisibility(settings);
-  } else {
-    const settings = loadSettings();
-    updateAppHealthStatus(settings);
-    updateSettingsVisibility(settings);
-  }
-  if (normalized === 'ua') {
-    uaMode?.checkUaVersion?.();
-  }
-}
 // ===== Core services (logger/theme/feedback) =====
 const LANGUAGE_CODES_PATTERN = Array.from(new Set([...Object.values(LANG_MAP), 'MULTI']))
   .filter(Boolean)
@@ -148,195 +117,6 @@ function updateVideoCodecMenu() {
   }
 }
 
-// ===== UA config parsing helpers =====
-function stripConfigLine(line) {
-  const trimmed = line.trim();
-  if (!trimmed || trimmed.startsWith('#')) {
-    return '';
-  }
-  return line;
-}
-
-function extractConfigBlock(content, key) {
-  const marker = `"${key}"`;
-  const start = content.indexOf(marker);
-  if (start === -1) {
-    return '';
-  }
-  const braceStart = content.indexOf('{', start);
-  if (braceStart === -1) {
-    return '';
-  }
-  let depth = 0;
-  for (let i = braceStart; i < content.length; i += 1) {
-    const char = content[i];
-    if (char === '{') {
-      depth += 1;
-    } else if (char === '}') {
-      depth -= 1;
-      if (depth === 0) {
-        return content.slice(braceStart + 1, i);
-      }
-    }
-  }
-  return '';
-}
-
-function extractConfigValue(block, key) {
-  const regex = new RegExp(`"${key}"\\s*:\\s*([^,\\n]+)`);
-  const match = regex.exec(block);
-  if (!match) {
-    return '';
-  }
-  let value = match[1].trim().replace(/,$/, '');
-  if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    value = value.slice(1, -1);
-  }
-  if (/^(True|False)$/i.test(value)) {
-    return value.toLowerCase() === 'true';
-  }
-  return value;
-}
-
-function extractConfigList(block, key) {
-  const regex = new RegExp(`"${key}"\\s*:\\s*\\[([^\\]]*)\\]`);
-  const match = regex.exec(block);
-  if (!match) {
-    return [];
-  }
-  return match[1]
-    .split(',')
-    .map((entry) => entry.trim().replace(/^['"]|['"]$/g, ''))
-    .filter(Boolean);
-}
-
-function isPlaceholderAnnounce(value) {
-  const raw = String(value || '').trim();
-  if (!raw) {
-    return true;
-  }
-  const lower = raw.toLowerCase();
-  if (lower.includes('<') || lower.includes('>')) {
-    return true;
-  }
-  if (
-    lower.includes('customannounceurl') ||
-    lower.includes('custom_announce_url') ||
-    lower.includes('get from') ||
-    lower.includes('yourpasskey') ||
-    lower.includes('passkeyhere') ||
-    lower.includes('insertyourpasskeyhere')
-  ) {
-    return true;
-  }
-  const passkeyMatch = /passkey=([^&]+)/i.exec(raw);
-  if (passkeyMatch) {
-    const token = passkeyMatch[1];
-    if (!token || /passkey|your|insert|here/i.test(token) || token.length < 6) {
-      return true;
-    }
-    return false;
-  }
-  const pathToken = /\/([a-z0-9]{6,})\/announce/i.exec(raw);
-  if (pathToken) {
-    return false;
-  }
-  if (/\/announce\/?$/i.test(raw)) {
-    return true;
-  }
-  return false;
-}
-
-function isTrackerConfigured(entry) {
-  const apiKey = String(entry.api_key || '').trim();
-  if (apiKey) {
-    return true;
-  }
-  const announce = String(entry.announce_url || '').trim();
-  if (announce && !isPlaceholderAnnounce(announce)) {
-    return true;
-  }
-  return false;
-}
-
-function extractTrackerBlocks(section) {
-  const cleaned = section
-    .split('\n')
-    .map(stripConfigLine)
-    .filter(Boolean)
-    .join('\n');
-  const blocks = {};
-  const trackerRegex = /"([A-Za-z0-9_]+)"\s*:\s*\{/g;
-  let match = trackerRegex.exec(cleaned);
-  while (match) {
-    const name = match[1];
-    const braceStart = cleaned.indexOf('{', match.index);
-    let depth = 0;
-    let end = braceStart;
-    for (let i = braceStart; i < cleaned.length; i += 1) {
-      const char = cleaned[i];
-      if (char === '{') {
-        depth += 1;
-      } else if (char === '}') {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
-      }
-    }
-    blocks[name] = cleaned.slice(braceStart + 1, end);
-    match = trackerRegex.exec(cleaned);
-  }
-  return blocks;
-}
-
-function parseUploadAssistantConfig(content) {
-  const cleaned = content
-    .split('\n')
-    .map(stripConfigLine)
-    .filter(Boolean)
-    .join('\n');
-  const defaultsBlock = extractConfigBlock(cleaned, 'DEFAULT');
-  const trackersBlock = extractConfigBlock(cleaned, 'TRACKERS');
-  const clientsBlock = extractConfigBlock(cleaned, 'TORRENT_CLIENTS');
-  const trackerBlocks = trackersBlock ? extractTrackerBlocks(trackersBlock) : {};
-  const clientBlocks = clientsBlock ? extractTrackerBlocks(clientsBlock) : {};
-
-  return {
-    defaults: {
-      tmdb_api: extractConfigValue(defaultsBlock, 'tmdb_api'),
-      btn_api: extractConfigValue(defaultsBlock, 'btn_api'),
-      img_host_1: extractConfigValue(defaultsBlock, 'img_host_1'),
-      img_host_2: extractConfigValue(defaultsBlock, 'img_host_2'),
-      imgbb_api: extractConfigValue(defaultsBlock, 'imgbb_api'),
-      ptscreens_api: extractConfigValue(defaultsBlock, 'ptscreens_api'),
-      screens: extractConfigValue(defaultsBlock, 'screens'),
-      min_successful_image_uploads: extractConfigValue(defaultsBlock, 'min_successful_image_uploads'),
-      tone_map: extractConfigValue(defaultsBlock, 'tone_map'),
-      default_torrent_client: extractConfigValue(defaultsBlock, 'default_torrent_client'),
-      injecting_client_list: extractConfigList(defaultsBlock, 'injecting_client_list')
-    },
-    trackers: {
-      default_trackers: extractConfigValue(trackersBlock, 'default_trackers'),
-      entries: Object.entries(trackerBlocks).map(([name, block]) => ({
-        name,
-        api_key: extractConfigValue(block, 'api_key'),
-        announce_url:
-          extractConfigValue(block, 'announce_url') || extractConfigValue(block, 'my_announce_url'),
-        anon: extractConfigValue(block, 'anon'),
-        use_italian_title: extractConfigValue(block, 'use_italian_title')
-      }))
-    },
-    clients: {
-      names: Object.keys(clientBlocks),
-      default_client: extractConfigValue(defaultsBlock, 'default_torrent_client')
-    }
-  };
-}
 
 function formatMasked(value) {
   const text = String(value || '').trim();
@@ -516,9 +296,6 @@ function resetAllInputs(options = {}) {
   if (ui.renameFolderCheckbox) {
     ui.renameFolderCheckbox.checked = false;
     ui.renameFolderCheckbox.disabled = true;
-  }
-  if (ui.openUploadAssistantBtn) {
-    ui.openUploadAssistantBtn.disabled = false;
   }
   if (ui.openUploadWizardBtn) {
     ui.openUploadWizardBtn.disabled = false;
@@ -1634,7 +1411,6 @@ const {
   loadSettings,
   saveSettings,
   updateAppHealthStatus,
-  setUaUpdateAvailable,
   updateFfmpegHint,
   updateQbitMappingHint,
   updateClientSections,
@@ -1667,24 +1443,6 @@ const dupeCheck = createDupeCheckTools({
   getFormState,
   showToast,
   logDebug
-});
-
-uaMode = createUAMode({
-  ui,
-  state,
-  showToast,
-  loadSettings,
-  updateAppHealthStatus,
-  setUaUpdateAvailable,
-  updateRulesCheckForTargets,
-  buildServiceOptions,
-  getFormState,
-  setupDropdown,
-  closeSettings,
-  isTrackerConfigured,
-  isPlaceholderAnnounce,
-  parseUploadAssistantConfig,
-  formatMasked
 });
 
 function setIfAuto(input, value) {
@@ -2403,7 +2161,6 @@ if (ui.generateTorrentBtn) {
 
 ui.openSettingsBtn.addEventListener('click', openSettings);
 ui.closeSettingsBtn.addEventListener('click', requestCloseSettings);
-uaMode?.bindEvents();
 if (ui.openAdvancedSettingsBtn) {
   ui.openAdvancedSettingsBtn.addEventListener('click', openAdvancedSettings);
 }
@@ -2506,13 +2263,6 @@ if (ui.themeToggle) {
   });
 }
 
-if (ui.uploadModeToggle) {
-  ui.uploadModeToggle.addEventListener('click', () => {
-    const current = document.body.dataset.uploadMode === 'ua' ? 'ua' : 'integrated';
-    const next = current === 'ua' ? 'integrated' : 'ua';
-    applyUploadMode(next, true);
-  });
-}
 
 ui.mediaInfoBadge.addEventListener('click', async () => {
   if (!ui.mediaInfoBadge.classList.contains('clickable')) {
@@ -2577,15 +2327,6 @@ if (ui.browseBdinfoPathBtn) {
     const filePath = await window.api.selectAnyFile?.();
     if (filePath && ui.settingsBdinfoPathInput) {
       ui.settingsBdinfoPathInput.value = filePath;
-    }
-  });
-}
-
-if (ui.browseUploadAssistantPathBtn) {
-  ui.browseUploadAssistantPathBtn.addEventListener('click', async () => {
-    const dir = await window.api.selectFolder();
-    if (dir && ui.settingsUploadAssistantPathInput) {
-      ui.settingsUploadAssistantPathInput.value = dir;
     }
   });
 }
@@ -2766,11 +2507,7 @@ ui.saveSettingsBtn.addEventListener('click', () => {
   applySettingsToUI(settings);
   setHint(ui.settingsHint, 'Impostazioni salvate.');
   showToast('Impostazioni salvate.', 'success');
-  uaMode?.updateUaServiceOptions?.();
   refreshSettingsSnapshot();
-  if (settings.uploadMode === 'ua') {
-    uaMode?.checkUaVersion?.();
-  }
 });
 
 if (ui.qbitTestBtn) {
@@ -2978,13 +2715,11 @@ if (ui.torrentClientSelect) {
 const initialSettings = loadSettings();
 applySettingsToUI(initialSettings);
 applyTheme(loadTheme());
-applyUploadMode(initialSettings.uploadMode || 'integrated');
 updateAutoDetectControls();
 updateVisibility();
 updateVideoCodecMenu();
 refreshPreview();
 updateAppVersionLabel();
 checkForAppUpdate();
-uaMode?.updateUaControlsState?.();
 
 logDebug('Renderer loaded');

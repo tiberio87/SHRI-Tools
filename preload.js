@@ -29,15 +29,6 @@ contextBridge.exposeInMainWorld('api', {
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   saveFile: (payload) => ipcRenderer.invoke('save-file', payload),
   saveFileDirect: (payload) => ipcRenderer.invoke('save-file-direct', payload),
-  uaStart: (payload) => ipcRenderer.invoke('ua-start', payload),
-  uaSendInput: (text) => ipcRenderer.invoke('ua-input', text),
-  uaStop: () => ipcRenderer.invoke('ua-stop'),
-  uaReadConfig: (payload) => ipcRenderer.invoke('ua-read-config', payload),
-  uaCheckVersion: (payload) => ipcRenderer.invoke('ua-check-version', payload),
-  uaOpenUpdateTerminal: (payload) => ipcRenderer.invoke('ua-open-update-terminal', payload),
-  uaUpdateStart: (payload) => ipcRenderer.invoke('ua-update-start', payload),
-  uaUpdateSendInput: (text) => ipcRenderer.invoke('ua-update-input', text),
-  uaUpdateStop: () => ipcRenderer.invoke('ua-update-stop'),
   getFilePath: (file) => (file ? webUtils.getPathForFile(file) : ''),
   onTorrentProgress: (handler) => {
     const listener = (_event, data) => handler(data);
@@ -53,25 +44,5 @@ contextBridge.exposeInMainWorld('api', {
     const listener = (_event, data) => handler(data);
     ipcRenderer.on('bdinfo-progress', listener);
     return () => ipcRenderer.removeListener('bdinfo-progress', listener);
-  },
-  onUaOutput: (handler) => {
-    const listener = (_event, data) => handler(data);
-    ipcRenderer.on('ua-output', listener);
-    return () => ipcRenderer.removeListener('ua-output', listener);
-  },
-  onUaExit: (handler) => {
-    const listener = (_event, data) => handler(data);
-    ipcRenderer.on('ua-exit', listener);
-    return () => ipcRenderer.removeListener('ua-exit', listener);
-  },
-  onUaUpdateOutput: (handler) => {
-    const listener = (_event, data) => handler(data);
-    ipcRenderer.on('ua-update-output', listener);
-    return () => ipcRenderer.removeListener('ua-update-output', listener);
-  },
-  onUaUpdateExit: (handler) => {
-    const listener = (_event, data) => handler(data);
-    ipcRenderer.on('ua-update-exit', listener);
-    return () => ipcRenderer.removeListener('ua-update-exit', listener);
   }
 });

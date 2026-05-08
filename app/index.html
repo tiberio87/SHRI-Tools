@@ -23,9 +23,6 @@
           <span class="app-health-label">Health Check</span>
           <div id="appHealthTooltip" class="app-health-tooltip"></div>
         </div>
-        <button id="uploadModeToggle" class="upload-mode-toggle secondary small" type="button">
-          Modalita Integrata
-        </button>
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
         <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -342,7 +339,6 @@
           <div class="action-row">
             <button id="applyRenameBtn" class="primary">Applica rinomina</button>
             <button id="reopenLastUploadBtn" class="secondary small hidden push-right" type="button">Riapri ultimo upload</button>
-            <button id="openUploadAssistantBtn" class="success torrent-button" type="button">Carica con Upload Assistant</button>
             <button id="openUploadWizardBtn" class="success torrent-button" type="button">Upload Wizard</button>
           </div>
           <div id="renameHint" class="hint"></div>
@@ -382,22 +378,7 @@
           </div>
         </div>
       </div>
-      <div class="settings-block" data-settings-scope="ua">
-        <h3 class="settings-title">Upload Assistant</h3>
-        <div class="row">
-          <div class="field">
-            <label for="settingsUploadAssistantPathInput">Percorso Upload Assistant</label>
-            <div class="input-with-action">
-              <input id="settingsUploadAssistantPathInput" type="text" placeholder="Seleziona cartella Upload-Assistant" />
-              <button id="browseUploadAssistantPathBtn" class="secondary small" type="button">Sfoglia</button>
-            </div>
-          </div>
-        </div>
-        <div class="settings-row">
-          <button id="openUaHealthFromSettingsBtn" class="secondary small" type="button">Apri Health Check</button>
-        </div>
-      </div>
-      <div class="settings-block" data-settings-scope="integrated">
+      <div class="settings-block" data-settings-scope="all">
         <h3 class="settings-title">Torrent</h3>
         <div class="row">
           <div class="field">
@@ -537,7 +518,7 @@
           </div>
         </div>
       </div>
-      <div class="settings-block" data-settings-scope="integrated">
+      <div class="settings-block" data-settings-scope="all">
         <h3 class="settings-title">Screenshot & Image Host</h3>
         <div class="row settings-grid">
           <div class="field">
@@ -606,7 +587,7 @@
           </div>
         </div>
       </div>
-      <div class="settings-block" data-settings-scope="integrated">
+      <div class="settings-block" data-settings-scope="all">
         <h3 class="settings-title">Upload API (UNIT3D)</h3>
         <div class="row settings-grid">
           <div class="field">
@@ -649,7 +630,7 @@
           <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
         </div>
       </div>
-      <div class="settings-block" data-settings-scope="integrated">
+      <div class="settings-block" data-settings-scope="all">
         <h3 class="settings-title">Client torrent</h3>
         <div class="row settings-grid">
           <div class="field">
@@ -815,7 +796,7 @@
           <button id="closeAdvancedSettingsBtn" class="secondary small">Chiudi</button>
         </div>
       </div>
-      <div class="advanced-settings-body" data-settings-scope="integrated">
+      <div class="advanced-settings-body" data-settings-scope="all">
         <p class="hint">Usa questi override solo se l'istanza UNIT3D ha ID diversi da quelli di SHRI.</p>
         <h3 class="settings-title">Rinomina</h3>
         <div class="row settings-grid">
@@ -1173,278 +1154,6 @@
         <div class="wizard-actions">
           <button id="wizardPrevBtn" class="secondary small" type="button">Indietro</button>
           <button id="wizardNextBtn" class="primary small" type="button">Avanti</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="uploadAssistantModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content ua-modal">
-      <div class="modal-header">
-        <h2>Upload Assistant</h2>
-        <div class="modal-actions">
-          <button id="closeUploadAssistantBtn" class="secondary small">Chiudi</button>
-        </div>
-      </div>
-      <div class="ua-body">
-        <div class="ua-rules">
-          <div class="ua-rules-header">
-            <h3>Rules check</h3>
-            <div class="hint">Controllo rapido prima di avviare l'upload.</div>
-          </div>
-          <div class="wizard-rules-summary ua-rules-summary">
-            <div id="uaRulesFolderBlock" class="wizard-rules-block hidden">
-              <div class="wizard-rules-path">
-                <div id="uaRulesFolderLabel" class="label">Cartella</div>
-                <div id="uaRulesFolderPath" class="preview">-</div>
-              </div>
-              <div id="uaRulesFolderBadges" class="wizard-rules-badges"></div>
-              <div id="uaRulesFolderHint" class="wizard-rules-hint hidden"></div>
-            </div>
-            <div id="uaRulesFileBlock" class="wizard-rules-block">
-              <div class="wizard-rules-path">
-                <div id="uaRulesFileLabel" class="label">File</div>
-                <div id="uaRulesFilePath" class="preview">-</div>
-              </div>
-              <div id="uaRulesFileBadges" class="wizard-rules-badges"></div>
-              <div id="uaRulesFileHint" class="wizard-rules-hint hidden"></div>
-              <div id="uaRulesFileNote" class="wizard-rules-note hidden"></div>
-            </div>
-          </div>
-        </div>
-
-        <pre id="uaConsoleLog" class="ua-console"></pre>
-
-        <div class="ua-controls">
-          <button id="uaStartBtn" class="primary">Avvia upload</button>
-          <div class="ua-input">
-            <span class="ua-prompt">&gt;</span>
-            <input id="uaInput" type="text" placeholder="Rispondi ai prompt di Upload Assistant..." />
-            <button id="uaSendBtn" class="secondary small" type="button">Invia</button>
-          </div>
-        </div>
-
-        <div class="ua-args">
-          <label class="ua-arg-btn" data-tooltip="-ua: Modalita unattended.">
-            <input id="uaUnattendedToggle" type="checkbox" />
-            <span>Unattended</span>
-          </label>
-          <label class="ua-arg-btn" data-tooltip="-tk SHRI: Upload su SHRI.">
-            <input id="uaTrackerShriToggle" type="checkbox" />
-            <span>SHRI</span>
-          </label>
-          <label class="ua-arg-btn" data-tooltip="-pr: Release personale.">
-            <input id="uaPersonalToggle" type="checkbox" />
-            <span>Personal</span>
-          </label>
-          <label class="ua-arg-btn" data-tooltip="-a: Upload anonimo.">
-            <input id="uaAnonymousToggle" type="checkbox" />
-            <span>Anonym</span>
-          </label>
-          <label class="ua-arg-btn" data-tooltip="-edition Hybrid: Edizione Hybrid. Es. Sorgente Bluray - Audio WEB-DL">
-            <input id="uaWebdvToggle" type="checkbox" />
-            <span>Hybrid</span>
-          </label>
-          <label class="ua-arg-btn" data-tooltip="-edition Repack: Edizione Repack.">
-            <input id="uaEditionRepackToggle" type="checkbox" />
-            <span>Repack</span>
-          </label>
-          <label class="ua-arg-btn" data-tooltip="-ns: No seed. Non aggiunge il torrent al client.">
-            <input id="uaNoSeedToggle" type="checkbox" />
-            <span>No seed</span>
-          </label>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-g: Tag gruppo forzato.">
-              <input id="uaTagToggle" type="checkbox" />
-              <span>Tag gruppo</span>
-            </label>
-            <input id="uaTagInput" class="ua-arg-input" type="text" placeholder="Tag gruppo" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-s: Screens (override numero).">
-              <input id="uaScreensToggle" type="checkbox" />
-              <span>Screens</span>
-            </label>
-            <input id="uaScreensInput" class="ua-arg-input ua-arg-input-short" type="number" min="1" max="8" step="1" value="6" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-serv: Servizio.">
-              <input id="uaServiceToggle" type="checkbox" />
-              <span>Servizio</span>
-            </label>
-            <div id="uaServiceDropdown" class="dropdown ua-arg-dropdown">
-              <button id="uaServiceBtn" class="dropdown-trigger" type="button">Seleziona servizio</button>
-              <div id="uaServiceMenu" class="dropdown-menu"></div>
-              <input id="uaServiceInput" type="hidden" value="" />
-            </div>
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-t: Override release type.">
-              <input id="uaTypeToggle" type="checkbox" />
-              <span>Tipo</span>
-            </label>
-            <div id="uaTypeDropdown" class="dropdown ua-arg-dropdown">
-              <button id="uaTypeBtn" class="dropdown-trigger" type="button">Seleziona tipo</button>
-              <div id="uaTypeMenu" class="dropdown-menu"></div>
-              <input id="uaTypeInput" type="hidden" value="" />
-            </div>
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="--source: Override source string.">
-              <input id="uaSourceToggle" type="checkbox" />
-              <span>Sorgente</span>
-            </label>
-            <div id="uaSourceDropdown" class="dropdown ua-arg-dropdown">
-              <button id="uaSourceBtn" class="dropdown-trigger" type="button">Seleziona sorgente</button>
-              <div id="uaSourceMenu" class="dropdown-menu"></div>
-              <input id="uaSourceInput" type="hidden" value="" />
-            </div>
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-res: Override resolution.">
-              <input id="uaResToggle" type="checkbox" />
-              <span>Risoluzione</span>
-            </label>
-            <div id="uaResDropdown" class="dropdown ua-arg-dropdown">
-              <button id="uaResBtn" class="dropdown-trigger" type="button">Seleziona risoluzione</button>
-              <div id="uaResMenu" class="dropdown-menu"></div>
-              <input id="uaResInput" type="hidden" value="" />
-            </div>
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-tmdb, --tmdb: TMDb id (movie/123 o tv/123), anche URL.">
-              <input id="uaTmdbToggle" type="checkbox" />
-              <span>TMDb</span>
-            </label>
-            <input id="uaTmdbInput" class="ua-arg-input" type="text" placeholder="movie/123 o URL" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-imdb, --imdb: IMDb id.">
-              <input id="uaImdbToggle" type="checkbox" />
-              <span>IMDb</span>
-            </label>
-            <input id="uaImdbInput" class="ua-arg-input" type="text" placeholder="tt1234567" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-tvdb, --tvdb: TVDB id.">
-              <input id="uaTvdbToggle" type="checkbox" />
-              <span>TVDB</span>
-            </label>
-            <input id="uaTvdbInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="12345" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-mal, --mal: MAL id.">
-              <input id="uaMalToggle" type="checkbox" />
-              <span>MAL</span>
-            </label>
-            <input id="uaMalInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="12345" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-season, --season: Season (manual).">
-              <input id="uaSeasonToggle" type="checkbox" />
-              <span>Season</span>
-            </label>
-            <input id="uaSeasonInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="09" />
-          </div>
-          <div class="ua-arg-group">
-            <label class="ua-arg-btn" data-tooltip="-episode, --episode: Episode (manual).">
-              <input id="uaEpisodeToggle" type="checkbox" />
-              <span>Episode</span>
-            </label>
-            <input id="uaEpisodeInput" class="ua-arg-input ua-arg-input-short" type="text" placeholder="10" />
-          </div>
-          <label class="ua-arg-btn" data-tooltip="-debug: Debug dettagliato.">
-            <input id="uaDebugToggle" type="checkbox" />
-            <span>Debug</span>
-          </label>
-        </div>
-
-        <div class="ua-footer">
-          <div id="uaStatus" class="hint"></div>
-          <div class="ua-footer-actions">
-            <button id="uaStopBtn" class="secondary small" type="button">Interrompi</button>
-            <button id="uaCopyLogBtn" class="secondary small" type="button">Copia log</button>
-            <button id="uaOpenFolderBtn" class="secondary small" type="button">Apri cartella UA</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="uaHealthModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content ua-health-modal">
-      <div class="modal-header">
-        <h2>Upload Assistant · Config</h2>
-        <div class="modal-actions">
-          <button id="closeUaHealthBtn" class="secondary small" type="button">Chiudi</button>
-        </div>
-      </div>
-      <div class="ua-health-body">
-        <div class="ua-health-summary">
-          <div class="ua-health-item">
-            <div class="label">Percorso UA</div>
-            <div class="ua-health-path">
-              <div id="uaHealthPath" class="preview">-</div>
-              <button id="uaHealthOpenPathBtn" class="secondary small" type="button">Apri</button>
-            </div>
-          </div>
-          <div class="ua-health-item">
-            <div class="label">Config</div>
-            <div class="ua-health-path">
-              <div id="uaHealthConfigPath" class="preview">-</div>
-              <button id="uaHealthOpenConfigBtn" class="secondary small" type="button">Apri</button>
-            </div>
-          </div>
-        </div>
-        <div id="uaHealthContent" class="ua-health-grid"></div>
-        <div class="ua-health-update">
-          <div class="ua-health-update-header">
-            <div class="label">Aggiornamento</div>
-            <div id="uaHealthVersion" class="hint">-</div>
-          </div>
-          <div class="ua-health-update-actions">
-            <button id="uaHealthUpdateBtn" class="secondary small" type="button">Apri terminale update</button>
-            <span id="uaHealthUpdateHint" class="hint">Nessun aggiornamento da installare.</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <div id="uaUpdateModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-    <div class="modal-content ua-update-modal">
-      <div class="modal-header">
-        <h2>Aggiornamento Upload Assistant</h2>
-        <div class="modal-actions">
-          <button id="closeUaUpdateBtn" class="secondary small" type="button">Chiudi</button>
-        </div>
-      </div>
-      <div class="ua-update-body">
-        <p class="ua-update-desc">
-          Questo tasto eseguira i seguenti comandi nel percorso U.A. impostato:
-        </p>
-        <pre id="uaUpdateCommands" class="ua-update-commands"></pre>
-        <div class="ua-controls">
-          <button id="uaUpdateRunBtn" class="primary" type="button">Esegui aggiornamento</button>
-          <div class="ua-input">
-            <span class="ua-prompt">&gt;</span>
-            <input id="uaUpdateInput" type="text" placeholder="Rispondi ai prompt di aggiornamento..." />
-          </div>
-          <button id="uaUpdateSendBtn" class="secondary small" type="button">Invia</button>
-        </div>
-        <div id="uaUpdateStatus" class="hint"></div>
-        <div id="uaUpdateConsole" class="ua-console" aria-live="polite"></div>
-        <div class="ua-update-external">
-          <button id="uaUpdateConfigBtn" class="secondary small" type="button">
-            Riesegui Config-generator
-          </button>
-          <span class="hint">
-            (Questo pulsante eseguira il comando "python config-generator.py" su un terminale
-            esterno all'app.)
-          </span>
         </div>
       </div>
     </div>

@@ -558,7 +558,7 @@ export function createDupeCheckTools({
   }
 
   async function runWizardDupeCheck() {
-    const isIntegrated = document.body.dataset.uploadMode !== 'ua';
+    const isIntegrated = true;
     if (!isIntegrated || state.kind === 'tracker') {
       setBlockVisible(false);
       return;

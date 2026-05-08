@@ -1908,6 +1908,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
 
     const descText = buildUploadDescription(form);
     ui.uploadDescText.textContent = descText || '-';
+    refreshUploadDescription();
 
     renderUploadWarnings(buildUploadWarnings(form, settings));
     updateFfmpegHint(settings);
@@ -2026,7 +2027,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         }))
       });
       ui.screensHint.textContent = `Screenshot caricati: ${okImages.length}/${state.screenshots.length}`;
-      ui.uploadDescText.textContent = buildUploadDescription(getFormState());
+      refreshUploadDescription();
       setScreensProgress(1);
       setScreensStage('done');
       // auto-save log nella cartella job
