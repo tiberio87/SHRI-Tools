@@ -275,5 +275,8 @@ export const ui = {
   toast: document.getElementById('toast'),
   appVersion: document.getElementById('appVersion'),
   appHealth: document.getElementById('appHealth'),
-  appHealthTooltip: document.getElementById('appHealthTooltip')
+  appHealthTooltip: document.getElementById('appHealthTooltip'),
+  healthCheckModal: document.getElementById('healthCheckModal'),
+  healthCheckBody: document.getElementById('healthCheckBody'),
+  closeHealthCheckBtn: document.getElementById('closeHealthCheckBtn')
 };

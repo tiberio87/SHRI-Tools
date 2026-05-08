@@ -1423,7 +1423,8 @@ const {
   updateClientSections,
   updateSettingsVisibility,
   applySettingsToUI,
-  getSettings
+  getSettings,
+  openHealthCheckModal
 } = createSettingsTools({
   ui,
   updateTagSuggestion,
@@ -2168,6 +2169,22 @@ if (ui.generateTorrentBtn) {
 
 ui.openSettingsBtn.addEventListener('click', openSettings);
 ui.closeSettingsBtn.addEventListener('click', requestCloseSettings);
+
+// Health Check modal
+ui.appHealth.addEventListener('click', () => openHealthCheckModal());
+if (ui.closeHealthCheckBtn) {
+  ui.closeHealthCheckBtn.addEventListener('click', () => {
+    ui.healthCheckModal?.classList.add('hidden');
+  });
+}
+if (ui.healthCheckModal) {
+  ui.healthCheckModal.addEventListener('click', (event) => {
+    if (event.target.classList.contains('modal-backdrop')) {
+      ui.healthCheckModal.classList.add('hidden');
+    }
+  });
+}
+
 if (ui.openAdvancedSettingsBtn) {
   ui.openAdvancedSettingsBtn.addEventListener('click', openAdvancedSettings);
 }

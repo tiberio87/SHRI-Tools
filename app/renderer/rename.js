@@ -136,7 +136,10 @@ export function createRenameTools(deps) {
       typeof data.source === 'string' &&
       /BLURAY/i.test(data.source) &&
       /2160p/i.test(String(data.resolution || ''));
-    const wantsUhd = data.tokenStyle === 'title' ? data.uhd : uhdFromEncodeBluray;
+    const isTv = isEpisode || isSeason;
+    const wantsUhd = data.tokenStyle === 'title'
+      ? (data.uhd && !isTv)
+      : uhdFromEncodeBluray;
     if (wantsUhd) {
       const sourceHasUhd = typeof data.source === 'string' && /\bUHD\b/i.test(data.source);
       if (!sourceHasUhd) {
