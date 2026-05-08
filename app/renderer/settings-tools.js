@@ -174,89 +174,174 @@ export function createSettingsTools({
   }
 
   function buildIntegratedHealthStatus(settings) {
-    const missingCritical = [];
-    const missingWarn = [];
+    const rows = [];
     const notes = [];
-    const metadataCount = [settings.tmdbKey, settings.tvdbKey, settings.omdbKey].filter(Boolean).length;
 
-    if (metadataCount === 0) {
-      missingWarn.push({
-        label: 'API Metadata',
-        detail: 'Auto-matching non disponibile.'
-      });
-    } else if (metadataCount < 3) {
-      notes.push(`Hai salvato solo ${metadataCount}/3 chiavi metadata. L'Auto-matching potrebbe essere meno efficace.`);
+    // API Metadata
+    const tmdbOk = Boolean(settings.tmdbKey);
+    const tvdbOk = Boolean(settings.tvdbKey);
+    const omdbOk = Boolean(settings.omdbKey);
+    const metadataCount = [tmdbOk, tvdbOk, omdbOk].filter(Boolean).length;
+    rows.push({ section: 'api', label: 'TMDb Key', ok: tmdbOk, optional: false, detail: tmdbOk ? 'Configurata.' : 'Auto-matching film/serie non disponibile.' });
+    rows.push({ section: 'api', label: 'TVDb Key', ok: tvdbOk, optional: true, detail: tvdbOk ? 'Configurata.' : 'Auto-matching serie TV tramite TVDb non disponibile (opzionale).' });
+    rows.push({ section: 'api', label: 'OMDb Key', ok: omdbOk, optional: true, detail: omdbOk ? 'Configurata.' : 'Fallback metadata via IMDb non disponibile (opzionale).' });
+    if (metadataCount > 0 && metadataCount < 3) {
+      notes.push(`Hai ${metadataCount}/3 chiavi metadata. L'auto-matching potrebbe essere meno efficace.`);
     }
 
-    if (!getAnnounceUrlFromSettings(settings)) {
-      missingCritical.push({
-        label: 'Announce PID/URL',
-        detail: 'Necessario per generare il .torrent.'
-      });
+    // API Upload/Immagini
+    const unit3dOk = Boolean(settings.unit3dBaseUrl && settings.unit3dApiKey);
+    const imgbbOk = Boolean(settings.imgbbKey);
+    const ptscreensOk = Boolean(settings.ptscreensKey);
+    const eitherImageOk = imgbbOk || ptscreensOk;
+    rows.push({ section: 'api', label: 'UNIT3D URL + API Key', ok: unit3dOk, optional: false, detail: unit3dOk ? 'Configurati.' : 'Upload automatico, dupe check e analisi tracker non disponibili.' });
+    rows.push({ section: 'api', label: 'imgBB Key', ok: imgbbOk, optional: true, detail: imgbbOk ? `Configurata${settings.imageHostPrimary === 'imgbb' ? ' (host primario)' : ' (fallback)'}.` : 'Host imgBB non configurato (opzionale se PTScreens disponibile).' });
+    rows.push({ section: 'api', label: 'PTScreens Key', ok: ptscreensOk, optional: true, detail: ptscreensOk ? `Configurata${settings.imageHostPrimary === 'ptscreens' ? ' (host primario)' : ' (fallback)'}.` : 'Host PTScreens non configurato (opzionale se imgBB disponibile).' });
+    if (!eitherImageOk) {
+      notes.push('Nessun host immagini configurato: gli screenshot non potranno essere caricati.');
     }
 
-    if (!settings.ffmpegPath) {
-      missingWarn.push({
-        label: 'Percorso FFmpeg',
-        detail: 'Screenshot non generabili.'
-      });
-    }
+    // Eseguibili
+    const ffmpegOk = Boolean(settings.ffmpegPath);
+    const bdinfoOk = Boolean(settings.bdinfoPath);
+    const mkbrrOk = Boolean(settings.torrentMkbrrPath);
+    rows.push({ section: 'exe', label: 'FFmpeg', ok: ffmpegOk, optional: false, detail: ffmpegOk ? settings.ffmpegPath : 'Generazione screenshot non disponibile.' });
+    rows.push({ section: 'exe', label: 'mkbrr', ok: mkbrrOk, optional: true, detail: mkbrrOk ? settings.torrentMkbrrPath : 'Creazione .torrent tramite mkbrr non disponibile (opzionale).' });
+    rows.push({ section: 'exe', label: 'BDInfo', ok: bdinfoOk, optional: true, detail: bdinfoOk ? settings.bdinfoPath : 'Analisi Blu-ray (Full Disc) non disponibile (opzionale).' });
 
-    if (!settings.imgbbKey && !settings.ptscreensKey) {
-      missingWarn.push({
-        label: 'API immagini',
-        detail: 'Screenshot non caricabili.'
-      });
-    }
+    // Configurazione torrent/upload
+    const announceOk = Boolean(getAnnounceUrlFromSettings(settings));
+    const outputDirOk = Boolean(settings.torrentOutputDir);
+    const torrentClientOk = Boolean(
+      (settings.torrentClient === 'qbit' && settings.qbitHost && settings.qbitPort) ||
+      (settings.torrentClient === 'transmission' && settings.transmissionHost && settings.transmissionPort)
+    );
+    rows.push({ section: 'config', label: 'Announce URL / Passkey', ok: announceOk, optional: false, detail: announceOk ? 'Configurato.' : 'Necessario per generare il .torrent.' });
+    rows.push({ section: 'config', label: 'Cartella output .torrent', ok: outputDirOk, optional: false, detail: outputDirOk ? settings.torrentOutputDir : 'Necessaria per salvare .torrent, BBCode e MediaInfo.' });
+    rows.push({ section: 'config', label: 'Client torrent', ok: torrentClientOk, optional: true, detail: torrentClientOk ? `${settings.torrentClient === 'transmission' ? 'Transmission' : 'qBittorrent'} configurato.` : 'Invio automatico .torrent al client non disponibile (opzionale).' });
 
-    if (!settings.unit3dBaseUrl || !settings.unit3dApiKey) {
-      missingWarn.push({
-        label: 'UNIT3D Base URL + API key',
-        detail: 'Upload automatico non disponibile.'
-      });
-    }
-
-    const status = missingCritical.length ? 'red' : missingWarn.length ? 'yellow' : 'green';
-    return { status, missingCritical, missingWarn, notes, mode: 'integrated' };
+    const criticalFail = rows.filter((r) => !r.ok && !r.optional);
+    const warnFail = rows.filter((r) => !r.ok && r.optional);
+    const status = criticalFail.length ? 'red' : warnFail.length ? 'yellow' : 'green';
+    return { status, rows, notes };
   }
 
   function buildAppHealthStatus(settings) {
     return buildIntegratedHealthStatus(settings);
   }
 
+  function renderHealthCheckModal(settings = loadSettings()) {
+    if (!ui.healthCheckBody) return;
+    const report = buildIntegratedHealthStatus(settings);
+    const body = ui.healthCheckBody;
+    body.innerHTML = '';
+
+    // Summary
+    const summary = document.createElement('div');
+    summary.className = 'hc-summary';
+    summary.dataset.status = report.status;
+    const dot = document.createElement('span');
+    dot.className = 'hc-summary-dot';
+    const label = document.createElement('span');
+    label.textContent = report.status === 'green'
+      ? 'Tutto configurato: pronto per rinomina, torrent, screenshot e upload.'
+      : report.status === 'yellow'
+        ? 'Configurazione parziale: alcune funzionalità opzionali non disponibili.'
+        : 'Configurazione incompleta: alcune funzionalità essenziali mancanti.';
+    summary.appendChild(dot);
+    summary.appendChild(label);
+    body.appendChild(summary);
+
+    // Sezioni
+    const sections = [
+      { key: 'api', title: 'API Key' },
+      { key: 'exe', title: 'Eseguibili' },
+      { key: 'config', title: 'Configurazione' }
+    ];
+
+    for (const sec of sections) {
+      const secRows = report.rows.filter((r) => r.section === sec.key);
+      if (!secRows.length) continue;
+      const secEl = document.createElement('div');
+      secEl.className = 'hc-section';
+      const title = document.createElement('div');
+      title.className = 'hc-section-title';
+      title.textContent = sec.title;
+      secEl.appendChild(title);
+      for (const row of secRows) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'hc-row';
+        const icon = document.createElement('div');
+        icon.className = `hc-row-icon ${row.ok ? 'ok' : row.optional ? 'optional' : 'error'}`;
+        icon.textContent = row.ok ? '✓' : row.optional ? '−' : '✕';
+        const info = document.createElement('div');
+        info.className = 'hc-row-info';
+        const lbl = document.createElement('div');
+        lbl.className = 'hc-row-label';
+        lbl.textContent = row.label;
+        const detail = document.createElement('div');
+        detail.className = 'hc-row-detail';
+        detail.textContent = row.detail;
+        info.appendChild(lbl);
+        info.appendChild(detail);
+        rowEl.appendChild(icon);
+        rowEl.appendChild(info);
+        secEl.appendChild(rowEl);
+      }
+      body.appendChild(secEl);
+    }
+
+    if (report.notes.length) {
+      const notes = document.createElement('div');
+      notes.className = 'hc-notes';
+      notes.textContent = report.notes.join(' ');
+      body.appendChild(notes);
+    }
+  }
+
+  function openHealthCheckModal() {
+    if (!ui.healthCheckModal) return;
+    renderHealthCheckModal();
+    ui.healthCheckModal.classList.remove('hidden');
+  }
+
   function updateAppHealthStatus(settings = loadSettings()) {
-    if (!ui.appHealth || !ui.appHealthTooltip) {
+    if (!ui.appHealth) {
       return;
     }
     const report = buildAppHealthStatus(settings);
     ui.appHealth.dataset.status = report.status;
 
-    const tooltip = ui.appHealthTooltip;
-    tooltip.innerHTML = '';
-
-    if (report.status === 'green') {
-      const item = document.createElement('div');
-      item.className = 'item';
-      item.textContent =
-        report.mode === 'ua'
-          ? 'Modalita Upload Assistant pronta.'
-          : 'Tutto configurato: rinomina, torrent, screenshot e upload automatico pronti.';
-      tooltip.appendChild(item);
-    } else {
-      const list = [...report.missingCritical, ...report.missingWarn];
-      list.forEach((entry) => {
+    if (ui.appHealthTooltip) {
+      const tooltip = ui.appHealthTooltip;
+      tooltip.innerHTML = '';
+      if (report.status === 'green') {
         const item = document.createElement('div');
         item.className = 'item';
-        item.innerHTML = `<strong>${entry.label}</strong>: ${entry.detail}`;
+        item.textContent = 'Tutto configurato. Clicca per i dettagli.';
         tooltip.appendChild(item);
-      });
-    }
-
-    if (report.notes.length) {
-      const note = document.createElement('div');
-      note.className = 'note';
-      note.textContent = report.notes.join(' ');
-      tooltip.appendChild(note);
+      } else {
+        const failRows = report.rows.filter((r) => !r.ok && !r.optional);
+        const warnRows = report.rows.filter((r) => !r.ok && r.optional);
+        [...failRows, ...warnRows].slice(0, 4).forEach((row) => {
+          const item = document.createElement('div');
+          item.className = 'item';
+          item.innerHTML = `<strong>${row.label}</strong>: ${row.detail}`;
+          tooltip.appendChild(item);
+        });
+        if (failRows.length + warnRows.length > 4) {
+          const more = document.createElement('div');
+          more.className = 'note';
+          more.textContent = 'Clicca per vedere tutti i dettagli.';
+          tooltip.appendChild(more);
+        }
+      }
+      if (report.notes.length) {
+        const note = document.createElement('div');
+        note.className = 'note';
+        note.textContent = report.notes.join(' ');
+        tooltip.appendChild(note);
+      }
     }
 
     ui.appHealth.setAttribute('aria-label', `Stato app: ${report.status}`);
@@ -521,6 +606,7 @@ export function createSettingsTools({
     updateClientSections,
     buildAppHealthStatus,
     updateAppHealthStatus,
+    openHealthCheckModal,
     updateSettingsVisibility,
     applySettingsToUI,
     getSettings
