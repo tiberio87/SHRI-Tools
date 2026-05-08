@@ -1206,8 +1206,15 @@ function updateFormatServiceSuggest() {
     return;
   }
   const nameFormat = detectFormatFromName(baseName);
-  const serviceCodes = buildServiceOptions(settings).map((item) => item.code);
+  const serviceOptions = buildServiceOptions(settings);
+  const serviceCodes = serviceOptions.map((item) => item.code);
   const service = extractTokensPresent(baseName, serviceCodes)[0] || '';
+  if (service && ui.serviceInput && ui.serviceInputBtn) {
+    const serviceOpt = serviceOptions.find((item) => item.code === service);
+    if (serviceOpt) {
+      setDropdownAuto(ui.serviceInput, ui.serviceInputBtn, service, `${serviceOpt.label} (${serviceOpt.code})`);
+    }
+  }
   const sourceFromName = detectSourceFromName(baseName);
   let source = sourceFromName;
   const repack = detectRepackFromName(baseName);
