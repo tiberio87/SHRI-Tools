@@ -16,13 +16,11 @@ const DEFAULT_SETTINGS = {
   renameOmitNoGroupInPaths: false,
   autoApplyNameSuggestions: false,
   bdinfoPath: '',
-  uploadMode: 'ua',
   torrentPasskey: '',
   torrentAnnounceUrl: '',
   torrentOutputDir: '',
   torrentMkbrrPath: '',
   torrentMkbrrWorkers: 1,
-  uploadAssistantPath: '',
   torrentPrivate: true,
   ffmpegPath: '',
   screenshotsCount: 6,
@@ -68,12 +66,6 @@ export function createSettingsTools({
   updateServiceOptions,
   schedulePreview
 }) {
-  let uaUpdateAvailable = null;
-
-  function setUaUpdateAvailable(value) {
-    uaUpdateAvailable = value;
-  }
-
   function extractPasskeyFromAnnounce(url) {
     if (!url) {
       return '';
@@ -228,35 +220,7 @@ export function createSettingsTools({
     return { status, missingCritical, missingWarn, notes, mode: 'integrated' };
   }
 
-  function buildUaHealthStatus(settings) {
-    const missingCritical = [];
-    const missingWarn = [];
-    const notes = [];
-
-    if (!settings.uploadAssistantPath) {
-      missingCritical.push({
-        label: 'Percorso Upload Assistant',
-        detail: 'Necessario per usare la modalita Upload Assistant.'
-      });
-    } else {
-      notes.push('Percorso UA configurato. Apri il pannello per i dettagli del config.');
-    }
-
-    if (uaUpdateAvailable === true) {
-      missingWarn.push({
-        label: 'Aggiornamenti UA',
-        detail: 'Aggiornamento disponibile.'
-      });
-    }
-
-    const status = missingCritical.length ? 'red' : missingWarn.length ? 'yellow' : 'green';
-    return { status, missingCritical, missingWarn, notes, mode: 'ua' };
-  }
-
   function buildAppHealthStatus(settings) {
-    if (settings?.uploadMode === 'ua') {
-      return buildUaHealthStatus(settings);
-    }
     return buildIntegratedHealthStatus(settings);
   }
 
@@ -298,12 +262,9 @@ export function createSettingsTools({
     ui.appHealth.setAttribute('aria-label', `Stato app: ${report.status}`);
   }
 
-  function updateSettingsVisibility(settings = loadSettings()) {
-    const mode = settings?.uploadMode === 'ua' ? 'ua' : 'integrated';
+  function updateSettingsVisibility() {
     document.querySelectorAll('[data-settings-scope]').forEach((block) => {
-      const scope = block.dataset.settingsScope || 'all';
-      const isVisible = scope === 'all' || scope === mode;
-      block.classList.toggle('hidden', !isVisible);
+      block.classList.remove('hidden');
     });
     if (ui.openAdvancedSettingsBtn) {
       ui.openAdvancedSettingsBtn.classList.remove('hidden');
@@ -457,9 +418,6 @@ export function createSettingsTools({
     if (ui.settingsBdinfoPathInput) {
       ui.settingsBdinfoPathInput.value = settings.bdinfoPath || '';
     }
-    if (ui.settingsUploadAssistantPathInput) {
-      ui.settingsUploadAssistantPathInput.value = settings.uploadAssistantPath || '';
-    }
     if (ui.settingsTorrentPrivateToggle) {
       ui.settingsTorrentPrivateToggle.checked = settings.torrentPrivate !== false;
     }
@@ -515,7 +473,6 @@ export function createSettingsTools({
       screenshotsCount: parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6,
       imageHostPrimary: ui.imageHostPrimarySelect?.value || 'imgbb',
       imageHostFallback: ui.imageHostFallbackSelect?.value || 'ptscreens',
-      uploadMode: stored.uploadMode || document.body?.dataset?.uploadMode || 'ua',
       unit3dBaseUrl: ui.unit3dBaseUrlInput?.value.trim() || 'https://shareisland.org',
       unit3dApiKey: ui.unit3dApiKeyInput?.value.trim() || '',
       unit3dAnonymous: Boolean(ui.unit3dAnonymousToggle?.checked),
@@ -549,7 +506,6 @@ export function createSettingsTools({
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
       torrentMkbrrPath: ui.settingsMkbrrPathInput?.value.trim() || '',
       torrentMkbrrWorkers: mkbrrWorkers,
-      uploadAssistantPath: ui.settingsUploadAssistantPathInput?.value.trim() || '',
       torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked)
     };
   }
@@ -560,7 +516,6 @@ export function createSettingsTools({
     getAnnounceUrlFromSettings,
     loadSettings,
     saveSettings,
-    setUaUpdateAvailable,
     updateFfmpegHint,
     updateQbitMappingHint,
     updateClientSections,
