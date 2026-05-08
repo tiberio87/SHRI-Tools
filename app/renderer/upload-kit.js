@@ -1,6 +1,6 @@
 // Upload wizard/integrated mode: build payloads, BBCode, and Unit3D upload flow.
 import { ui } from './dom.js';
-import { state } from './state.js';
+import { state, debugState } from './state.js';
 import {
   UNIT3D_CATEGORY_ID,
   SHRI_TYPE_ID,
@@ -2128,8 +2128,19 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         if (jobDir) {
           const safeTitle = buildTrackerTorrentFilename().replace(/\.torrent$/, '');
           const sep = jobDir.includes('\\') ? '\\' : '/';
-          const result = await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}${safeTitle}.txt`, content });
-          if (result?.saved) showToast('BBCode salvato nella cartella job.', 'success');
+          const saves = [
+            window.api?.saveFileDirect({ filePath: `${jobDir}${sep}${safeTitle}.txt`, content })
+          ];
+          const miText = uploadMiFullCache && uploadMiFullCache !== 'Caricamento...' ? uploadMiFullCache : null;
+          if (miText) {
+            saves.push(window.api?.saveFileDirect({ filePath: `${jobDir}${sep}mediainfo.txt`, content: miText }));
+          }
+          const logContent = debugState.buffer.length ? debugState.buffer.join('\n') : null;
+          if (logContent) {
+            saves.push(window.api?.saveFileDirect({ filePath: `${jobDir}${sep}debug-log.txt`, content: logContent }));
+          }
+          await Promise.all(saves);
+          showToast('BBCode, MediaInfo e log salvati nella cartella job.', 'success');
         } else {
           const result = await window.api?.saveFile({ defaultName: 'bbcode.txt', content });
           if (result?.saved) showToast('BBCode salvato.', 'success');
