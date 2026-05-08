@@ -956,6 +956,29 @@ async function updateAppVersionLabel() {
   }
 }
 
+async function checkForAppUpdate() {
+  if (!window.api?.checkUpdate) return;
+  try {
+    const result = await window.api.checkUpdate();
+    if (!result?.hasUpdate) return;
+    const banner = document.getElementById('updateBanner');
+    if (!banner) return;
+    const text = document.getElementById('updateBannerText');
+    const dlBtn = document.getElementById('updateBannerDownload');
+    const dismissBtn = document.getElementById('updateBannerDismiss');
+    if (text) text.textContent = `Nuova versione ${result.latestVersion} disponibile`;
+    if (dlBtn && result.releaseUrl) {
+      dlBtn.addEventListener('click', () => window.api.openExternal(result.releaseUrl));
+    }
+    if (dismissBtn) {
+      dismissBtn.addEventListener('click', () => banner.classList.add('hidden'));
+    }
+    banner.classList.remove('hidden');
+  } catch {
+    // silenzioso — il check fallisce senza disturbare l'utente
+  }
+}
+
 function closeRulesModal() {
   ui.rulesModal.classList.add('hidden');
 }
@@ -2941,6 +2964,7 @@ updateVisibility();
 updateVideoCodecMenu();
 refreshPreview();
 updateAppVersionLabel();
+checkForAppUpdate();
 uaMode?.updateUaControlsState?.();
 
 logDebug('Renderer loaded');

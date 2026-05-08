@@ -2,7 +2,7 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.themoviedb.org https://www.omdbapi.com https://api4.thetvdb.com; img-src 'self' data: https:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://api.themoviedb.org https://www.omdbapi.com https://api4.thetvdb.com https://api.github.com; img-src 'self' data: https:; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com;" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SHRI - Tools</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -38,6 +38,12 @@
         </button>
       </div>
     </header>
+
+    <div id="updateBanner" class="update-banner hidden">
+      <span id="updateBannerText" class="update-banner-text"></span>
+      <button id="updateBannerDownload" class="update-banner-btn" type="button">Scarica</button>
+      <button id="updateBannerDismiss" class="update-banner-dismiss" type="button" aria-label="Chiudi">✕</button>
+    </div>
 
     <div class="content-grid">
       <div class="left-stack">

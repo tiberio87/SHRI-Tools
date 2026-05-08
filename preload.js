@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('api', {
   transmissionTest: (payload) => ipcRenderer.invoke('transmission-test', payload),
   generateScreenshots: (payload) => ipcRenderer.invoke('generate-screenshots', payload),
   getAppVersion: () => ipcRenderer.invoke('app-version'),
+  checkUpdate: () => ipcRenderer.invoke('check-update'),
   uaStart: (payload) => ipcRenderer.invoke('ua-start', payload),
   uaSendInput: (text) => ipcRenderer.invoke('ua-input', text),
   uaStop: () => ipcRenderer.invoke('ua-stop'),
