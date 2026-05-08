@@ -183,10 +183,10 @@ function extractAudioCodecFromName(name) {
   if (/\bDTS\b/.test(upper)) {
     return 'DTS';
   }
-  if (/DD\+/.test(upper) || /\bDDP\b/.test(upper) || /\bEAC3\b/.test(upper) || /\bE-AC-3\b/.test(upper)) {
+  if (/DD\+/.test(upper) || /\bDDP(?:\b|[0-9])/.test(upper) || /\bEAC3\b/.test(upper) || /\bE-AC-3\b/.test(upper)) {
     return 'DD+';
   }
-  if (/\bDD\b/.test(upper) || /\bAC3\b/.test(upper)) {
+  if (/\bDD(?:\b|[0-9])/.test(upper) || /\bAC3\b/.test(upper)) {
     return 'DD';
   }
   if (/\bAAC\b/.test(upper)) {
@@ -205,8 +205,13 @@ function extractAudioCodecFromName(name) {
 }
 
 function extractAudioChannelsFromName(name) {
-  const match = String(name || '').match(/\b([1-7]\.[01])\b/);
-  return match ? match[1] : '';
+  const s = String(name || '');
+  // Caso standard: separatore prima del numero canale (DDP.5.1, TRUEHD.7.1)
+  const strict = s.match(/\b([1-7]\.[01])\b/);
+  if (strict) return strict[1];
+  // Fallback: numero canale attaccato al codec senza separatore (DDP5.1, DD5.1)
+  const loose = s.match(/(?:DDP|DD\+?|EAC3|TRUEHD|DTS)([1-7]\.[01])/i);
+  return loose ? loose[1] : '';
 }
 
 function extractTokensPresent(name, tokens) {
