@@ -2327,9 +2327,13 @@ if (ui.generateTorrentBtn) {
     const announce = getAnnounceUrlFromSettings(settings);
     let outputDir = '';
     if (baseOutputDir) {
+      const safeTitle = outputName
+        .replace(/[\\/:*?"<>|]+/g, '')
+        .replace(/\s+/g, '.')
+        .replace(/\.+$/g, '') || 'job';
       const separator = baseOutputDir.includes('\\') ? '\\' : '/';
       const trimmed = baseOutputDir.replace(/[\\/]+$/, '');
-      outputDir = `${trimmed}${separator}app_generated`;
+      outputDir = `${trimmed}${separator}${safeTitle}`;
     }
 
     if (!announce) {
@@ -2382,6 +2386,7 @@ if (ui.generateTorrentBtn) {
       setTorrentGeneratorHint(result.generator || (settings.torrentMkbrrPath ? 'mkbrr' : 'node'));
       setTorrentProgress(1);
       setTorrentStage('done');
+      uploadKit.saveMediaInfoToJobDir?.();
     } else {
       setHint(ui.torrentHint, result?.error || 'Errore nella generazione.');
       resetTorrentProgress();
@@ -2681,6 +2686,14 @@ ui.clearDebugBtn.addEventListener('click', () => {
   debugState.buffer = [];
   updateDebugLogView();
 });
+if (ui.saveDebugBtn) {
+  ui.saveDebugBtn.addEventListener('click', async () => {
+    const content = debugState.buffer.length ? debugState.buffer.join('\n') : '';
+    if (!content) return;
+    const stamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    await window.api?.saveFile({ defaultName: `shri-log-${stamp}.txt`, content });
+  });
+}
 ui.debugModal.addEventListener('click', (event) => {
   if (event.target.classList.contains('modal-backdrop')) {
     closeDebugModal();

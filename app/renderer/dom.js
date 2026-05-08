@@ -28,6 +28,7 @@ export const ui = {
   debugLogText: document.getElementById('debugLogText'),
   closeDebugBtn: document.getElementById('closeDebugBtn'),
   clearDebugBtn: document.getElementById('clearDebugBtn'),
+  saveDebugBtn: document.getElementById('saveDebugBtn'),
   selectFileBtn: document.getElementById('selectFileBtn'),
   selectFolderBtn: document.getElementById('selectFolderBtn'),
   trackerOpenBtn: document.getElementById('trackerOpenBtn'),
