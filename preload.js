@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
   getAppVersion: () => ipcRenderer.invoke('app-version'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   saveFile: (payload) => ipcRenderer.invoke('save-file', payload),
+  saveFileDirect: (payload) => ipcRenderer.invoke('save-file-direct', payload),
   uaStart: (payload) => ipcRenderer.invoke('ua-start', payload),
   uaSendInput: (text) => ipcRenderer.invoke('ua-input', text),
   uaStop: () => ipcRenderer.invoke('ua-stop'),

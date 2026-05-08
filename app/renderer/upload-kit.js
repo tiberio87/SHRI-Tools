@@ -613,14 +613,18 @@ export function createUploadKit(deps) {
     return Boolean(settings?.qbitHost && settings?.qbitUsername && settings?.qbitPassword);
   }
 
-  function buildTrackerOutputDir(settings) {
+  function buildTrackerOutputDir(settings, title) {
     const baseDir = String(settings?.torrentOutputDir || '').trim();
     if (!baseDir) {
       return '';
     }
+    const safeTitle = String(title || 'job')
+      .replace(/[\\/:*?"<>|]+/g, '')
+      .replace(/\s+/g, '.')
+      .replace(/\.+$/g, '') || 'job';
     const separator = baseDir.includes('\\') ? '\\' : '/';
     const trimmed = baseDir.replace(/[\\/]+$/, '');
-    return `${trimmed}${separator}tracker_generated`;
+    return `${trimmed}${separator}${safeTitle}`;
   }
 
   function openPostUploadModal(result, settings) {
@@ -629,7 +633,7 @@ export function createUploadKit(deps) {
     }
     reopenMode = false;
     lastUploadDownloadUrl = extractDownloadUrl(result);
-    const outputDir = buildTrackerOutputDir(settings);
+    const outputDir = buildTrackerOutputDir(settings, buildUploadTitle().title);
     if (ui.downloadTrackerTorrentBtn) {
       ui.downloadTrackerTorrentBtn.disabled = !lastUploadDownloadUrl || !outputDir;
     }
@@ -661,7 +665,7 @@ export function createUploadKit(deps) {
     const settings = loadSettings();
     lastUploadDownloadUrl = last.downloadUrl || '';
     lastTrackerTorrentPath = last.torrentPath || '';
-    const outputDir = buildTrackerOutputDir(settings);
+    const outputDir = buildTrackerOutputDir(settings, last.title || '');
     if (ui.downloadTrackerTorrentBtn) {
       ui.downloadTrackerTorrentBtn.disabled = !lastUploadDownloadUrl || !outputDir;
     }
@@ -692,7 +696,7 @@ export function createUploadKit(deps) {
     const settings = loadSettings();
     const baseUrl = settings.unit3dBaseUrl || '';
     const apiKey = settings.unit3dApiKey || '';
-    const outputDir = buildTrackerOutputDir(settings);
+    const outputDir = buildTrackerOutputDir(settings, buildUploadTitle().title);
     if (!baseUrl || !apiKey) {
       showToast('Imposta Base URL e API key UNIT3D.', 'warning');
       return;
@@ -749,9 +753,9 @@ export function createUploadKit(deps) {
 
   async function openTrackerOutputFolder() {
     const settings = loadSettings();
-    const outputDir = buildTrackerOutputDir(settings);
+    const outputDir = buildTrackerOutputDir(settings, buildUploadTitle().title);
     if (!outputDir) {
-      showToast('Imposta la cartella output .torrent.', 'warning');
+      showToast('Imposta la cartella output job nelle impostazioni.', 'warning');
       return;
     }
     if (!window.api?.openPath) {
@@ -1983,7 +1987,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       isDisc: isFullDisc(form),
       category: form.type || 'Movie',
       seekMode,
-      skipFrame
+      skipFrame,
+      screensOutputDir: buildTrackerOutputDir(settings, buildUploadTitle().title)
     };
     const result = await window.api.generateScreenshots(payload);
     if (result?.ok) {
@@ -2118,8 +2123,17 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       ui.saveUploadDescBtn.addEventListener('click', async () => {
         const content = ui.uploadDescText?.textContent || '';
         if (!content || content === '-') return;
-        const result = await window.api?.saveFile({ defaultName: 'bbcode.txt', content });
-        if (result?.saved) showToast('BBCode salvato.', 'success');
+        const settings = loadSettings();
+        const jobDir = buildTrackerOutputDir(settings, buildUploadTitle().title);
+        if (jobDir) {
+          const safeTitle = buildTrackerTorrentFilename().replace(/\.torrent$/, '');
+          const sep = jobDir.includes('\\') ? '\\' : '/';
+          const result = await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}${safeTitle}.txt`, content });
+          if (result?.saved) showToast('BBCode salvato nella cartella job.', 'success');
+        } else {
+          const result = await window.api?.saveFile({ defaultName: 'bbcode.txt', content });
+          if (result?.saved) showToast('BBCode salvato.', 'success');
+        }
       });
     }
     if (ui.uploadReleaseNotesInput) {

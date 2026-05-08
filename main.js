@@ -1973,6 +1973,14 @@ ipcMain.handle('save-file', async (_event, { defaultName, content }) => {
   return { saved: true, filePath };
 });
 
+ipcMain.handle('save-file-direct', async (_event, { filePath: targetPath, content }) => {
+  const safe = String(targetPath || '').trim();
+  if (!safe) return { saved: false };
+  await fs.mkdir(path.dirname(safe), { recursive: true });
+  await fs.writeFile(safe, content, 'utf8');
+  return { saved: true, filePath: safe };
+});
+
 function compareVersions(a, b) {
   const pa = String(a).split('.').map(Number);
   const pb = String(b).split('.').map(Number);
@@ -2031,7 +2039,10 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
   }
 
   const outputDir = path.join(app.getPath('temp'), 'shri-tools', 'screenshots', String(Date.now()));
-  await fs.mkdir(outputDir, { recursive: true });
+  const screensOutputDir = String(payload?.screensOutputDir || '').trim();
+  const useJobDir = Boolean(screensOutputDir);
+  const effectiveOutputDir = useJobDir ? screensOutputDir : outputDir;
+  await fs.mkdir(effectiveOutputDir, { recursive: true });
 
   sendProgress({
     stage: 'debug',
@@ -2109,7 +2120,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
     for (const time of times) {
       index += 1;
       const fileName = `shot_${String(index).padStart(2, '0')}.png`;
-      const filePath = path.join(outputDir, fileName);
+      const filePath = path.join(effectiveOutputDir, fileName);
       const options = {
         scaleWidth: needsScale ? scaledWidth : 0,
         scaleHeight: needsScale ? scaledHeight : 0,
@@ -2180,7 +2191,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
           message: `[screens:upload:ok] #${index} host=${upload.host} url="${upload.displayUrl || upload.rawUrl || ''}"`
         });
         try {
-          await fs.unlink(filePath);
+          if (!useJobDir) await fs.unlink(filePath);
         } catch {}
       } else {
         sendProgress({
@@ -2213,8 +2224,20 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       stage: 'debug',
       message: `[screens:done] ok=${okCount}/${images.length} tonemapped=${tonemapApplied}`
     });
+
+    if (useJobDir) {
+      const urlLines = images
+        .filter((img) => img.ok && (img.displayUrl || img.rawUrl))
+        .map((img, i) => `[${i + 1}] ${img.displayUrl || img.rawUrl}${img.viewerUrl ? `  viewer: ${img.viewerUrl}` : ''}`);
+      if (urlLines.length) {
+        try {
+          await fs.writeFile(path.join(effectiveOutputDir, 'screens-urls.txt'), urlLines.join('\n'), 'utf8');
+        } catch {}
+      }
+    }
+
     sendProgress({ progress: 1, stage: 'done', current: totalShots, total: totalShots });
-    return { ok: true, outputDir, images, tonemapped: tonemapApplied };
+    return { ok: true, outputDir: effectiveOutputDir, images, tonemapped: tonemapApplied };
   } catch (error) {
     sendProgress({ stage: 'debug', message: `[screens:fatal] ${error.message || error}` });
     sendProgress({ stage: 'error', error: String(error) });
