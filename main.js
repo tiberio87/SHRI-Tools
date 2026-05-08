@@ -1962,6 +1962,32 @@ ipcMain.handle('select-any-file', async () => {
 
 ipcMain.handle('app-version', () => app.getVersion());
 
+function compareVersions(a, b) {
+  const pa = String(a).split('.').map(Number);
+  const pb = String(b).split('.').map(Number);
+  for (let i = 0; i < 3; i++) {
+    const diff = (pa[i] || 0) - (pb[i] || 0);
+    if (diff !== 0) return diff;
+  }
+  return 0;
+}
+
+ipcMain.handle('check-update', async () => {
+  try {
+    const resp = await fetch('https://api.github.com/repos/tiberio87/SHRI-Tools/releases/latest', {
+      headers: { 'User-Agent': 'SHRI-Tools-updater' }
+    });
+    if (!resp.ok) return { hasUpdate: false };
+    const data = await resp.json();
+    const latest = String(data.tag_name || '').replace(/^v/, '');
+    const current = app.getVersion();
+    const hasUpdate = latest && compareVersions(latest, current) > 0;
+    return { hasUpdate: !!hasUpdate, latestVersion: latest, releaseUrl: data.html_url || '' };
+  } catch {
+    return { hasUpdate: false };
+  }
+});
+
 ipcMain.handle('generate-screenshots', async (_event, payload) => {
   const videoPath = payload?.videoPath || '';
   const ffmpegPath = payload?.ffmpegPath || '';
