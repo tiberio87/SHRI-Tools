@@ -302,6 +302,9 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
 
   const upperName = String(baseName || '').toUpperCase();
   const nameHasWeb = /\bWEB\b/.test(upperName);
+  // Distingue WEB-DL esplicito da generico WEB/WEBRip: i servizi streaming (HMAX, NF, ecc.)
+  // codificano alla fonte, quindi i loro file sono WEB-DL puri anche se MediaInfo mostra x264.
+  const nameHasWebDL = /\bWEB[-.\s]?DL\b/.test(upperName);
   const serviceUpper = String(service || '').toUpperCase();
   const sourceUpper = String(source || '').toUpperCase();
   const sourceIsBluRay = sourceUpper.includes('BLURAY') || sourceUpper.includes('BLU-RAY');
@@ -311,6 +314,7 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
 
   Object.assign(debugInfo, {
     nameHasWeb,
+    nameHasWebDL,
     serviceUpper,
     sourceUpper,
     sourceIsBluRay,
@@ -376,6 +380,14 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
     });
   }
   if (encodingSettings.includes('crf=')) {
+    if (nameHasWebDL && serviceUpper) {
+      return withDebug({
+        value: 'WEB-DL',
+        reason: 'Rilevato dal parsing del nome file: WEB-DL + servizio streaming (CRF alla fonte)',
+        source: '',
+        sourceReason: ''
+      });
+    }
     return withDebug({
       value: nameHasWeb || serviceUpper ? 'WEBRip' : 'Encode',
       reason: 'Rilevato dal parsing MediaInfo: CRF rilevato',
@@ -384,6 +396,14 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
     });
   }
   if (serviceUpper === 'CR') {
+    if (nameHasWebDL) {
+      return withDebug({
+        value: 'WEB-DL',
+        reason: 'Rilevato dal parsing del nome file: WEB-DL esplicito (Crunchyroll streaming source)',
+        source: '',
+        sourceReason: ''
+      });
+    }
     if (fingerprintLibrary.includes('core 142')) {
       return withDebug({
         value: 'WEB-DL',
@@ -424,6 +444,16 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
     });
   }
   if (nameHasWeb) {
+    // Se il filename ha sia WEB-DL che un codice servizio (NF, HMAX, CR, ecc.) → WEB-DL definitivo.
+    // Il servizio nel nome è il discriminatore: i file senza servizio seguono la logica normale.
+    if (nameHasWebDL && serviceUpper) {
+      return withDebug({
+        value: 'WEB-DL',
+        reason: 'Rilevato dal parsing del nome file: WEB-DL + servizio streaming',
+        source: '',
+        sourceReason: ''
+      });
+    }
     if (hasEncodingTools) {
       return withDebug({
         value: 'WEBRip',
@@ -441,10 +471,10 @@ function detectFormatFromMediaInfo(mediaInfo, baseName, { service, source } = {}
       });
     }
   }
-  if (serviceUpper && !hasEncode) {
+  if (serviceUpper && (!hasEncode || !hasEncodingTools)) {
     return withDebug({
       value: 'WEB-DL',
-      reason: 'Rilevato dal parsing MediaInfo: servizio presente senza encoding',
+      reason: 'Rilevato dal parsing MediaInfo: servizio streaming senza tool di encoding',
       source: '',
       sourceReason: ''
     });
