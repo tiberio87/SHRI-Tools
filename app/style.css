@@ -1995,12 +1995,12 @@ body.light .badge.error {
 }
 
 #uploadWizardModal .modal-content {
-  height: min(84vh, 760px);
+  height: calc(100vh - 24px);
   max-height: none;
   overflow: hidden;
   gap: 0;
   padding: 0;
-  width: min(980px, 96vw);
+  width: calc(100vw - 24px);
 }
 
 #uploadWizardModal .modal-header {
@@ -2372,6 +2372,27 @@ body.light .badge.error {
 
 .text-output-compact {
   max-height: 36vh;
+}
+
+textarea.text-output {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  white-space: pre;
+  overflow-wrap: normal;
+  cursor: default;
+  outline: none;
+  display: block;
+}
+
+textarea.text-output:not([readonly]) {
+  border-color: var(--accent);
+  cursor: text;
+  resize: vertical;
+}
+
+#uploadDescText {
+  min-height: 36vh;
 }
 
 .bbcode-preview {
