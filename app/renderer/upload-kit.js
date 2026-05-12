@@ -1166,15 +1166,20 @@ export function createUploadKit(deps) {
 
   function buildReleaseNotesSection(form) {
     const tag = (form.tag || '').replace(/^-/, '').trim();
-    const tonemapNote = state.screenshotsMeta?.tonemapped ? 'Screenshot tonemappati (HDR -> SDR).' : '';
+    const tonemapNote = (state.screenshotsMeta?.tonemapped || form.dv || form.hdr || form.hdr10plus)
+      ? 'Screenshot tonemappati (HDR -> SDR).'
+      : '';
     const manualNotes = ui.uploadReleaseNotesInput?.value.trim();
     const isIsland = tag.toLowerCase() === 'island';
     // Nota repack stagione TV (solo se non ci sono note manuali)
     if (isSeasonRepack && !manualNotes) {
       const folderName = repackFolderName || 'NOME CARTELLA';
       const repackNote = `Questo è il RE-PACK della stagione completa, se avete scaricato le puntate singole vi basterà creare una cartella nominarla "${folderName}" inserire al suo interno le puntate che avete, a questo punto scaricate il file torrent e fategli riconoscere la cartella appena creata, il client farà il re-check e cosi facendovi riemetterete in seed senza dover riscaricare nulla.`;
-      const notesContent = tonemapNote ? `${repackNote}\n${tonemapNote}` : repackNote;
-      return `[size=13][b][color=#e8024b]--- RELEASE NOTES ---[/color][/b][/size]\n[size=11][color=#FFFFFF]${notesContent}[/color][/size]`;
+      const islandNote = isIsland
+        ? 'Release Shareisland 🏴‍☠️\nFalla girare, condividila e contribuisci a mantenerla viva restando in seed il più possibile.\nGrazie per il supporto!'
+        : '';
+      const parts = [repackNote, islandNote, tonemapNote].filter(Boolean);
+      return `[size=13][b][color=#e8024b]--- RELEASE NOTES ---[/color][/b][/size]\n[size=11][color=#FFFFFF]${parts.join('\n')}[/color][/size]`;
     }
     const baseNotes = manualNotes || (isIsland
       ? 'Release Shareisland 🏴‍☠️\nFalla girare, condividila e contribuisci a mantenerla viva restando in seed il più possibile.\nGrazie per il supporto!'
