@@ -39,7 +39,8 @@ export function createUploadKit(deps) {
     openConfirmModal,
     setHint,
     showToast,
-    updateFfmpegHint
+    updateFfmpegHint,
+    onUploadTitleChange
   } = deps;
 
   let uploadMiMode = 'short';
@@ -2107,6 +2108,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         ui.editUploadTitleBtn.setAttribute('aria-label', 'Modifica titolo upload');
         ui.editUploadTitleBtn.title = 'Modifica titolo';
         syncUploadTitleOverride(ui.uploadTitleInput.value);
+        onUploadTitleChange?.();
       });
     }
 
@@ -2116,6 +2118,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
           return;
         }
         syncUploadTitleOverride(ui.uploadTitleInput.value);
+        onUploadTitleChange?.();
       });
     }
 
@@ -2310,6 +2313,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     buildScreensBbcode,
     buildUploadDescription,
     buildUploadWarnings,
+    buildUploadTitle,
     closeUploadKitModal,
     generateScreenshots,
     initUploadKitEvents,
@@ -2317,6 +2321,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     prepareUploadKitStep,
     refreshUploadDescription,
     renderScreensList,
-    saveMediaInfoToJobDir
+    saveMediaInfoToJobDir,
+    syncUploadTitleOverride
   };
 }
