@@ -1998,11 +1998,29 @@ setupSourceDragDrop({ ui, showToast, loadPath });
 
 if (ui.applyNameSuggestBtn) {
   ui.applyNameSuggestBtn.addEventListener('click', () => {
-    const format = ui.applyNameSuggestBtn.dataset.format || '';
-    const service = ui.applyNameSuggestBtn.dataset.service || '';
-    const source = ui.applyNameSuggestBtn.dataset.source || '';
-    const repack = ui.applyNameSuggestBtn.dataset.repack || '';
-    applyNameSuggestions(format, service, source, repack);
+    // Reset flag manual su tutti i campi rilevabili automaticamente
+    [
+      ui.resolutionInput,
+      ui.videoCodecInput,
+      ui.audioCodecInput,
+      ui.audioChannelsInput,
+      ui.audioMetaInput,
+      ui.languageTagInput,
+      ui.formatSelect,
+      ui.sourceInput,
+      ui.serviceInput,
+      ui.repackSelect
+    ].forEach((input) => {
+      if (input) {
+        input.dataset.manual = 'false';
+        input.dataset.auto = 'false';
+      }
+    });
+    // Re-applica i dati MediaInfo (codec, risoluzione, audio, lingua)
+    metadataTools.fillFromMediaInfo();
+    // Forza re-apply suggerimenti formato/servizio/sorgente azzerando la chiave cache
+    state.lastAutoSuggestKey = null;
+    updateFormatServiceSuggest();
   });
 }
 
