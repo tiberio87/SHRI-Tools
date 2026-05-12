@@ -1631,7 +1631,8 @@ const renameFlow = createRenameFlow({
   updateFormatServiceSuggest,
   getMediaInfoText: (path) => window.api.getMediaInfoText(path),
   previewRename: (payload) => window.api.previewRename(payload),
-  copyToClipboard
+  copyToClipboard,
+  refreshMainUploadTitle: () => refreshMainUploadTitle()
 });
 
 ({ refreshPreview, schedulePreview, showMediaInfoReport } = renameFlow);
@@ -1971,9 +1972,70 @@ const uploadKit = createUploadKit({
   openConfirmModal,
   setHint,
   showToast,
-  updateFfmpegHint
+  updateFfmpegHint,
+  onUploadTitleChange: () => refreshMainUploadTitle()
 });
 uploadKit.initUploadKitEvents();
+
+// ===== Titolo Upload (pagina principale) =====
+function refreshMainUploadTitle() {
+  if (!ui.mainUploadTitleInput) {
+    return;
+  }
+  const { title, overridden } = uploadKit.buildUploadTitle();
+  // Non sovrascrivere se l'utente sta editando direttamente il campo
+  if (ui.mainUploadTitleInput.dataset.editing === 'true') {
+    return;
+  }
+  ui.mainUploadTitleInput.value = title || '-';
+  if (ui.mainUploadTitleHint) {
+    ui.mainUploadTitleHint.textContent = overridden ? 'Titolo modificato manualmente.' : '';
+  }
+}
+
+if (ui.copyMainUploadTitleBtn) {
+  ui.copyMainUploadTitleBtn.addEventListener('click', () => {
+    copyToClipboard(ui.mainUploadTitleInput?.value || '', 'Titolo copiato.');
+  });
+}
+
+if (ui.editMainUploadTitleBtn && ui.mainUploadTitleInput) {
+  ui.editMainUploadTitleBtn.addEventListener('click', () => {
+    const isEditing = ui.mainUploadTitleInput.dataset.editing === 'true';
+    if (!isEditing) {
+      ui.mainUploadTitleInput.readOnly = false;
+      ui.mainUploadTitleInput.dataset.editing = 'true';
+      ui.mainUploadTitleInput.classList.add('editing');
+      ui.editMainUploadTitleBtn.classList.add('editing');
+      ui.editMainUploadTitleBtn.setAttribute('aria-label', 'Blocca titolo upload');
+      ui.editMainUploadTitleBtn.title = 'Blocca titolo';
+      ui.mainUploadTitleInput.focus();
+      ui.mainUploadTitleInput.select();
+      return;
+    }
+    ui.mainUploadTitleInput.readOnly = true;
+    ui.mainUploadTitleInput.dataset.editing = 'false';
+    ui.mainUploadTitleInput.classList.remove('editing');
+    ui.editMainUploadTitleBtn.classList.remove('editing');
+    ui.editMainUploadTitleBtn.setAttribute('aria-label', 'Modifica titolo upload');
+    ui.editMainUploadTitleBtn.title = 'Modifica titolo';
+    // Sincronizza override nell'upload-kit e aggiorna anche il campo nel wizard
+    uploadKit.syncUploadTitleOverride(ui.mainUploadTitleInput.value);
+    refreshMainUploadTitle();
+  });
+}
+
+if (ui.mainUploadTitleInput) {
+  ui.mainUploadTitleInput.addEventListener('input', () => {
+    if (ui.mainUploadTitleInput.readOnly) {
+      return;
+    }
+    uploadKit.syncUploadTitleOverride(ui.mainUploadTitleInput.value);
+    if (ui.mainUploadTitleHint) {
+      ui.mainUploadTitleHint.textContent = 'Titolo modificato manualmente.';
+    }
+  });
+}
 
 // ===== Event bindings =====
 ui.selectFileBtn.addEventListener('click', async () => {

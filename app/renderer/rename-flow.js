@@ -21,7 +21,8 @@ export function createRenameFlow({
   updateFormatServiceSuggest,
   getMediaInfoText,
   previewRename,
-  copyToClipboard
+  copyToClipboard,
+  refreshMainUploadTitle
 }) {
   let previewTimer = null;
 
@@ -678,6 +679,7 @@ export function createRenameFlow({
   async function refreshPreview() {
     updateVisibility();
     updateFormatServiceSuggest();
+    refreshMainUploadTitle?.();
     await updateRenamePlan();
   }
 
