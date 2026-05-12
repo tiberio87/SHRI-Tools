@@ -14,7 +14,6 @@ const DEFAULT_SETTINGS = {
   renameLangInFolders: true,
   renameLangInFiles: true,
   renameOmitNoGroupInPaths: false,
-  autoApplyNameSuggestions: false,
   bdinfoPath: '',
   torrentPasskey: '',
   torrentAnnounceUrl: '',
@@ -379,9 +378,7 @@ export function createSettingsTools({
     if (ui.renameOmitNoGroupToggle) {
       ui.renameOmitNoGroupToggle.checked = settings.renameOmitNoGroupInPaths === true;
     }
-    if (ui.autoApplyNameSuggestToggle) {
-      ui.autoApplyNameSuggestToggle.checked = settings.autoApplyNameSuggestions === true;
-    }
+
     ui.serviceListInput.value = settings.serviceList || '';
     ui.tagListInput.value = settings.tagList || '';
     if (ui.ffmpegPathInput) {
@@ -548,7 +545,7 @@ export function createSettingsTools({
       renameLangInFolders: Boolean(ui.renameLangFoldersToggle?.checked),
       renameLangInFiles: Boolean(ui.renameLangFilesToggle?.checked),
       renameOmitNoGroupInPaths: Boolean(ui.renameOmitNoGroupToggle?.checked),
-      autoApplyNameSuggestions: Boolean(ui.autoApplyNameSuggestToggle?.checked),
+
       bdinfoPath: ui.settingsBdinfoPathInput?.value.trim() || '',
       serviceList: ui.serviceListInput.value.trim(),
       tagList: ui.tagListInput.value.trim(),

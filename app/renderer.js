@@ -1180,11 +1180,7 @@ function updateFormatServiceSuggest() {
   }
   const settings = getSettings();
   if (ui.applyNameSuggestBtn) {
-    if (settings.autoApplyNameSuggestions) {
-      ui.applyNameSuggestBtn.dataset.tooltip = 'Inserimento suggerimenti automatico ATTIVO';
-    } else {
-      ui.applyNameSuggestBtn.removeAttribute('data-tooltip');
-    }
+    ui.applyNameSuggestBtn.removeAttribute('data-tooltip');
   }
   if (!state.targetPath) {
     ui.formatSuggestRow.classList.remove('is-empty');
@@ -1375,7 +1371,7 @@ function updateFormatServiceSuggest() {
     ui.applyNameSuggestBtn.dataset.source = source || '';
     ui.applyNameSuggestBtn.dataset.repack = repack || '';
   }
-  if (settings.autoApplyNameSuggestions) {
+  {
     const autoKey = JSON.stringify({
       target: state.targetPath || '',
       format,

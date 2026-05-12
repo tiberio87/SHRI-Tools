@@ -115,7 +115,7 @@ export const ui = {
   renameLangFoldersToggle: document.getElementById('renameLangFoldersToggle'),
   renameLangFilesToggle: document.getElementById('renameLangFilesToggle'),
   renameOmitNoGroupToggle: document.getElementById('renameOmitNoGroupToggle'),
-  autoApplyNameSuggestToggle: document.getElementById('autoApplyNameSuggestToggle'),
+
   serviceListInput: document.getElementById('serviceListInput'),
   tagListInput: document.getElementById('tagListInput'),
   autoTagDetectToggle: document.getElementById('autoTagDetectToggle'),
