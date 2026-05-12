@@ -54,6 +54,9 @@ export function createUploadKit(deps) {
   let uploadTitleBase = '';
   let uploadTitleFallback = false;
   let uploadTitleSourcePath = '';
+  let isSeasonRepack = false;
+  let repackFolderName = '';
+  let repackAskedForPath = '';
   let lastUploadDownloadUrl = '';
   let lastTrackerTorrentPath = '';
   let reopenMode = false;
@@ -1166,6 +1169,13 @@ export function createUploadKit(deps) {
     const tonemapNote = state.screenshotsMeta?.tonemapped ? 'Screenshot tonemappati (HDR -> SDR).' : '';
     const manualNotes = ui.uploadReleaseNotesInput?.value.trim();
     const isIsland = tag.toLowerCase() === 'island';
+    // Nota repack stagione TV (solo se non ci sono note manuali)
+    if (isSeasonRepack && !manualNotes) {
+      const folderName = repackFolderName || 'NOME CARTELLA';
+      const repackNote = `Questo è il RE-PACK della stagione completa, se avete scaricato le puntate singole vi basterà creare una cartella nominarla "${folderName}" inserire al suo interno le puntate che avete, a questo punto scaricate il file torrent e fategli riconoscere la cartella appena creata, il client farà il re-check e cosi facendovi riemetterete in seed senza dover riscaricare nulla.`;
+      const notesContent = tonemapNote ? `${repackNote}\n${tonemapNote}` : repackNote;
+      return `[size=13][b][color=#e8024b]--- RELEASE NOTES ---[/color][/b][/size]\n[size=11][color=#FFFFFF]${notesContent}[/color][/size]`;
+    }
     const baseNotes = manualNotes || (isIsland
       ? 'Release Shareisland 🏴‍☠️\nFalla girare, condividila e contribuisci a mantenerla viva restando in seed il più possibile.\nGrazie per il supporto!'
       : 'Nulla da aggiungere.');
@@ -1843,6 +1853,22 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       uploadTitleSourcePath = state.targetPath;
       lastUploadDownloadUrl = '';
       lastTrackerTorrentPath = '';
+    }
+    // Popup repack per stagioni TV (chiedi solo alla prima apertura per ogni cartella)
+    const isTvSeasonDir = state.kind === 'dir' && (form.type.includes('tv') || form.type.includes('anime'));
+    if (isTvSeasonDir && state.targetPath !== repackAskedForPath) {
+      repackAskedForPath = state.targetPath;
+      isSeasonRepack = false;
+      repackFolderName = '';
+      const confirmed = await openConfirmModal(
+        '<div class="confirm-intro">Questa stagione è un <strong>RE-PACK</strong> di episodi già caricati singolarmente?</div>' +
+        '<div style="margin-top:8px;font-size:12px;opacity:0.75;">Se sì, verrà aggiunta una nota nelle Release Notes per guidare gli utenti nel re-seed senza dover riscaricare.</div>',
+        { html: true }
+      );
+      if (confirmed) {
+        isSeasonRepack = true;
+        repackFolderName = getPathBaseName(state.targetPath) || '';
+      }
     }
     const { title, fallback, baseTitle, overridden } = buildUploadTitle();
     uploadTitleBase = baseTitle || '';
