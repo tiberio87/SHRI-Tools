@@ -1082,20 +1082,6 @@
                     <input id="uploadReleaseNotesInput" type="text" placeholder="Aggiungi note da inserire in release notes" />
                   </div>
                 </section>
-                <section id="uploadDescSection" class="upload-section full collapsible collapsed">
-                  <div class="section-header">
-                    <div class="collapse-title">
-                      <h3>Descrizione (BBCode)</h3>
-                    </div>
-                    <div class="section-actions">
-                      <button id="previewUploadDescBtn" class="secondary small">Preview</button>
-                      <button id="copyUploadDescBtn" class="secondary small">Copia BBCode</button>
-                    </div>
-                  </div>
-                  <div class="collapsible-body">
-                    <pre id="uploadDescText" class="text-output text-output-compact">-</pre>
-                  </div>
-                </section>
                 <section class="upload-section full">
                   <div class="section-header">
                     <h3>Screenshots</h3>
@@ -1121,6 +1107,21 @@
                     <div id="screensProgressStageText" class="progress-stage-text">Preparazione...</div>
                   </div>
                   <div id="screensList" class="screens-list"></div>
+                </section>
+                <section id="uploadDescSection" class="upload-section full collapsible collapsed">
+                  <div class="section-header">
+                    <div class="collapse-title">
+                      <h3>Descrizione (BBCode)</h3>
+                    </div>
+                    <div class="section-actions">
+                      <button id="previewUploadDescBtn" class="secondary small">Preview</button>
+                      <button id="editUploadDescBtn" class="secondary small upload-title-edit" type="button" aria-label="Modifica BBCode" title="Modifica BBCode"></button>
+                      <button id="copyUploadDescBtn" class="secondary small">Copia BBCode</button>
+                    </div>
+                  </div>
+                  <div class="collapsible-body">
+                    <textarea id="uploadDescText" class="text-output text-output-compact" readonly spellcheck="false">-</textarea>
+                  </div>
                 </section>
               </div>
             </div>

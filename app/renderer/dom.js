@@ -258,6 +258,7 @@ export const ui = {
   uploadDescText: document.getElementById('uploadDescText'),
   uploadReleaseNotesInput: document.getElementById('uploadReleaseNotesInput'),
   previewUploadDescBtn: document.getElementById('previewUploadDescBtn'),
+  editUploadDescBtn: document.getElementById('editUploadDescBtn'),
   copyUploadDescBtn: document.getElementById('copyUploadDescBtn'),
   generateScreensBtn: document.getElementById('generateScreensBtn'),
   copyScreensBbcodeBtn: document.getElementById('copyScreensBbcodeBtn'),

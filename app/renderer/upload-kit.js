@@ -1907,7 +1907,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     }
 
     const descText = buildUploadDescription(form);
-    ui.uploadDescText.textContent = descText || '-';
+    ui.uploadDescText.value = descText || '-';
     refreshUploadDescription();
 
     renderUploadWarnings(buildUploadWarnings(form, settings));
@@ -2053,8 +2053,11 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (!ui.uploadDescText) {
       return;
     }
+    if (ui.uploadDescText.dataset.editing === 'true') {
+      return;
+    }
     const content = buildUploadDescription(getFormState());
-    ui.uploadDescText.textContent = content;
+    ui.uploadDescText.value = content;
     const settings = loadSettings();
     const jobDir = buildTrackerOutputDir(settings, getJobFileTitle());
     if (jobDir && content && content !== '-') {
@@ -2151,7 +2154,26 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
 
     if (ui.copyUploadDescBtn) {
       ui.copyUploadDescBtn.addEventListener('click', () => {
-        copyToClipboard(ui.uploadDescText.textContent, 'Descrizione copiata.');
+        copyToClipboard(ui.uploadDescText.value, 'Descrizione copiata.');
+      });
+    }
+    if (ui.editUploadDescBtn && ui.uploadDescText) {
+      ui.editUploadDescBtn.addEventListener('click', () => {
+        const isEditing = ui.uploadDescText.dataset.editing === 'true';
+        if (!isEditing) {
+          ui.uploadDescText.removeAttribute('readonly');
+          ui.uploadDescText.dataset.editing = 'true';
+          ui.editUploadDescBtn.classList.add('editing');
+          ui.editUploadDescBtn.setAttribute('aria-label', 'Blocca BBCode');
+          ui.editUploadDescBtn.title = 'Blocca BBCode';
+          ui.uploadDescText.focus();
+        } else {
+          ui.uploadDescText.setAttribute('readonly', '');
+          ui.uploadDescText.dataset.editing = 'false';
+          ui.editUploadDescBtn.classList.remove('editing');
+          ui.editUploadDescBtn.setAttribute('aria-label', 'Modifica BBCode');
+          ui.editUploadDescBtn.title = 'Modifica BBCode';
+        }
       });
     }
     if (ui.uploadReleaseNotesInput) {
@@ -2164,7 +2186,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         if (!ui.bbcodePreviewModal || !ui.bbcodePreviewContent) {
           return;
         }
-        ui.bbcodePreviewContent.innerHTML = renderBbcodePreview(ui.uploadDescText.textContent);
+        ui.bbcodePreviewContent.innerHTML = renderBbcodePreview(ui.uploadDescText.value);
         ui.bbcodePreviewModal.classList.remove('hidden');
       });
     }
