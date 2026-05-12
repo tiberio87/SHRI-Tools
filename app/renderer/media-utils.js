@@ -68,7 +68,7 @@ export function mapAudioCodec(track) {
   if (combined.includes('LPCM') || combined.includes('PCM')) {
     return 'PCM';
   }
-  if (combined.includes('E-AC-3') || combined.includes('EAC3') || combined.includes('DD+')) {
+  if (combined.includes('E-AC-3') || combined.includes('EAC3') || combined.includes('DD+') || combined.includes('DIGITAL PLUS')) {
     return 'DD+';
   }
   if (combined.includes('AC-3') || combined.includes('AC3') || combined.includes('DD')) {
