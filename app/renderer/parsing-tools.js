@@ -48,8 +48,9 @@ function detectFormatFromName(name) {
   const upper = String(name || '').toUpperCase();
   if (/\bDVD[-.\s]?RIP\b/.test(upper) || /\bDVDRIP\b/.test(upper)) {
     return 'Encode';
-  }
-  if (/\bWEB[-.\s]?DL\b/.test(upper) || /\bWEBDL\b/.test(upper)) {
+  }  if (/\bBD[-.]?RIP\b/.test(upper) || /\bBDRIP\b/.test(upper)) {
+    return 'Encode';
+  }  if (/\bWEB[-.\s]?DL\b/.test(upper) || /\bWEBDL\b/.test(upper)) {
     return 'WEB-DL';
   }
   if (/\bWEB[-.\s]?RIP\b/.test(upper) || /\bWEBRIP\b/.test(upper)) {
@@ -79,6 +80,9 @@ function detectSourceFromName(name) {
     return 'UHD BluRay';
   }
   if (/\bBLU[-\s]?RAY\b/.test(upper) || /\bBLURAY\b/.test(upper)) {
+    return 'BluRay';
+  }
+  if (/\bBD[-.]?RIP\b/.test(upper) || /\bBDRIP\b/.test(upper)) {
     return 'BluRay';
   }
   if (/\bDVD\b/.test(upper)) {

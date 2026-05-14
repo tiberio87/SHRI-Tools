@@ -75,7 +75,7 @@
             <div class="field manual-field">
               <label for="formatSelect">Formato</label>
               <div class="dropdown down" id="formatDropdown">
-                <button id="formatSelectBtn" class="dropdown-trigger" type="button">WEB-DL</button>
+                <button id="formatSelectBtn" class="dropdown-trigger" type="button">Seleziona formato</button>
                 <div class="dropdown-menu" id="formatDropdownMenu">
                   <button class="dropdown-item" type="button" data-value="WEB-DL">WEB-DL</button>
                   <button class="dropdown-item" type="button" data-value="WEBRip">WEBRip</button>
@@ -83,7 +83,7 @@
                   <button class="dropdown-item" type="button" data-value="Remux">Remux</button>
                   <button class="dropdown-item" type="button" data-value="Full Disc">Full Disc</button>
                 </div>
-                <input id="formatSelect" type="hidden" value="WEB-DL" />
+                <input id="formatSelect" type="hidden" value="" />
               </div>
             </div>
             <div class="field manual-field" id="sourceGroup">
@@ -939,6 +939,20 @@
       <div class="confirm-actions">
         <button id="confirmCancelBtn" class="secondary">Annulla</button>
         <button id="confirmOkBtn" class="primary">Procedi</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="choiceModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="choiceModalTitle"></h2>
+      </div>
+      <div id="choiceMessage" class="confirm-text"></div>
+      <div id="choiceButtons" class="choice-buttons"></div>
+      <div class="confirm-actions">
+        <button id="choiceCancelBtn" class="secondary">Salta</button>
       </div>
     </div>
   </div>

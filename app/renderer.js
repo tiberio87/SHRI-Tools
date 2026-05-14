@@ -42,6 +42,7 @@ let settingsSnapshot = '';
 let settingsDirty = false;
 let wizardStepIndex = 0;
 let torrentGenerator = 'node';
+let sourceAskedForPath = '';
 let refreshPreview = async () => {};
 let schedulePreview = () => {};
 let showMediaInfoReport = async () => {};
@@ -62,7 +63,7 @@ const { applyTheme, loadTheme, saveTheme } = createThemeTools({
   ui,
   storageKey: THEME_STORAGE_KEY
 });
-const { showToast, copyToClipboard, openConfirmModal, bindConfirmHandlers } =
+const { showToast, copyToClipboard, openConfirmModal, openChoiceModal, bindConfirmHandlers } =
   createFeedbackTools({ ui });
 
 // ===== UI helper functions =====
@@ -231,11 +232,11 @@ function resetAllInputs(options = {}) {
     ui.typeSelect.dataset.manual = 'false';
   }
   if (ui.formatSelect) {
-    ui.formatSelect.value = 'WEB-DL';
+    ui.formatSelect.value = '';
     ui.formatSelect.dataset.manual = 'false';
     ui.formatSelect.dataset.auto = 'false';
     if (ui.formatSelectBtn) {
-      ui.formatSelectBtn.textContent = 'WEB-DL';
+      ui.formatSelectBtn.textContent = 'Seleziona formato';
     }
   }
 
@@ -290,7 +291,7 @@ function resetAllInputs(options = {}) {
   }
 
   if (ui.renameFileCheckbox) {
-    ui.renameFileCheckbox.checked = true;
+    ui.renameFileCheckbox.checked = false;
     ui.renameFileCheckbox.disabled = false;
   }
   if (ui.renameFolderCheckbox) {
@@ -1232,7 +1233,14 @@ function updateFormatServiceSuggest() {
     format = 'Encode';
     formatReason = 'Rilevato da parsing del nome file: sorgente rilevata (fallback Encode)';
   }
-  if (format === 'Encode') {
+  // Se il formato suggerito è Remux ma il nome contiene x264/x265, potrebbe essere un GPU encode
+  const nameHasEncodeMarker = /\bx264\b|\bx265\b/i.test(baseName);
+  const isRemuxWithEncodeMarker = format === 'Remux' && nameHasEncodeMarker;
+  if (isRemuxWithEncodeMarker) {
+    format = 'Encode';
+    formatReason = 'Attenzione: il nome file contiene x264/x265 ma MediaInfo non mostra firme encoder (possibile GPU encode). Suggerito Encode — verifica manualmente se si tratta di un REMUX.';
+  }
+  if (format === 'Encode' && !isRemuxWithEncodeMarker) {
     const webHint =
       nameFormat === 'WEBRip' ||
       nameFormat === 'WEB-DL' ||
@@ -1381,14 +1389,43 @@ function updateFormatServiceSuggest() {
     });
     if (autoKey && state.lastAutoSuggestKey !== autoKey) {
       state.lastAutoSuggestKey = autoKey;
-      logDebug('suggest: auto-apply', {
-        format: format || '',
-        service: service || '',
-        source: source || '',
-        repack: repack || '',
-        autoKey
-      });
-      applyNameSuggestions(format, service, source, repack, settings);
+      (async () => {
+        let resolvedSource = source;
+        if (format === 'Encode' && !resolvedSource && state.targetPath !== sourceAskedForPath) {
+          sourceAskedForPath = state.targetPath;
+          logDebug('suggest: source unknown, showing choice modal');
+          const chosen = await openChoiceModal(
+            'Sorgente non rilevata',
+            'Il formato rilevato è <b>Encode</b> ma la sorgente non è determinabile dal nome file o da MediaInfo.<br>Seleziona la sorgente corretta:',
+            [
+              { value: 'BluRay', label: 'BluRay' },
+              { value: 'UHD BluRay', label: 'UHD BluRay' },
+              { value: 'DVD', label: 'DVD' },
+              { value: 'HDTV', label: 'HDTV' }
+            ]
+          );
+          if (chosen) {
+            resolvedSource = chosen;
+            logDebug('suggest: source chosen from modal', resolvedSource);
+          }
+        }
+        logDebug('suggest: auto-apply', {
+          format: format || '',
+          service: service || '',
+          source: resolvedSource || '',
+          repack: repack || '',
+          autoKey
+        });
+        applyNameSuggestions(format, service, resolvedSource, repack, settings);
+        // Se era un GPU encode rilevato dal nome, correggi anche il video codec
+        if (isRemuxWithEncodeMarker && ui.videoCodecInput && ui.videoCodecSelectBtn) {
+          const codecFromName = /\bx265\b/i.test(baseName) ? 'x265' : /\bx264\b/i.test(baseName) ? 'x264' : '';
+          if (codecFromName) {
+            ui.videoCodecInput.dataset.manual = 'false';
+            setDropdownAuto(ui.videoCodecInput, ui.videoCodecSelectBtn, codecFromName, codecFromName);
+          }
+        }
+      })();
     }
   }
 }
@@ -1921,9 +1958,6 @@ async function loadPath(targetPath) {
 
   if (scan.kind === 'dir') {
     ui.renameFolderCheckbox.disabled = false;
-    if (!ui.renameFolderCheckbox.checked) {
-      ui.renameFolderCheckbox.checked = true;
-    }
   } else {
     ui.renameFolderCheckbox.checked = false;
     ui.renameFolderCheckbox.disabled = true;
@@ -1935,8 +1969,6 @@ async function loadPath(targetPath) {
       ui.renameFileCheckbox.disabled = discStructure;
       if (discStructure) {
         ui.renameFileCheckbox.checked = false;
-      } else if (!ui.renameFileCheckbox.checked) {
-        ui.renameFileCheckbox.checked = true;
       }
     } else {
       ui.renameFileCheckbox.disabled = false;
