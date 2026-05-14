@@ -1261,6 +1261,10 @@ body.light .fetch-warning {
     minmax(170px, 1.5fr);
 }
 
+.format-row.no-source.no-service {
+  grid-template-columns: minmax(105px, 0.8fr) minmax(140px, 1fr) minmax(105px, 0.65fr) minmax(180px, 1.5fr);
+}
+
 .format-row.with-region.no-service {
   grid-template-columns: minmax(95px, 0.6fr) minmax(140px, 0.9fr) minmax(105px, 0.6fr) minmax(80px, 0.75fr)
     minmax(80px, 0.55fr) minmax(170px, 1.5fr);
@@ -1706,6 +1710,17 @@ body.light .badge.error {
   justify-content: flex-end;
   gap: 10px;
   margin-top: 16px;
+}
+
+.choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+#choiceModal .modal-content {
+  width: min(480px, 94vw);
 }
 
 .progress-row {

@@ -2,6 +2,7 @@ export function createFeedbackTools({ ui }) {
   let toastTimer = null;
   let toastHideTimer = null;
   let confirmResolver = null;
+  let choiceResolver = null;
 
   function showToast(message, tone = 'info') {
     if (!ui.toast) {
@@ -59,6 +60,46 @@ export function createFeedbackTools({ ui }) {
     ui.confirmModal.classList.add('hidden');
   }
 
+  function closeChoiceModal() {
+    if (!ui.choiceModal) {
+      return;
+    }
+    ui.choiceModal.classList.add('hidden');
+    if (ui.choiceButtons) {
+      ui.choiceButtons.innerHTML = '';
+    }
+  }
+
+  function openChoiceModal(title, message, choices) {
+    if (!ui.choiceModal || !ui.choiceMessage || !ui.choiceButtons) {
+      return Promise.resolve(null);
+    }
+    if (ui.choiceModalTitle) {
+      ui.choiceModalTitle.textContent = title;
+    }
+    ui.choiceMessage.innerHTML = message;
+    ui.choiceButtons.innerHTML = '';
+    for (const choice of choices) {
+      const btn = document.createElement('button');
+      btn.className = 'primary';
+      btn.textContent = choice.label;
+      btn.addEventListener('click', () => resolveChoice(choice.value));
+      ui.choiceButtons.appendChild(btn);
+    }
+    ui.choiceModal.classList.remove('hidden');
+    return new Promise((resolve) => {
+      choiceResolver = resolve;
+    });
+  }
+
+  function resolveChoice(value) {
+    if (choiceResolver) {
+      choiceResolver(value);
+      choiceResolver = null;
+    }
+    closeChoiceModal();
+  }
+
   function openConfirmModal(message, options = {}) {
     if (!ui.confirmModal || !ui.confirmMessage) {
       return Promise.resolve(false);
@@ -99,7 +140,17 @@ export function createFeedbackTools({ ui }) {
         }
       });
     }
+    if (ui.choiceCancelBtn) {
+      ui.choiceCancelBtn.addEventListener('click', () => resolveChoice(null));
+    }
+    if (ui.choiceModal) {
+      ui.choiceModal.addEventListener('click', (event) => {
+        if (event.target.classList.contains('modal-backdrop')) {
+          resolveChoice(null);
+        }
+      });
+    }
   }
 
-  return { showToast, copyToClipboard, openConfirmModal, resolveConfirm, bindConfirmHandlers };
+  return { showToast, copyToClipboard, openConfirmModal, openChoiceModal, resolveConfirm, bindConfirmHandlers };
 }
