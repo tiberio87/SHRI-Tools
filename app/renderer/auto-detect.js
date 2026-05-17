@@ -17,7 +17,8 @@ export function createAutoDetectFlow({
   getPathBaseName,
   getParentPath,
   isDiscStructure,
-  fetchMetadata
+  fetchMetadata,
+  onAmbiguity
 }) {
   async function fetchMetadataAuto(guess) {
     if (state.autoDetectRunning) {
@@ -63,8 +64,22 @@ export function createAutoDetectFlow({
       logDebug('fetchMetadata payload', payload);
       logDebug('fetchMetadata result', data);
       let finalData = data;
+
+      // Disambiguazione: se ci sono più candidati con anni diversi, chiedi all'utente
+      if (data?.candidates?.length > 1 && typeof onAmbiguity === 'function') {
+        logDebug('fetchMetadata: ambiguità rilevata', { candidates: data.candidates });
+        const chosen = await onAmbiguity(data.candidates);
+        if (chosen) {
+          const disambPayload = { ...payload, forceTmdbId: String(chosen.id), forceTmdbType: chosen.type };
+          logDebug('fetchMetadata: disambiguazione', { chosen });
+          const disambData = await fetchMetadata(disambPayload);
+          logDebug('fetchMetadata: risultato disambiguato', disambData);
+          finalData = disambData;
+        }
+      }
+
       const hasMatch = Boolean(
-        data?.title || data?.tmdbId || data?.imdbId || data?.tvdbSeriesId
+        finalData?.title || finalData?.tmdbId || finalData?.imdbId || finalData?.tvdbSeriesId
       );
       if (!hasMatch && payload.title) {
         const cleanedTitle = metadataTools.cleanSearchTitle(payload.title);

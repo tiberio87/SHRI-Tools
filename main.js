@@ -3393,24 +3393,53 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       }
     } else if (tmdbKey && titleGuess) {
       const type = isTvHint ? 'tv' : 'movie';
-      const search = await fetchTmdbSearch(titleGuess, type, tmdbKey, preferredLanguage, yearGuess);
-      const results = Array.isArray(search?.results) ? search.results : [];
-      let first = results[0];
-      if (yearGuess && results.length) {
-        const targetYear = String(yearGuess);
-        const match = results.find((item) => {
-          const date = item?.first_air_date || item?.release_date || '';
-          return date.startsWith(targetYear);
-        });
-        if (match) {
-          first = match;
+      const forceTmdbId = payload.forceTmdbId ? Number(payload.forceTmdbId) : 0;
+      const resolvedType = forceTmdbId ? (payload.forceTmdbType || type) : type;
+
+      let first;
+      if (forceTmdbId) {
+        // L'utente ha già selezionato un risultato dalla disambiguazione
+        first = { id: forceTmdbId };
+      } else {
+        const search = await fetchTmdbSearch(titleGuess, type, tmdbKey, preferredLanguage, yearGuess);
+        const results = Array.isArray(search?.results) ? search.results : [];
+        first = results[0];
+        if (yearGuess && results.length) {
+          const targetYear = String(yearGuess);
+          const match = results.find((item) => {
+            const date = item?.first_air_date || item?.release_date || '';
+            return date.startsWith(targetYear);
+          });
+          if (match) {
+            first = match;
+          }
+        }
+        // Rileva ambiguità: più risultati con anni diversi e nessun anno fornito
+        if (!yearGuess && results.length > 1) {
+          const topResults = results.slice(0, 8);
+          const uniqueYears = new Set(
+            topResults.map((r) => extractYear(r.release_date || r.first_air_date || '')).filter(Boolean)
+          );
+          if (uniqueYears.size > 1) {
+            result.candidates = topResults
+              .map((r) => ({
+                id: r.id,
+                title: r.title || r.name || '',
+                year: extractYear(r.release_date || r.first_air_date || ''),
+                type,
+                posterUrl: r.poster_path ? `https://image.tmdb.org/t/p/w92${r.poster_path}` : ''
+              }))
+              .filter((c) => c.year)
+              .slice(0, 6);
+          }
         }
       }
+
       if (first?.id) {
-        if (type === 'tv') {
+        if (resolvedType === 'tv') {
           tmdbTvId = String(first.id);
         }
-        const details = await fetchTmdbDetails(type, first.id, tmdbKey, preferredLanguage);
+        const details = await fetchTmdbDetails(resolvedType, first.id, tmdbKey, preferredLanguage);
         if (details?.original_language) {
           result.originalLanguage = details.original_language;
         }
@@ -3426,7 +3455,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
           result.year = extractYear(details.release_date || details.first_air_date);
         }
         result.tmdbId = String(first.id);
-        result.tmdbType = type;
+        result.tmdbType = resolvedType;
         if (details?.imdb_id && !result.imdbId) {
           result.imdbId = details.imdb_id;
         }
@@ -3444,7 +3473,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (tmdbMissingLocalizedTitle || (wantsItalianTitle && !result.title)) {
           let imdbLookup = result.imdbId || '';
           if (!imdbLookup && tmdbKey) {
-            const external = await fetchTmdbExternalIds(type, first.id, tmdbKey);
+            const external = await fetchTmdbExternalIds(resolvedType, first.id, tmdbKey);
             imdbLookup = external?.imdb_id || '';
             if (imdbLookup) {
               result.imdbId = imdbLookup;
