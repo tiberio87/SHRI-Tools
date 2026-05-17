@@ -1928,6 +1928,72 @@ ipcMain.handle('save-file-direct', async (_event, { filePath: targetPath, conten
   return { saved: true, filePath: safe };
 });
 
+ipcMain.handle('mkv-get-tracks', async (_event, { filePath: mkvFile, mkvmergePath }) => {
+  const bin = String(mkvmergePath || 'mkvmerge').trim() || 'mkvmerge';
+  try {
+    const { stdout } = await runProcess(bin, ['-J', mkvFile]);
+    return { ok: true, data: JSON.parse(stdout) };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle('mkv-apply-tags', async (_event, { filePath: mkvFile, mkvpropeditPath, xmlContent, title, tracks }) => {
+  const bin = String(mkvpropeditPath || 'mkvpropedit').trim() || 'mkvpropedit';
+  const tmpFiles = [];
+
+  function escXml(s) {
+    return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  try {
+    // 1. Scrivi XML tag globali
+    const tmpXml = path.join(os.tmpdir(), `shri_tags_${Date.now()}.xml`);
+    tmpFiles.push(tmpXml);
+    await fs.writeFile(tmpXml, xmlContent, 'utf-8');
+
+    // 2. Titolo file MKV
+    if (title) {
+      await runProcess(bin, [mkvFile, '--edit', 'info', '--set', `title=${title}`]);
+    }
+
+    // 3. Proprietà tracce (language + name) — name solo se non vuoto
+    for (const t of (tracks || [])) {
+      if (!t.editSelector) continue;
+      const setArgs = [];
+      if (t.language) setArgs.push('--set', `language=${t.language}`);
+      if (t.trackTitle) setArgs.push('--set', `name=${t.trackTitle}`);
+      if (setArgs.length) await runProcess(bin, [mkvFile, '--edit', t.editSelector, ...setArgs]);
+    }
+
+    // 4. Applica tag globali (IMDB / TMDB / TVDB / Encoder)
+    await runProcess(bin, [mkvFile, '--tags', `all:${tmpXml}`]);
+
+    // 5. Applica Source per traccia via --tags track:N: (evita problemi UID 64-bit)
+    for (const t of (tracks || [])) {
+      if (!t.source || !t.trackNumber) continue;
+      const trackXml =
+        `<?xml version="1.0" encoding="UTF-8"?>\n` +
+        `<!DOCTYPE Tags SYSTEM "matroska-tags.dtd">\n` +
+        `<Tags>\n  <Tag>\n    <Targets/>\n` +
+        `    <Simple><Name>Source</Name><String>${escXml(t.source)}</String></Simple>\n` +
+        `  </Tag>\n</Tags>`;
+      const tmpTrackXml = path.join(os.tmpdir(), `shri_track_${t.trackNumber}_${Date.now()}.xml`);
+      tmpFiles.push(tmpTrackXml);
+      await fs.writeFile(tmpTrackXml, trackXml, 'utf-8');
+      await runProcess(bin, [mkvFile, '--tags', `track:${t.trackNumber}:${tmpTrackXml}`]);
+    }
+
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  } finally {
+    for (const f of tmpFiles) {
+      await fs.unlink(f).catch(() => {});
+    }
+  }
+});
+
 function compareVersions(a, b) {
   const pa = String(a).split('.').map(Number);
   const pb = String(b).split('.').map(Number);

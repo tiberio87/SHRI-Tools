@@ -35,6 +35,7 @@ import { createRenameFlow } from './renderer/rename-flow.js';
 import { createAutoDetectFlow } from './renderer/auto-detect.js';
 import { createTrackerAnalysis } from './renderer/tracker-analysis.js';
 import { createDupeCheckTools } from './renderer/dupe-check.js';
+import { createMkvTagger } from './renderer/mkv-tagger.js';
 
 // ===== Module state & runtime flags =====
 let currentTorrentRequestId = null;
@@ -50,6 +51,7 @@ let autoDetectFromPath = async () => {};
 let fetchMetadataAuto = async () => {};
 let updateAutoDetectControls = () => {};
 let manualDetectFromInputs = async () => {};
+let mkvTagger = null;
 const torrentLogLines = [];
 const WIZARD_STEP_COUNT = 3;
 
@@ -322,6 +324,7 @@ function resetAllInputs(options = {}) {
 
   updateAutoDetectControls();
   updateVisibility();
+  mkvTagger?.reset();
   if (!options.skipPreview) {
     refreshPreview();
   }
@@ -1486,6 +1489,8 @@ const dupeCheck = createDupeCheckTools({
   logDebug
 });
 
+mkvTagger = createMkvTagger({ ui, loadSettings });
+
 function setIfAuto(input, value) {
   const isCheckbox = input.type === 'checkbox';
   if (!isCheckbox && !value) {
@@ -1696,6 +1701,21 @@ const autoDetectFlow = createAutoDetectFlow({
 });
 
 ({ fetchMetadataAuto, autoDetectFromPath, updateAutoDetectControls, manualDetectFromInputs } = autoDetectFlow);
+
+{
+  const _origFetchMetadataAuto = fetchMetadataAuto;
+  fetchMetadataAuto = async (...args) => {
+    await _origFetchMetadataAuto(...args);
+    mkvTagger?.syncMetadata();
+    mkvTagger?.syncTitle();
+  };
+  const _origManualDetect = manualDetectFromInputs;
+  manualDetectFromInputs = async (...args) => {
+    await _origManualDetect(...args);
+    mkvTagger?.syncMetadata();
+    mkvTagger?.syncTitle();
+  };
+}
 
 const trackerAnalysis = createTrackerAnalysis({
   ui,
@@ -2020,6 +2040,7 @@ function refreshMainUploadTitle() {
     return;
   }
   ui.mainUploadTitleInput.value = title || '-';
+  mkvTagger?.syncTitle();
   if (ui.mainUploadTitleHint) {
     ui.mainUploadTitleHint.textContent = overridden ? 'Titolo modificato manualmente.' : '';
   }
@@ -2463,7 +2484,17 @@ if (ui.browseBdinfoPathBtn) {
   });
 }
 
+if (ui.browseMkvpropeditPathBtn) {
+  ui.browseMkvpropeditPathBtn.addEventListener('click', async () => {
+    const filePath = await window.api.selectAnyFile?.();
+    if (filePath && ui.settingsMkvpropeditPathInput) {
+      ui.settingsMkvpropeditPathInput.value = filePath;
+    }
+  });
+}
+
 bindConfirmHandlers();
+mkvTagger.bind();
 
 if (window.api?.onTorrentProgress) {
   window.api.onTorrentProgress((data) => {

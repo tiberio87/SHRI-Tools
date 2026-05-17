@@ -54,7 +54,9 @@ const DEFAULT_SETTINGS = {
   transmissionSavePath: '',
   transmissionAutoStart: true,
   transmissionPathMapLocal: '',
-  transmissionPathMapRemote: ''
+  transmissionPathMapRemote: '',
+  mkvpropeditPath: '',
+  mkvTaggerEncoder: 'SHRI'
 };
 
 export function createSettingsTools({
@@ -491,6 +493,12 @@ export function createSettingsTools({
     if (ui.settingsMkbrrPathInput) {
       ui.settingsMkbrrPathInput.value = settings.torrentMkbrrPath || '';
     }
+    if (ui.settingsMkvpropeditPathInput) {
+      ui.settingsMkvpropeditPathInput.value = settings.mkvpropeditPath || '';
+    }
+    if (ui.settingsMkvTaggerEncoderInput) {
+      ui.settingsMkvTaggerEncoderInput.value = settings.mkvTaggerEncoder || 'SHRI';
+    }
     if (ui.settingsMkbrrWorkersInput) {
       const workers = Number.isFinite(settings.torrentMkbrrWorkers)
         ? settings.torrentMkbrrWorkers
@@ -588,7 +596,9 @@ export function createSettingsTools({
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
       torrentMkbrrPath: ui.settingsMkbrrPathInput?.value.trim() || '',
       torrentMkbrrWorkers: mkbrrWorkers,
-      torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked)
+      torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked),
+      mkvpropeditPath: ui.settingsMkvpropeditPathInput?.value.trim() || '',
+      mkvTaggerEncoder: ui.settingsMkvTaggerEncoderInput?.value.trim() || 'SHRI'
     };
   }
 

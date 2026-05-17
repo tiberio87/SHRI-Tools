@@ -29,6 +29,8 @@ contextBridge.exposeInMainWorld('api', {
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   saveFile: (payload) => ipcRenderer.invoke('save-file', payload),
   saveFileDirect: (payload) => ipcRenderer.invoke('save-file-direct', payload),
+  mkvGetTracks: (payload) => ipcRenderer.invoke('mkv-get-tracks', payload),
+  mkvApplyTags: (payload) => ipcRenderer.invoke('mkv-apply-tags', payload),
   getFilePath: (file) => (file ? webUtils.getPathForFile(file) : ''),
   onTorrentProgress: (handler) => {
     const listener = (_event, data) => handler(data);

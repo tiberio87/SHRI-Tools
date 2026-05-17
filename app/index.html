@@ -322,6 +322,52 @@
             <div id="fetchStatus" class="hint"></div>
           </div>
         </section>
+
+        <section class="section" id="mkvTagsSection">
+          <div class="section-header">
+            <h2>MKV Tags</h2>
+            <div class="section-actions">
+              <button id="loadMkvTracksBtn" class="secondary small" type="button">Carica tracce</button>
+              <button id="applyMkvTagsBtn" class="primary small" type="button">Applica Tag MKV</button>
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="mkvTagsMkvTitle">Titolo MKV</label>
+              <input id="mkvTagsMkvTitle" type="text" placeholder="Titolo del file MKV" />
+            </div>
+            <div class="field">
+              <label for="mkvTagsImdb">IMDb ID</label>
+              <input id="mkvTagsImdb" type="text" placeholder="tt1234567" />
+            </div>
+            <div class="field">
+              <label for="mkvTagsTmdb">TMDB</label>
+              <input id="mkvTagsTmdb" type="text" placeholder="movie/12345 o tv/12345" />
+            </div>
+            <div class="field">
+              <label for="mkvTagsTvdb">TVDB ID</label>
+              <input id="mkvTagsTvdb" type="text" placeholder="12345" />
+            </div>
+          </div>
+          <div class="mkv-tracks-wrapper">
+            <table class="mkv-tracks-table">
+              <thead>
+                <tr>
+                  <th>UID</th>
+                  <th>Tipo</th>
+                  <th>Codec</th>
+                  <th>Lingua</th>
+                  <th>Titolo traccia</th>
+                  <th>Source</th>
+                </tr>
+              </thead>
+              <tbody id="mkvTagsTracksBody">
+                <tr><td colspan="6" class="mkv-tracks-empty">Carica le tracce per iniziare.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div id="mkvTagsLog" class="mkv-log hidden"></div>
+        </section>
       </div>
 
       <aside class="right-stack">
@@ -597,6 +643,23 @@
                 </svg>
               </button>
             </div>
+          </div>
+        </div>
+      </div>
+      <div class="settings-block" data-settings-scope="all">
+        <h3 class="settings-title">MKV Tags (MKVToolNix)</h3>
+        <div class="row">
+          <div class="field">
+            <label for="settingsMkvpropeditPathInput">Percorso mkvpropedit (opzionale)</label>
+            <div class="input-with-action">
+              <input id="settingsMkvpropeditPathInput" type="text" placeholder="Seleziona mkvpropedit.exe" />
+              <button id="browseMkvpropeditPathBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+            <div class="hint">Lascia vuoto per usare mkvpropedit dal PATH di sistema.</div>
+          </div>
+          <div class="field">
+            <label for="settingsMkvTaggerEncoderInput">Tag Encoder default</label>
+            <input id="settingsMkvTaggerEncoderInput" type="text" placeholder="SHRI" />
           </div>
         </div>
       </div>

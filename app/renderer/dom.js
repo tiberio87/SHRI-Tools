@@ -288,5 +288,19 @@ export const ui = {
   appHealthTooltip: document.getElementById('appHealthTooltip'),
   healthCheckModal: document.getElementById('healthCheckModal'),
   healthCheckBody: document.getElementById('healthCheckBody'),
-  closeHealthCheckBtn: document.getElementById('closeHealthCheckBtn')
+  closeHealthCheckBtn: document.getElementById('closeHealthCheckBtn'),
+  // MKV Tagger — settings
+  settingsMkvpropeditPathInput: document.getElementById('settingsMkvpropeditPathInput'),
+  browseMkvpropeditPathBtn: document.getElementById('browseMkvpropeditPathBtn'),
+  settingsMkvTaggerEncoderInput: document.getElementById('settingsMkvTaggerEncoderInput'),
+  // MKV Tagger — main section
+  mkvTagsSection: document.getElementById('mkvTagsSection'),
+  mkvTagsTracksBody: document.getElementById('mkvTagsTracksBody'),
+  mkvTagsMkvTitle: document.getElementById('mkvTagsMkvTitle'),
+  mkvTagsImdb: document.getElementById('mkvTagsImdb'),
+  mkvTagsTmdb: document.getElementById('mkvTagsTmdb'),
+  mkvTagsTvdb: document.getElementById('mkvTagsTvdb'),
+  loadMkvTracksBtn: document.getElementById('loadMkvTracksBtn'),
+  applyMkvTagsBtn: document.getElementById('applyMkvTagsBtn'),
+  mkvTagsLog: document.getElementById('mkvTagsLog')
 };
