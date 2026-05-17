@@ -1994,6 +1994,24 @@ ipcMain.handle('mkv-apply-tags', async (_event, { filePath: mkvFile, mkvpropedit
   }
 });
 
+ipcMain.handle('list-dir', async (_event, dirPath) => {
+  try {
+    const entries = await fs.readdir(String(dirPath || ''));
+    return { ok: true, files: entries };
+  } catch (err) {
+    return { ok: false, files: [], error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle('read-file-text', async (_event, filePath) => {
+  try {
+    const content = await fs.readFile(String(filePath || ''), 'utf-8');
+    return { ok: true, content };
+  } catch (err) {
+    return { ok: false, content: '', error: String(err?.message || err) };
+  }
+});
+
 function compareVersions(a, b) {
   const pa = String(a).split('.').map(Number);
   const pb = String(b).split('.').map(Number);

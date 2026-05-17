@@ -821,6 +821,14 @@ function prepareTorrentStep() {
   setHint(ui.torrentHint, '');
   setTorrentGeneratorHint(useMkbrr ? 'mkbrr' : 'node');
   resetTorrentProgress();
+
+  // Ripristina automaticamente torrent dalla cartella job se già generato
+  uploadKit?.restoreJobStateIfNeeded?.().then(() => {
+    if (state.lastTorrentPath && ui.torrentHint && !ui.torrentHint.textContent) {
+      const name = state.lastTorrentPath.replace(/\\/g, '/').split('/').pop();
+      setHint(ui.torrentHint, `Torrent trovato: ${name}`);
+    }
+  }).catch(() => {});
 }
 
 function openTorrentModal() {
