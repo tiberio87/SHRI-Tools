@@ -58,6 +58,7 @@ export function createUploadKit(deps) {
   let repackFolderName = '';
   let repackAskedForPath = '';
   let lastUploadDownloadUrl = '';
+  let lastTorrentPageUrl = '';
   let lastTrackerTorrentPath = '';
   let reopenMode = false;
   let appVersion = '';
@@ -598,6 +599,44 @@ export function createUploadKit(deps) {
     return '';
   }
 
+  function extractTorrentPageUrl(result, baseUrl) {
+    const data = result?.data;
+
+    // 1. Campo esplicito nella risposta
+    const explicit = data?.page_url || data?.permalink || data?.torrent_url || '';
+    if (explicit && /^https?:\/\//i.test(explicit)) {
+      return explicit.trim();
+    }
+
+    // 2. ID nella risposta → {baseUrl}/torrents/{id}
+    const id = data?.id;
+    if (id && baseUrl) {
+      const base = String(baseUrl).replace(/\/+$/, '');
+      return `${base}/torrents/${id}`;
+    }
+
+    // 3. Estrai l'ID dall'URL di download (es. /torrent/download/108229.apikey o /torrents/download/108229/key)
+    const downloadUrl = extractDownloadUrl(result);
+    if (downloadUrl && baseUrl) {
+      const match = downloadUrl.match(/\/torrents?\/download\/(\d+)/);
+      if (match) {
+        const base = String(baseUrl).replace(/\/+$/, '');
+        return `${base}/torrents/${match[1]}`;
+      }
+    }
+
+    return '';
+  }
+
+  function setTorrentPageLink(url) {
+    if (ui.postUploadTorrentLink) {
+      ui.postUploadTorrentLink.classList.toggle('hidden', !url);
+    }
+    if (ui.postUploadTorrentLinkAnchor) {
+      ui.postUploadTorrentLinkAnchor.dataset.href = url || '';
+    }
+  }
+
   function setPostUploadHint(message) {
     if (!ui.postUploadHint) {
       return;
@@ -647,6 +686,9 @@ export function createUploadKit(deps) {
     }
     reopenMode = false;
     lastUploadDownloadUrl = extractDownloadUrl(result);
+    const baseUrl = settings?.unit3dBaseUrl || '';
+    lastTorrentPageUrl = extractTorrentPageUrl(result, baseUrl);
+    setTorrentPageLink(lastTorrentPageUrl);
     const outputDir = buildTrackerOutputDir(settings, getJobFileTitle());
     if (ui.downloadTrackerTorrentBtn) {
       ui.downloadTrackerTorrentBtn.disabled = !lastUploadDownloadUrl || !outputDir;
@@ -678,7 +720,9 @@ export function createUploadKit(deps) {
     reopenMode = true;
     const settings = loadSettings();
     lastUploadDownloadUrl = last.downloadUrl || '';
+    lastTorrentPageUrl = last.torrentPageUrl || '';
     lastTrackerTorrentPath = last.torrentPath || '';
+    setTorrentPageLink(lastTorrentPageUrl);
     const outputDir = buildTrackerOutputDir(settings, last.title || '');
     if (ui.downloadTrackerTorrentBtn) {
       ui.downloadTrackerTorrentBtn.disabled = !lastUploadDownloadUrl || !outputDir;
@@ -1672,6 +1716,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         error: result?.error || '',
         details: result?.details || '',
         status: result?.status || '',
+        data: result?.data ? JSON.stringify(result.data).slice(0, 500) : '',
         raw: result?.raw ? String(result.raw).slice(0, 2000) : ''
       });
       if (result?.ok) {
@@ -1680,6 +1725,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         const snapshot = {
           title: ui.uploadTitleInput?.value || '',
           downloadUrl: extractDownloadUrl(result),
+          torrentPageUrl: extractTorrentPageUrl(result, settings.unit3dBaseUrl || ''),
           torrentPath: '',
           createdAt: Date.now()
         };
@@ -1938,17 +1984,22 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       }
     }
 
-    const descText = buildUploadDescription(form);
-    ui.uploadDescText.value = descText || '-';
-    refreshUploadDescription();
-
     renderUploadWarnings(buildUploadWarnings(form, settings));
     updateFfmpegHint(settings);
     ui.screensHint.textContent = settings.ffmpegPath
       ? ''
       : 'FFmpeg non configurato.';
     resetScreensProgress();
+    await restoreJobStateIfNeeded();
     renderScreensList();
+    if (state.screenshots.length) {
+      const okCount = state.screenshots.filter((s) => s.ok).length;
+      ui.screensHint.textContent = `Screenshot ripristinati: ${okCount}/${state.screenshots.length}`;
+    }
+
+    const descText = buildUploadDescription(form);
+    ui.uploadDescText.value = descText || '-';
+    refreshUploadDescription();
 
     setUploadKitCollapsed('uploadMiSection', true);
     setUploadKitCollapsed('uploadDescSection', true);
@@ -1966,6 +2017,43 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     }
     if (typeof openWizardStep === 'function') {
       openWizardStep(2);
+    }
+  }
+
+  async function restoreJobStateIfNeeded() {
+    if (!state.targetPath) return;
+    const settings = loadSettings();
+    const jobDir = buildTrackerOutputDir(settings, getJobFileTitle());
+    if (!jobDir) return;
+    const sep = jobDir.includes('\\') ? '\\' : '/';
+    const fileTitle = getJobFileTitle() || 'job';
+
+    // Ripristina .torrent dalla cartella job
+    if (!state.lastTorrentPath) {
+      const dirResult = await window.api?.listDir?.(jobDir).catch(() => null);
+      if (dirResult?.ok && Array.isArray(dirResult.files)) {
+        const torrentFile = dirResult.files.find((f) => String(f).toLowerCase().endsWith('.torrent'));
+        if (torrentFile) {
+          state.lastTorrentPath = `${jobDir}${sep}${torrentFile}`;
+          logDebug?.('restoreJobState: torrent ripristinato', state.lastTorrentPath);
+        }
+      }
+    }
+
+    // Ripristina screenshots dal JSON salvato
+    if (!state.screenshots.length) {
+      const jsonPath = `${jobDir}${sep}${fileTitle}.screenshots.json`;
+      const res = await window.api?.readFileText?.(jsonPath).catch(() => null);
+      if (res?.ok && res.content) {
+        try {
+          const saved = JSON.parse(res.content);
+          if (Array.isArray(saved?.screenshots) && saved.screenshots.length) {
+            state.screenshots = saved.screenshots;
+            state.screenshotsMeta = saved.meta || null;
+            logDebug?.('restoreJobState: screenshots ripristinati', state.screenshots.length);
+          }
+        } catch {}
+      }
     }
   }
 
@@ -2069,6 +2157,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         const safeTitleLog = getJobFileTitle();
         const sepLog = jobDirLog.includes('\\') ? '\\' : '/';
         try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}${safeTitleLog}.debug-log.txt`, content: debugState.buffer.join('\n') }); } catch {}
+      }
+      // salva metadata screenshots per ripristino automatico
+      if (jobDirLog && state.screenshots.length) {
+        const safeTitleScreens = getJobFileTitle();
+        const sepScreens = jobDirLog.includes('\\') ? '\\' : '/';
+        const screensJson = JSON.stringify({ screenshots: state.screenshots, meta: state.screenshotsMeta });
+        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepScreens}${safeTitleScreens}.screenshots.json`, content: screensJson }); } catch {}
       }
     } else {
       logDebug?.('screens: error', { error: result?.error || 'unknown' });
@@ -2254,6 +2349,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         ui.postUploadModal?.classList.add('hidden');
       });
     }
+    if (ui.postUploadTorrentLinkAnchor) {
+      ui.postUploadTorrentLinkAnchor.addEventListener('click', (e) => {
+        e.preventDefault();
+        const url = ui.postUploadTorrentLinkAnchor.dataset.href || '';
+        if (url) window.api.openExternal(url);
+      });
+    }
     if (ui.postUploadModal) {
       ui.postUploadModal.addEventListener('click', (event) => {
         if (event.target?.classList.contains('modal-backdrop')) {
@@ -2352,6 +2454,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     prepareUploadKitStep,
     refreshUploadDescription,
     renderScreensList,
+    restoreJobStateIfNeeded,
     saveMediaInfoToJobDir,
     syncUploadTitleOverride
   };

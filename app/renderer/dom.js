@@ -207,6 +207,8 @@ export const ui = {
   sendToClientBtn: document.getElementById('sendToClientBtn'),
   openTrackerOutputBtn: document.getElementById('openTrackerOutputBtn'),
   postUploadHint: document.getElementById('postUploadHint'),
+  postUploadTorrentLink: document.getElementById('postUploadTorrentLink'),
+  postUploadTorrentLinkAnchor: document.getElementById('postUploadTorrentLinkAnchor'),
   torrentModal: document.getElementById('torrentModal'),
   torrentAnnounceInput: document.getElementById('torrentAnnounceInput'),
   torrentOutputInput: document.getElementById('torrentOutputInput'),

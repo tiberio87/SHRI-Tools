@@ -1027,19 +1027,19 @@
         <h2>Upload completato</h2>
         <button id="closePostUploadBtn" class="secondary">Chiudi</button>
       </div>
+        <div id="postUploadTorrentLink" class="post-upload-torrent-link hidden">
+          <a id="postUploadTorrentLinkAnchor" href="#" class="torrent-page-link">Apri pagina torrent sul tracker ↗</a>
+        </div>
         <div class="post-upload-body">
           <div class="hint">Scarica il .torrent ufficiale dal tracker oppure invialo al client.</div>
           <div class="post-upload-actions">
-            <div class="post-upload-spacer"></div>
-            <div class="post-upload-center">
-              <button id="downloadTrackerTorrentBtn" class="primary">Download tracker .torrent</button>
-              <button id="sendToClientBtn" class="success" type="button" disabled title="In arrivo">
-                Invia al client torrent
-              </button>
-            </div>
-            <div class="post-upload-right">
-              <button id="openTrackerOutputBtn" class="secondary" type="button">Apri cartella job</button>
-            </div>
+            <button id="downloadTrackerTorrentBtn" class="primary">Download tracker .torrent</button>
+            <button id="sendToClientBtn" class="success" type="button" disabled title="In arrivo">
+              Invia al client torrent
+            </button>
+          </div>
+          <div class="post-upload-secondary">
+            <button id="openTrackerOutputBtn" class="secondary" type="button">Apri cartella job</button>
           </div>
           <div id="postUploadHint" class="hint"></div>
         </div>

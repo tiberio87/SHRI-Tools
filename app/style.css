@@ -1991,23 +1991,36 @@ body.light .badge.error {
   gap: 12px;
 }
 
-.post-upload-actions {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  gap: 10px;
+.post-upload-torrent-link {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));
+  text-align: center;
 }
 
-.post-upload-center {
+.torrent-page-link {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--accent-color, #4ea1f3);
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.torrent-page-link:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
+.post-upload-actions {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 10px;
-  justify-self: center;
   flex-wrap: wrap;
 }
 
-.post-upload-right {
-  justify-self: end;
+.post-upload-secondary {
+  display: flex;
+  justify-content: center;
 }
 
 .post-upload-actions .primary,
