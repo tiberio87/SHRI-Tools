@@ -1723,6 +1723,79 @@ body.light .badge.error {
   width: min(480px, 94vw);
 }
 
+/* ===== Disambiguation modal ===== */
+.disambiguation-modal {
+  width: min(520px, 96vw);
+}
+
+.disambiguation-intro {
+  margin: 0 0 12px;
+  opacity: 0.75;
+  font-size: 13px;
+}
+
+.disambiguation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.disambiguation-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  text-align: left;
+  width: 100%;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.disambiguation-item:hover {
+  background: var(--hover);
+  border-color: var(--accent);
+}
+
+.disambiguation-item-poster {
+  flex-shrink: 0;
+  width: 42px;
+  height: 62px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.disambiguation-item-poster img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.disambiguation-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.disambiguation-item-title {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.disambiguation-item-year {
+  font-size: 12px;
+  opacity: 0.65;
+}
+
 /* ===== MKV Tags section ===== */
 .mkv-tracks-wrapper {
   overflow-x: auto;

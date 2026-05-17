@@ -1687,6 +1687,67 @@ const renameFlow = createRenameFlow({
 
 ({ refreshPreview, schedulePreview, showMediaInfoReport } = renameFlow);
 
+function openDisambiguationModal(candidates) {
+  const modal = document.getElementById('disambiguationModal');
+  const list = document.getElementById('disambiguationList');
+  const cancelBtn = document.getElementById('disambiguationCancelBtn');
+  if (!modal || !list || !candidates?.length) return Promise.resolve(null);
+
+  list.innerHTML = '';
+  return new Promise((resolve) => {
+    let settled = false;
+    function close(value) {
+      if (settled) return;
+      settled = true;
+      modal.classList.add('hidden');
+      resolve(value);
+    }
+
+    candidates.forEach((c) => {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'disambiguation-item';
+
+      const poster = document.createElement('div');
+      poster.className = 'disambiguation-item-poster';
+      if (c.posterUrl) {
+        const img = document.createElement('img');
+        img.src = c.posterUrl;
+        img.alt = '';
+        poster.appendChild(img);
+      }
+      item.appendChild(poster);
+
+      const info = document.createElement('div');
+      info.className = 'disambiguation-item-info';
+      const title = document.createElement('div');
+      title.className = 'disambiguation-item-title';
+      title.textContent = c.title || '-';
+      const year = document.createElement('div');
+      year.className = 'disambiguation-item-year';
+      year.textContent = c.year || 'Anno sconosciuto';
+      info.appendChild(title);
+      info.appendChild(year);
+      item.appendChild(info);
+
+      item.addEventListener('click', () => close(c));
+      list.appendChild(item);
+    });
+
+    if (cancelBtn) {
+      const handler = () => close(null);
+      cancelBtn.addEventListener('click', handler, { once: true });
+    }
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal || e.target.classList.contains('modal-backdrop')) {
+        close(null);
+      }
+    }, { once: true });
+
+    modal.classList.remove('hidden');
+  });
+}
+
 const autoDetectFlow = createAutoDetectFlow({
   ui,
   state,
@@ -1705,7 +1766,8 @@ const autoDetectFlow = createAutoDetectFlow({
   getPathBaseName,
   getParentPath,
   isDiscStructure,
-  fetchMetadata: (payload) => window.api.fetchMetadata(payload)
+  fetchMetadata: (payload) => window.api.fetchMetadata(payload),
+  onAmbiguity: openDisambiguationModal
 });
 
 ({ fetchMetadataAuto, autoDetectFromPath, updateAutoDetectControls, manualDetectFromInputs } = autoDetectFlow);
