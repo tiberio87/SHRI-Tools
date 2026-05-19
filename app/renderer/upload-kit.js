@@ -658,6 +658,31 @@ export function createUploadKit(deps) {
     return Boolean(settings?.qbitHost && settings?.qbitUsername && settings?.qbitPassword);
   }
 
+  function parseQbitCategories(settings) {
+    return String(settings?.qbitCategories || settings?.qbitCategory || '')
+      .split('\n')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+
+  function populateQbitCategorySelect(settings) {
+    const categoryRow = document.getElementById('qbitCategoryRow');
+    if (!ui.qbitCategorySelect) return;
+    const cats = parseQbitCategories(settings);
+    if (cats.length <= 1) {
+      if (categoryRow) categoryRow.classList.add('hidden');
+      return;
+    }
+    ui.qbitCategorySelect.innerHTML = '';
+    cats.forEach((cat) => {
+      const opt = document.createElement('option');
+      opt.value = cat;
+      opt.textContent = cat;
+      ui.qbitCategorySelect.appendChild(opt);
+    });
+    if (categoryRow) categoryRow.classList.remove('hidden');
+  }
+
   function getJobFileTitle() {
     const raw = String(ui.torrentNameInput?.value || '').trim();
     return raw
@@ -699,8 +724,8 @@ export function createUploadKit(deps) {
     if (ui.sendToClientBtn) {
       ui.sendToClientBtn.disabled = !canSendToClient(settings);
     }
+    populateQbitCategorySelect(settings);
     if (!outputDir) {
-      setPostUploadHint('Imposta la cartella output .torrent nelle impostazioni.');
     } else if (!lastUploadDownloadUrl) {
       setPostUploadHint('URL di download non disponibile nella risposta del tracker.');
     } else {
@@ -733,6 +758,7 @@ export function createUploadKit(deps) {
     if (ui.sendToClientBtn) {
       ui.sendToClientBtn.disabled = !canSendToClient(settings);
     }
+    populateQbitCategorySelect(settings);
     const timeLabel = last.createdAt ? new Date(last.createdAt).toLocaleString() : '';
     const titleLabel = last.title ? `Ultimo upload: ${last.title}` : 'Ultimo upload';
     const hintParts = [titleLabel, timeLabel].filter(Boolean);
@@ -894,19 +920,24 @@ export function createUploadKit(deps) {
         });
         logDebug?.('transmission add response', result);
       } else {
+        const qbitCats = parseQbitCategories(settings);
+        const qbitCategory =
+          qbitCats.length > 1
+            ? ui.qbitCategorySelect?.value || qbitCats[0] || ''
+            : qbitCats[0] || '';
         result = await window.api.qbitAddTorrent({
           baseUrl,
           username: settings.qbitUsername,
           password: settings.qbitPassword,
           torrentPath: lastTrackerTorrentPath,
           savePath,
-          category: settings.qbitCategory || '',
+          category: qbitCategory,
           paused: settings.qbitAutoStart === false
         });
         logDebug?.('qbit add payload', {
           baseUrl,
           savePath,
-          category: settings.qbitCategory || '',
+          category: qbitCategory,
           paused: settings.qbitAutoStart === false
         });
         logDebug?.('qbit add response', result);

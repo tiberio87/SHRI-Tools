@@ -2083,6 +2083,22 @@ body.light .badge.error {
   opacity: 0.85;
 }
 
+.qbit-category-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding: 0 4px;
+}
+.qbit-category-row label {
+  white-space: nowrap;
+  font-size: 13px;
+  opacity: 0.8;
+}
+.qbit-category-row select {
+  flex: 1;
+}
+
 .post-upload-actions {
   display: flex;
   justify-content: center;
