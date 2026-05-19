@@ -42,7 +42,7 @@ const DEFAULT_SETTINGS = {
   qbitPassword: '',
   qbitHttps: false,
   qbitSavePath: '',
-  qbitCategory: '',
+  qbitCategories: '',
   qbitAutoStart: true,
   qbitPathMapLocal: '',
   qbitPathMapRemote: '',
@@ -172,6 +172,10 @@ export function createSettingsTools({
     if (ui.transmissionSettingsSection) {
       ui.transmissionSettingsSection.classList.toggle('hidden', client !== 'transmission');
     }
+    if (ui.qbitTestBtn) ui.qbitTestBtn.classList.toggle('hidden', client !== 'qbit');
+    if (ui.qbitTestHint) ui.qbitTestHint.classList.toggle('hidden', client !== 'qbit');
+    if (ui.transmissionTestBtn) ui.transmissionTestBtn.classList.toggle('hidden', client !== 'transmission');
+    if (ui.transmissionTestHint) ui.transmissionTestHint.classList.toggle('hidden', client !== 'transmission');
   }
 
   function buildIntegratedHealthStatus(settings) {
@@ -441,8 +445,8 @@ export function createSettingsTools({
     if (ui.qbitSavePathInput) {
       ui.qbitSavePathInput.value = settings.qbitSavePath || '';
     }
-    if (ui.qbitCategoryInput) {
-      ui.qbitCategoryInput.value = settings.qbitCategory || '';
+    if (ui.qbitCategoriesInput) {
+      ui.qbitCategoriesInput.value = settings.qbitCategories || settings.qbitCategory || '';
     }
     if (ui.qbitAutoStartToggle) {
       ui.qbitAutoStartToggle.checked = settings.qbitAutoStart !== false;
@@ -578,7 +582,7 @@ export function createSettingsTools({
       qbitPassword: ui.qbitPasswordInput?.value.trim() || '',
       qbitHttps: Boolean(ui.qbitHttpsToggle?.checked),
       qbitSavePath: ui.qbitSavePathInput?.value.trim() || '',
-      qbitCategory: ui.qbitCategoryInput?.value.trim() || '',
+      qbitCategories: ui.qbitCategoriesInput?.value.trim() || '',
       qbitAutoStart: Boolean(ui.qbitAutoStartToggle?.checked),
       qbitPathMapLocal: ui.qbitPathMapLocalInput?.value.trim() || '',
       qbitPathMapRemote: ui.qbitPathMapRemoteInput?.value.trim() || '',

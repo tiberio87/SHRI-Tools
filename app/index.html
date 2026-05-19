@@ -753,19 +753,9 @@
             <input id="qbitSavePathInput" type="text" placeholder="Es. D:\\Downloads" />
           </div>
           <div class="field">
-            <label for="qbitCategoryInput">Categoria/Tag (opzionale)</label>
-            <input id="qbitCategoryInput" type="text" placeholder="Es. SHRI" />
+            <label for="qbitCategoriesInput">Categorie (una per riga, opzionale)</label>
+            <textarea id="qbitCategoriesInput" rows="3" placeholder="Es.&#10;Films&#10;Serie TV&#10;Anime"></textarea>
           </div>
-        </div>
-        <div class="row">
-          <label class="checkbox">
-            <input id="qbitHttpsToggle" type="checkbox" />
-            Usa HTTPS
-          </label>
-          <label class="checkbox">
-            <input id="qbitAutoStartToggle" type="checkbox" checked />
-            Avvia torrent automaticamente
-          </label>
         </div>
         <div class="row settings-grid">
           <div class="field">
@@ -780,9 +770,15 @@
         <div class="row">
           <div id="qbitMappingHint" class="hint">Usa il mapping solo se il client gira su un'altra macchina.</div>
         </div>
-        <div class="settings-row">
-          <button id="qbitTestBtn" class="secondary small" type="button">Test connessione</button>
-          <div id="qbitTestHint" class="hint"></div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="qbitHttpsToggle" type="checkbox" />
+            Usa HTTPS
+          </label>
+          <label class="checkbox">
+            <input id="qbitAutoStartToggle" type="checkbox" checked />
+            Avvia torrent automaticamente
+          </label>
         </div>
       </div>
 
@@ -844,15 +840,15 @@
         <div class="row">
           <div id="transmissionMappingHint" class="hint">Usa il mapping solo se il client gira su un'altra macchina.</div>
         </div>
-        <div class="settings-row">
-          <button id="transmissionTestBtn" class="secondary small" type="button">Test connessione</button>
-          <div id="transmissionTestHint" class="hint"></div>
-        </div>
       </div>
       </div>
       <div class="settings-footer">
         <div class="settings-footer-left">
+          <button id="qbitTestBtn" class="secondary small" type="button">Test connessione</button>
+          <button id="transmissionTestBtn" class="secondary small hidden" type="button">Test connessione</button>
           <div id="settingsHint" class="hint"></div>
+          <div id="qbitTestHint" class="hint"></div>
+          <div id="transmissionTestHint" class="hint hidden"></div>
         </div>
         <div class="settings-footer-right">
           <button id="openRulesBtn" class="secondary small">Apri rules</button>
@@ -1046,6 +1042,10 @@
         </div>
         <div class="post-upload-body">
           <div class="hint">Scarica il .torrent ufficiale dal tracker oppure invialo al client.</div>
+          <div id="qbitCategoryRow" class="qbit-category-row hidden">
+            <label for="qbitCategorySelect">Categoria qBittorrent</label>
+            <select id="qbitCategorySelect"></select>
+          </div>
           <div class="post-upload-actions">
             <button id="downloadTrackerTorrentBtn" class="primary">Download tracker .torrent</button>
             <button id="sendToClientBtn" class="success" type="button" disabled title="In arrivo">
