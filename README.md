@@ -27,13 +27,27 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Dupe check automatico sul tracker con filtri dedicati.
 - Upload diretto al tracker + invio al client torrent (qBittorrent / Transmission).
 - Compatibile con **qBittorrent 5.2.0+** (gestione cookie `QBT_SID_<porta>`, header CSRF, risposta HTTP 204).
+- **Cartella job**: al termine del flusso viene creata automaticamente una cartella `<OutputDir>/<Titolo>/` con file a nome fisso:
+  - `BASE.torrent` — torrent generato localmente
+  - `MEDIAINFO.txt` — output MediaInfo completo
+  - `DEBUG.txt` — log diagnostico
+  - `[SHRI]DESCRIPTION.txt` — BBCode della descrizione
+  - `image_data.json` — dati screenshot per ripristino automatico
+  - `image_urls.txt` — URL degli screenshot caricati, uno per riga
 
 ### 3. Analisi Tracker
 - Inserisci un link Unit3D e ottieni:
   - titolo suggerito secondo le rules,
   - MediaInfo sintetico,
   - badge ID meta copiabili,
-  - segnalazione mismatch ID.
+  - segnalazione mismatch ID,
+  - **BBCode generato automaticamente** dai metadati del torrent analizzato.
+- Al termine dell'analisi si apre il **modal BBCode** con i tasti:
+  - **Modifica** — abilita la modifica diretta del testo
+  - **Anteprima** — rendering visivo del BBCode
+  - **Copia** — copia negli appunti
+- Il footer del BBCode generato da analisi riporta `Edited by SHRI-Tools vX.X.X` per distinguerlo da una descrizione creata ex novo.
+- Il **pulsante Anteprima BBCode** nell'area azioni principali apre lo stesso modal in qualsiasi momento, anche senza passare dall'analisi tracker.
 
 ### 4. Generazione Screenshot
 - Cattura automatica dei frame tramite FFmpeg con tempi ottimizzati.
@@ -86,7 +100,7 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 
 **qBittorrent**
 - Host / Porta / HTTPS, Username / Password.
-- Save path, Categoria, Auto-start.
+- Save path, Categoria (supporto **categorie multiple** separate da virgola), Auto-start.
 - Path mapping locale/remoto (quando il client e` su altra macchina).
 
 **Transmission**
