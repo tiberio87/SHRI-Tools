@@ -1445,9 +1445,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     const settings = loadSettings();
     const jobDir = buildTrackerOutputDir(settings, getJobFileTitle());
     if (jobDir && uploadMiFullCache && uploadMiFullCache !== 'Nessun output disponibile.') {
-      const fileTitle = getJobFileTitle();
       const sep = jobDir.includes('\\') ? '\\' : '/';
-      try { await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}${fileTitle}.mediainfo.txt`, content: uploadMiFullCache }); } catch {}
+      try { await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}MEDIAINFO.txt`, content: uploadMiFullCache }); } catch {}
     }
     return uploadMiFullCache;
   }
@@ -2073,7 +2072,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
 
     // Ripristina screenshots dal JSON salvato
     if (!state.screenshots.length) {
-      const jsonPath = `${jobDir}${sep}${fileTitle}.screenshots.json`;
+      const jsonPath = `${jobDir}${sep}image_data.json`;
       const res = await window.api?.readFileText?.(jsonPath).catch(() => null);
       if (res?.ok && res.content) {
         try {
@@ -2187,14 +2186,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       if (jobDirLog && debugState.buffer.length) {
         const safeTitleLog = getJobFileTitle();
         const sepLog = jobDirLog.includes('\\') ? '\\' : '/';
-        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}${safeTitleLog}.debug-log.txt`, content: debugState.buffer.join('\n') }); } catch {}
+        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}DEBUG.txt`, content: debugState.buffer.join('\n') }); } catch {}
       }
       // salva metadata screenshots per ripristino automatico
       if (jobDirLog && state.screenshots.length) {
-        const safeTitleScreens = getJobFileTitle();
         const sepScreens = jobDirLog.includes('\\') ? '\\' : '/';
         const screensJson = JSON.stringify({ screenshots: state.screenshots, meta: state.screenshotsMeta });
-        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepScreens}${safeTitleScreens}.screenshots.json`, content: screensJson }); } catch {}
+        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepScreens}image_data.json`, content: screensJson }); } catch {}
       }
     } else {
       logDebug?.('screens: error', { error: result?.error || 'unknown' });
@@ -2219,9 +2217,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     const settings = loadSettings();
     const jobDir = buildTrackerOutputDir(settings, getJobFileTitle());
     if (jobDir && content && content !== '-') {
-      const fileTitle = getJobFileTitle();
       const sep = jobDir.includes('\\') ? '\\' : '/';
-      try { window.api?.saveFileDirect({ filePath: `${jobDir}${sep}${fileTitle}.txt`, content }); } catch {}
+      try { window.api?.saveFileDirect({ filePath: `${jobDir}${sep}[SHRI]DESCRIPTION.txt`, content }); } catch {}
     }
   }
 
@@ -2468,9 +2465,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (!jobDir) return;
     const mi = await ensureUploadMiFullCache();
     if (!mi || mi === 'Caricamento...' || mi === 'Nessun output disponibile.') return;
-    const fileTitle = getJobFileTitle();
     const sep = jobDir.includes('\\') ? '\\' : '/';
-    try { await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}${fileTitle}.mediainfo.txt`, content: mi }); } catch {}
+    try { await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}MEDIAINFO.txt`, content: mi }); } catch {}
   }
 
   return {
