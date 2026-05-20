@@ -386,6 +386,7 @@
             <button id="applyRenameBtn" class="primary">Applica rinomina</button>
             <button id="reopenLastUploadBtn" class="secondary small hidden push-right" type="button">Riapri ultimo upload</button>
             <button id="openUploadWizardBtn" class="success torrent-button" type="button">Upload Wizard</button>
+            <button id="bbcodePreviewBtn" class="secondary small" type="button">Anteprima BBCode</button>
           </div>
           <div id="renameHint" class="hint"></div>
         </section>
@@ -931,6 +932,24 @@
         <div class="modal-actions">
           <button id="trackerAnalyzeBtn" class="primary">Analizza</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="bbcodeModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide">
+      <div class="modal-header">
+        <h3>BBCode generato</h3>
+        <div class="modal-actions">
+          <button id="bbcodeEditBtn" class="secondary small">Modifica</button>
+          <button id="bbcodeRenderPreviewBtn" class="secondary small">Anteprima</button>
+          <button id="bbcodeCopyBtn" class="primary small">Copia</button>
+          <button id="bbcodeCloseBtn" class="secondary small">Chiudi</button>
+        </div>
+      </div>
+      <div class="modal-body">
+        <textarea id="bbcodeTextarea" class="upload-desc-text" readonly></textarea>
       </div>
     </div>
   </div>

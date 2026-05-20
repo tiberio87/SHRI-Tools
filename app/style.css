@@ -2545,6 +2545,29 @@ body.light .badge.error {
   width: min(900px, 94vw);
 }
 
+#bbcodeModal .modal-content {
+  width: min(1100px, 96vw);
+  height: min(86vh, 900px);
+  max-height: none;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#bbcodeModal .modal-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#bbcodeModal #bbcodeTextarea {
+  flex: 1;
+  min-height: 0;
+  resize: none;
+  height: 100%;
+}
+
 .text-output {
   margin: 0;
   padding: 12px;

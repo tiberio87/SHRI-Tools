@@ -1787,6 +1787,50 @@ const autoDetectFlow = createAutoDetectFlow({
   };
 }
 
+function showBbcodeModal(content) {
+  if (!ui.bbcodeModal || !ui.bbcodeTextarea) return;
+  ui.bbcodeTextarea.value = content || '';
+  ui.bbcodeTextarea.readOnly = true;
+  if (ui.bbcodeEditBtn) ui.bbcodeEditBtn.textContent = 'Modifica';
+  ui.bbcodeModal.classList.remove('hidden');
+}
+
+function closeBbcodeModal() {
+  if (!ui.bbcodeModal) return;
+  ui.bbcodeModal.classList.add('hidden');
+}
+
+if (ui.bbcodeCloseBtn) ui.bbcodeCloseBtn.addEventListener('click', closeBbcodeModal);
+ui.bbcodeModal?.querySelector('.modal-backdrop')?.addEventListener('click', closeBbcodeModal);
+
+if (ui.bbcodePreviewBtn) {
+  ui.bbcodePreviewBtn.addEventListener('click', () => {
+    showBbcodeModal(uploadKit.buildUploadDescription(getFormState()));
+  });
+}
+
+if (ui.bbcodeEditBtn) {
+  ui.bbcodeEditBtn.addEventListener('click', () => {
+    if (!ui.bbcodeTextarea) return;
+    const isEditing = !ui.bbcodeTextarea.readOnly;
+    ui.bbcodeTextarea.readOnly = isEditing;
+    ui.bbcodeEditBtn.textContent = isEditing ? 'Modifica' : 'Blocca';
+    if (!isEditing) ui.bbcodeTextarea.focus();
+  });
+}
+
+if (ui.bbcodeCopyBtn) {
+  ui.bbcodeCopyBtn.addEventListener('click', () => {
+    copyToClipboard(ui.bbcodeTextarea?.value || '', 'BBCode copiato.');
+  });
+}
+
+if (ui.bbcodeRenderPreviewBtn) {
+  ui.bbcodeRenderPreviewBtn.addEventListener('click', () => {
+    uploadKit.showBbcodePreview(ui.bbcodeTextarea?.value || '');
+  });
+}
+
 const trackerAnalysis = createTrackerAnalysis({
   ui,
   state,
@@ -1804,7 +1848,8 @@ const trackerAnalysis = createTrackerAnalysis({
   schedulePreview,
   fetchMetadataAuto,
   setIfAuto,
-  setInputAuto
+  setInputAuto,
+  refreshUploadDescription: () => showBbcodeModal(uploadKit.buildUploadDescription(getFormState(), { edited: true }))
 });
 trackerAnalysis.init();
 
