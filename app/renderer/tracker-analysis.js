@@ -284,7 +284,8 @@ export function createTrackerAnalysis({
   schedulePreview,
   fetchMetadataAuto,
   setIfAuto,
-  setInputAuto
+  setInputAuto,
+  refreshUploadDescription
 }) {
   const openModal = () => {
     if (!ui.trackerModal) {
@@ -710,6 +711,7 @@ export function createTrackerAnalysis({
     });
 
     schedulePreview();
+    refreshUploadDescription?.();
   }
 
   async function handleAnalyze() {
