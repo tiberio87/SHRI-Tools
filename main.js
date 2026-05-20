@@ -3347,6 +3347,12 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (details?.imdb_id && !result.imdbId) {
           result.imdbId = details.imdb_id;
         }
+        if (!result.imdbId) {
+          const external = await fetchTmdbExternalIds(type, tmdbId, tmdbKey);
+          if (external?.imdb_id) {
+            result.imdbId = external.imdb_id;
+          }
+        }
         const originalLang = String(details?.original_language || '');
         const tmdbMissingLocalizedTitle =
           wantsItalianTitle &&
@@ -3359,7 +3365,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
           result.warnings.push('TMDB: titolo localizzato non disponibile.');
         }
         if (tmdbMissingLocalizedTitle || (wantsItalianTitle && !result.title)) {
-          let imdbLookup = result.imdbId || '';
+          const imdbLookup = result.imdbId || '';
           if (imdbLookup) {
             const akas = await fetchImdbAkas(imdbLookup);
             const italianTitle = pickItalianImdbTitle(akas);
@@ -3459,6 +3465,12 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (details?.imdb_id && !result.imdbId) {
           result.imdbId = details.imdb_id;
         }
+        if (!result.imdbId) {
+          const external = await fetchTmdbExternalIds(resolvedType, first.id, tmdbKey);
+          if (external?.imdb_id) {
+            result.imdbId = external.imdb_id;
+          }
+        }
         const originalLang = String(details?.original_language || '');
         const tmdbMissingLocalizedTitle =
           wantsItalianTitle &&
@@ -3471,14 +3483,7 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
           result.warnings.push('TMDB: titolo localizzato non disponibile.');
         }
         if (tmdbMissingLocalizedTitle || (wantsItalianTitle && !result.title)) {
-          let imdbLookup = result.imdbId || '';
-          if (!imdbLookup && tmdbKey) {
-            const external = await fetchTmdbExternalIds(resolvedType, first.id, tmdbKey);
-            imdbLookup = external?.imdb_id || '';
-            if (imdbLookup) {
-              result.imdbId = imdbLookup;
-            }
-          }
+          const imdbLookup = result.imdbId || '';
           if (imdbLookup) {
             const akas = await fetchImdbAkas(imdbLookup);
             const italianTitle = pickItalianImdbTitle(akas);
@@ -3502,6 +3507,9 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
       tvdbId;
     if (!tvdbKey && tvdbWanted) {
       result.warnings.push('TVDB key mancante: episodi non recuperati.');
+      if (tvdbId) {
+        result.tvdbSeriesId = tvdbId;
+      }
     }
 
     if (tvdbKey && tvdbWanted) {
