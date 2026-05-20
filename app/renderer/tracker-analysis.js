@@ -754,13 +754,10 @@ export function createTrackerAnalysis({
   }
 
   function init() {
-    if (!ui.trackerModal || !ui.trackerOpenBtn) {
+    if (!ui.trackerAnalyzeBtn && !ui.trackerUrlInput) {
       return;
     }
-    ui.trackerOpenBtn.addEventListener('click', openModal);
     ui.trackerAnalyzeBtn?.addEventListener('click', handleAnalyze);
-    ui.trackerCloseBtn?.addEventListener('click', closeModal);
-    ui.trackerModal.querySelector('.modal-backdrop')?.addEventListener('click', closeModal);
     ui.trackerUrlInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();

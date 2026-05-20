@@ -1809,6 +1809,12 @@ if (ui.bbcodePreviewBtn) {
   });
 }
 
+if (ui.bbcodeDirectCopyBtn) {
+  ui.bbcodeDirectCopyBtn.addEventListener('click', () => {
+    copyToClipboard(uploadKit.buildUploadDescription(getFormState()), 'BBCode copiato.');
+  });
+}
+
 if (ui.bbcodeEditBtn) {
   ui.bbcodeEditBtn.addEventListener('click', () => {
     if (!ui.bbcodeTextarea) return;

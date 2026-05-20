@@ -679,6 +679,21 @@ body:not(.light) .theme-toggle .icon-moon {
   flex-wrap: wrap;
 }
 
+.tracker-url-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tracker-url-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.tracker-url-row button {
+  flex-shrink: 0;
+}
+
 .action-row .primary,
 .action-row .secondary {
   width: auto;
