@@ -2266,7 +2266,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         .map((img, i) => `[${i + 1}] ${img.displayUrl || img.rawUrl}${img.viewerUrl ? `  viewer: ${img.viewerUrl}` : ''}`);
       if (urlLines.length) {
         try {
-          const urlFileName = screensJobTitle ? `${screensJobTitle}.screens-urls.txt` : 'screens-urls.txt';
+          const urlFileName = 'image_urls.txt';
           await fs.writeFile(path.join(effectiveOutputDir, urlFileName), urlLines.join('\n'), 'utf8');
         } catch {}
       }

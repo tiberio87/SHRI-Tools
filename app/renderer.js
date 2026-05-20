@@ -2331,7 +2331,7 @@ if (ui.generateTorrentBtn) {
       targetPath: state.targetPath,
       announce,
       outputDir,
-      outputName,
+      outputName: 'BASE',
       private: isPrivate,
       requestId: currentTorrentRequestId,
       mkbrrPath: settings.torrentMkbrrPath || '',
