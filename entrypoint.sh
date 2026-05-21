@@ -1,13 +1,15 @@
 #!/bin/bash
 set -e
 
+X11_WAIT_TIMEOUT=10
+
 mkdir -p "${HOME:-/data}" /tmp/runtime-root
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
 
 # Start virtual display
 Xvfb :1 -screen 0 1920x1080x24 &
 
-for _ in $(seq 1 10); do
+for _ in $(seq 1 "$X11_WAIT_TIMEOUT"); do
   if [ -S /tmp/.X11-unix/X1 ]; then
     break
   fi
