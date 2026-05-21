@@ -44,8 +44,10 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-    mkbrr_version="$(basename "$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)" | sed 's/^v//')"; \
-    [ -n "$mkbrr_version" ]; \
+    mkbrr_redirect_url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)"; \
+    mkbrr_tag="$(basename "$mkbrr_redirect_url")"; \
+    mkbrr_version="${mkbrr_tag#v}"; \
+    [ -n "$mkbrr_version" ] || { echo "Unable to determine mkbrr version from $mkbrr_redirect_url" >&2; exit 1; }; \
     mkdir -p /tmp/mkbrr-extract; \
     curl -fsSL "https://github.com/autobrr/mkbrr/releases/download/v${mkbrr_version}/mkbrr_${mkbrr_version}_linux_amd64.tar.gz" -o /tmp/mkbrr.tar.gz; \
     tar -xzf /tmp/mkbrr.tar.gz -C /tmp/mkbrr-extract; \
@@ -66,7 +68,7 @@ RUN set -eux; \
             break; \
         fi; \
     done; \
-    [ -n "$bdinfo_url" ]; \
+    [ -n "$bdinfo_url" ] || { echo "Unable to locate a supported BDInfo Linux asset" >&2; exit 1; }; \
     curl -fsSL "$bdinfo_url" -o /tmp/bdinfo-archive; \
     case "$bdinfo_url" in \
         *.zip) unzip -q /tmp/bdinfo-archive -d /opt/bdinfo ;; \
@@ -85,7 +87,7 @@ RUN set -eux; \
         ln -sf "$bdinfo_bin" /usr/local/bin/bdinfo; \
     else \
         bdinfo_dll="$(find /opt/bdinfo -type f -name 'BDInfo*.dll' | head -n 1)"; \
-        [ -n "$bdinfo_dll" ]; \
+        [ -n "$bdinfo_dll" ] || { echo "Unable to find a BDInfo executable or DLL in /opt/bdinfo" >&2; exit 1; }; \
         printf '#!/bin/sh\nexec dotnet "%s" "$@"\n' "$bdinfo_dll" > /usr/local/bin/bdinfo; \
         chmod +x /usr/local/bin/bdinfo; \
     fi; \

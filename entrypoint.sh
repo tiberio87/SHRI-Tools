@@ -16,7 +16,10 @@ for _ in $(seq 1 "$X11_WAIT_TIMEOUT"); do
   sleep 1
 done
 
-[ -S /tmp/.X11-unix/X1 ]
+if [ ! -S /tmp/.X11-unix/X1 ]; then
+  echo "Error: X11 socket not available after ${X11_WAIT_TIMEOUT} seconds" >&2
+  exit 1
+fi
 
 # Start window manager
 fluxbox &
