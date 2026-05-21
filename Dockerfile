@@ -29,10 +29,12 @@ RUN apt-get update \
     && rm -f /tmp/packages-microsoft-prod.deb \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        xvfb \
-        x11vnc \
+        tigervnc-standalone-server \
         fluxbox \
         ffmpeg \
+        mkvtoolnix \
+        novnc \
+        websockify \
         libgtk-3-0 \
         libnotify4 \
         libnss3 \
@@ -52,50 +54,19 @@ RUN set -eux; \
     mkbrr_version="${mkbrr_tag#v}"; \
     [ -n "$mkbrr_version" ] || { echo "Failed to extract version from mkbrr latest release redirect" >&2; exit 1; }; \
     mkdir -p /tmp/mkbrr-extract; \
-    curl --max-time 60 -fsSL "https://github.com/autobrr/mkbrr/releases/download/v${mkbrr_version}/mkbrr_${mkbrr_version}_linux_amd64.tar.gz" -o /tmp/mkbrr.tar.gz; \
+    curl --max-time 60 -fsSL "https://github.com/autobrr/mkbrr/releases/download/v${mkbrr_version}/mkbrr_${mkbrr_version}_linux_x86_64.tar.gz" -o /tmp/mkbrr.tar.gz; \
     tar -xzf /tmp/mkbrr.tar.gz -C /tmp/mkbrr-extract; \
     install -m 0755 "$(find /tmp/mkbrr-extract -type f -name mkbrr | head -n 1)" /usr/local/bin/mkbrr; \
     rm -rf /tmp/mkbrr.tar.gz /tmp/mkbrr-extract
 
 RUN set -eux; \
     mkdir -p /opt/bdinfo; \
-    bdinfo_url=""; \
-    for candidate in \
-        "https://github.com/UniqProject/BDInfo/releases/latest/download/BDInfo.CLI-linux-x64.zip" \
-        "https://github.com/UniqProject/BDInfo/releases/latest/download/BDInfo-linux-x64.zip" \
-        "https://github.com/UniqProject/BDInfo/releases/latest/download/BDInfo.CLI-linux-x64.tar.gz" \
-        "https://github.com/UniqProject/BDInfo/releases/latest/download/BDInfo-linux-x64.tar.gz" \
-        "https://github.com/tetrahydroc/BDInfoCLI/releases/latest/download/BDInfo-linux-x64.tar.gz"; do \
-        if curl --max-time 15 -fsSLI "$candidate" > /dev/null; then \
-            bdinfo_url="$candidate"; \
-            break; \
-        else \
-            echo "Skipping unavailable BDInfo asset: $candidate" >&2; \
-        fi; \
-    done; \
-    [ -n "$bdinfo_url" ] || { echo "Unable to locate a supported BDInfo Linux asset" >&2; exit 1; }; \
-    curl --max-time 60 -fsSL "$bdinfo_url" -o /tmp/bdinfo-archive; \
-    case "$bdinfo_url" in \
-        *.zip) unzip -q /tmp/bdinfo-archive -d /opt/bdinfo ;; \
-        *.tar.gz) tar -xzf /tmp/bdinfo-archive -C /opt/bdinfo ;; \
-        *) echo "Unsupported BDInfo archive: $bdinfo_url" >&2; exit 1 ;; \
-    esac; \
-    bdinfo_bin=""; \
-    for candidate in BDInfo.CLI BDInfo bdinfo; do \
-        bdinfo_bin="$(find /opt/bdinfo -type f -name "$candidate" | head -n 1)"; \
-        if [ -n "$bdinfo_bin" ]; then \
-            break; \
-        fi; \
-    done; \
-    if [ -n "$bdinfo_bin" ]; then \
-        chmod +x "$bdinfo_bin"; \
-        ln -sf "$bdinfo_bin" /usr/local/bin/bdinfo; \
-    else \
-        bdinfo_dll="$(find /opt/bdinfo -type f -name 'BDInfo*.dll' | head -n 1)"; \
-        [ -n "$bdinfo_dll" ] || { echo "Unable to find a BDInfo executable or DLL in /opt/bdinfo" >&2; exit 1; }; \
-        printf '#!/bin/sh\nexec dotnet "%s" "$@"\n' "$bdinfo_dll" > /usr/local/bin/bdinfo; \
-        chmod +x /usr/local/bin/bdinfo; \
-    fi; \
+    curl --max-time 60 -fsSL "https://github.com/Audionut/BDInfoCLI-ng/releases/latest/download/bdinfo-linux-x64.tar.gz" -o /tmp/bdinfo-archive; \
+    tar -xzf /tmp/bdinfo-archive -C /opt/bdinfo; \
+    bdinfo_bin="$(find /opt/bdinfo -type f -name "bdinfo" | head -n 1)"; \
+    [ -n "$bdinfo_bin" ] || { echo "Unable to find bdinfo binary in /opt/bdinfo" >&2; exit 1; }; \
+    chmod +x "$bdinfo_bin"; \
+    ln -sf "$bdinfo_bin" /usr/local/bin/bdinfo; \
     rm -f /tmp/bdinfo-archive
 
 COPY package*.json ./
@@ -106,9 +77,10 @@ COPY assets ./assets
 COPY main.js preload.js ./
 COPY entrypoint.sh /entrypoint.sh
 
-RUN chmod +x /entrypoint.sh \
+RUN sed -i 's/\r//' /entrypoint.sh \
+    && chmod +x /entrypoint.sh \
     && mkdir -p /data
 
-EXPOSE 5901
+EXPOSE 5901 6080
 
 ENTRYPOINT ["/entrypoint.sh"]

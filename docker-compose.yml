@@ -6,8 +6,11 @@ services:
     container_name: shri-tools
     ports:
       - "5901:5901"
+      - "6080:6080"
     volumes:
       - ./data:/data
+      - ./media:/media
+      - ./output:/output
       - /tmp/.X11-unix:/tmp/.X11-unix
     environment:
       - VNC_PASSWORD=${VNC_PASSWORD:-changeme}

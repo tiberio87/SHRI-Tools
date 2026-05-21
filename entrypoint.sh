@@ -5,15 +5,11 @@ X11_WAIT_TIMEOUT=10
 
 mkdir -p "${HOME:-/data}" /tmp/runtime-root
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
-VNC_PASSWD_FILE="$(mktemp)"
-trap 'rm -f "$VNC_PASSWD_FILE"' EXIT
+# Start TigerVNC (X display + VNC server in one process)
+/usr/bin/Xtigervnc :1 -desktop "SHRI-Tools" -SecurityTypes None -rfbport 5901 \
+  -geometry 1920x1080 -depth 24 -localhost no &
 
-x11vnc -storepasswd "${VNC_PASSWORD:-changeme}" "$VNC_PASSWD_FILE" >/dev/null
-chmod 600 "$VNC_PASSWD_FILE"
-
-# Start virtual display
-Xvfb :1 -screen 0 1920x1080x24 &
-
+# Wait for X display
 for _ in $(seq 1 "$X11_WAIT_TIMEOUT"); do
   if [ -S /tmp/.X11-unix/X1 ]; then
     break
@@ -29,13 +25,13 @@ fi
 # Start window manager
 fluxbox &
 
-# Start VNC server
-x11vnc -display :1 -forever -rfbport 5901 -rfbauth "$VNC_PASSWD_FILE" -shared &
+# Start noVNC (browser access on port 6080)
+websockify --web /usr/share/novnc/ 6080 localhost:5901 &
 
 echo "VNC server avviato sulla porta 5901"
-echo "Collegati con un client VNC all'indirizzo: <host>:5901"
-echo "Password: ${VNC_PASSWORD:-changeme}"
+echo "noVNC browser UI disponibile su: http://localhost:6080/vnc.html"
 
 # Start Electron app
+# --disable-gpu forces software rendering so X11 damage events reach TigerVNC correctly
 cd /app
-exec npm start -- --no-sandbox
+exec npm start -- --no-sandbox --disable-gpu
