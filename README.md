@@ -162,7 +162,7 @@ docker compose up -d
 - host: `localhost:5901` (o `<host>:5901` da un'altra macchina);
 - password: valore della variabile `VNC_PASSWORD` (default `changeme`).
 
-Per cambiare password basta aggiornare `VNC_PASSWORD` nel file `docker-compose.yml` oppure esportarla da shell prima del build/up. **Importante:** cambia subito la password di default prima di esporre il container fuori dalla macchina locale.
+Per cambiare password basta aggiornare `VNC_PASSWORD` nel file `docker-compose.yml` oppure esportarla da shell prima del `docker compose up`. **Importante:** cambia subito la password di default prima di esporre il container fuori dalla macchina locale.
 
 ### Configurazione percorsi nell'app
 

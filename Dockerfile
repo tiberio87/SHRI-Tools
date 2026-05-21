@@ -46,7 +46,8 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-    mkbrr_redirect_url="$(curl --max-time 15 -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)"; \
+    mkbrr_redirect_url="$(curl --max-time 15 -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)" \
+        || { echo "Failed to query mkbrr latest release redirect" >&2; exit 1; }; \
     mkbrr_tag="$(basename "$mkbrr_redirect_url")"; \
     mkbrr_version="${mkbrr_tag#v}"; \
     [ -n "$mkbrr_version" ] || { echo "Failed to extract version from mkbrr latest release redirect" >&2; exit 1; }; \
@@ -68,6 +69,8 @@ RUN set -eux; \
         if curl --max-time 15 -fsSLI "$candidate" > /dev/null; then \
             bdinfo_url="$candidate"; \
             break; \
+        else \
+            echo "Skipping unavailable BDInfo asset: $candidate" >&2; \
         fi; \
     done; \
     [ -n "$bdinfo_url" ] || { echo "Unable to locate a supported BDInfo Linux asset" >&2; exit 1; }; \

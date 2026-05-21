@@ -6,6 +6,7 @@ X11_WAIT_TIMEOUT=10
 mkdir -p "${HOME:-/data}" /tmp/runtime-root
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
 VNC_PASSWD_FILE="$(mktemp)"
+trap 'rm -f "$VNC_PASSWD_FILE"' EXIT
 
 x11vnc -storepasswd "${VNC_PASSWORD:-changeme}" "$VNC_PASSWD_FILE" >/dev/null
 chmod 600 "$VNC_PASSWD_FILE"
