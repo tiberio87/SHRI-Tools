@@ -40,7 +40,7 @@ function buildEditSelector(track, counters) {
   return null;
 }
 
-export function createMkvTagger({ ui, loadSettings }) {
+export function createMkvTagger({ ui, loadSettings, saveSettings }) {
   let loadedTracks = []; // [{uid, type, codec, language, trackTitle, editSelector, source}]
 
   // ── Helper UI ──────────────────────────────────────────────────────────────
@@ -76,14 +76,14 @@ export function createMkvTagger({ ui, loadSettings }) {
   function syncMetadata() {
     const meta = state.metadata;
     if (!meta) return;
-    if (ui.mkvTagsImdb && !ui.mkvTagsImdb.dataset.manual) {
+    if (ui.mkvTagsImdb && ui.mkvTagsImdb.dataset.manual !== 'true') {
       ui.mkvTagsImdb.value = meta.imdbId || '';
     }
-    if (ui.mkvTagsTmdb && !ui.mkvTagsTmdb.dataset.manual) {
+    if (ui.mkvTagsTmdb && ui.mkvTagsTmdb.dataset.manual !== 'true') {
       const tmdbType = meta.tmdbType || 'movie';
       ui.mkvTagsTmdb.value = meta.tmdbId ? `${tmdbType}/${meta.tmdbId}` : '';
     }
-    if (ui.mkvTagsTvdb && !ui.mkvTagsTvdb.dataset.manual) {
+    if (ui.mkvTagsTvdb && ui.mkvTagsTvdb.dataset.manual !== 'true') {
       ui.mkvTagsTvdb.value = meta.tvdbSeriesId ? String(meta.tvdbSeriesId) : '';
     }
   }
@@ -195,7 +195,7 @@ export function createMkvTagger({ ui, loadSettings }) {
     try {
       const settings = loadSettings();
       const mkvpropeditPath = settings.mkvpropeditPath || '';
-      const encoder = settings.mkvTaggerEncoder || 'SHRI';
+      const encoder = ui.mkvTagsEncoder?.value.trim() || settings.mkvTaggerEncoder || 'SHRI';
 
       const imdb = ui.mkvTagsImdb?.value.trim() || '';
       const tmdb = ui.mkvTagsTmdb?.value.trim() || '';
@@ -232,9 +232,36 @@ export function createMkvTagger({ ui, loadSettings }) {
     }
   }
 
-  // ── Bind eventi ───────────────────────────────────────────────────────────
+  async function clearTags() {
+    const filePath = state.targetPath;
+    if (!filePath || !filePath.toLowerCase().endsWith('.mkv')) {
+      setLog('Nessun file .mkv selezionato.', true);
+      return;
+    }
+    clearLog();
+    if (ui.clearMkvTagsBtn) ui.clearMkvTagsBtn.disabled = true;
+    try {
+      const settings = loadSettings();
+      const mkvpropeditPath = settings.mkvpropeditPath || '';
+      const result = await window.api.mkvClearTags({ filePath, mkvpropeditPath });
+      if (!result.ok) {
+        setLog(`Errore mkvpropedit: ${result.error}`, true);
+      } else {
+        setLog('Tag MKV rimossi con successo.');
+      }
+    } catch (err) {
+      setLog(`Errore: ${err?.message || err}`, true);
+    } finally {
+      if (ui.clearMkvTagsBtn) ui.clearMkvTagsBtn.disabled = false;
+    }
+  }
+
+  // ── Bind eventi ──────────────────────────────────────────────────────
 
   function bind() {
+    if (ui.clearMkvTagsBtn) {
+      ui.clearMkvTagsBtn.addEventListener('click', clearTags);
+    }
     if (ui.loadMkvTracksBtn) {
       ui.loadMkvTracksBtn.addEventListener('click', loadTracks);
     }
@@ -248,6 +275,18 @@ export function createMkvTagger({ ui, loadSettings }) {
         el.dataset.manual = 'true';
       });
     });
+    // Popola il campo encoder dalla configurazione salvata e salva al cambiamento
+    if (ui.mkvTagsEncoder) {
+      const initSettings = loadSettings();
+      ui.mkvTagsEncoder.value = initSettings.mkvTaggerEncoder || 'SHRI';
+      if (saveSettings) {
+        ui.mkvTagsEncoder.addEventListener('input', () => {
+          const s = loadSettings();
+          s.mkvTaggerEncoder = ui.mkvTagsEncoder.value.trim() || 'SHRI';
+          saveSettings(s);
+        });
+      }
+    }
     // Aggiorna il titolo MKV quando cambiano title/year nel form principale
     [ui.titleInput, ui.yearInput, ui.includeYear].forEach((el) => {
       if (!el) return;

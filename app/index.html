@@ -326,6 +326,7 @@
           <div class="section-header">
             <h2>MKV Tags</h2>
             <div class="section-actions">
+              <button id="clearMkvTagsBtn" class="secondary small" type="button">Pulisci Tag</button>
               <button id="loadMkvTracksBtn" class="secondary small" type="button">Carica tracce</button>
               <button id="applyMkvTagsBtn" class="primary small" type="button">Applica Tag MKV</button>
             </div>
@@ -346,6 +347,10 @@
             <div class="field">
               <label for="mkvTagsTvdb">TVDB ID</label>
               <input id="mkvTagsTvdb" type="text" placeholder="12345" />
+            </div>
+            <div class="field">
+              <label for="mkvTagsEncoder">Encoder</label>
+              <input id="mkvTagsEncoder" type="text" placeholder="SHRI" />
             </div>
           </div>
           <div class="mkv-tracks-wrapper">
@@ -670,10 +675,6 @@
               <button id="browseMkvpropeditPathBtn" class="secondary small" type="button">Sfoglia</button>
             </div>
             <div class="hint">Lascia vuoto per usare mkvpropedit dal PATH di sistema.</div>
-          </div>
-          <div class="field">
-            <label for="settingsMkvTaggerEncoderInput">Tag Encoder default</label>
-            <input id="settingsMkvTaggerEncoderInput" type="text" placeholder="SHRI" />
           </div>
         </div>
       </div>
