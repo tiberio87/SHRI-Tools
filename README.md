@@ -176,20 +176,54 @@ Connettiti a `localhost:5901` (o `<host>:5901` da un'altra macchina) con qualsia
 
 > **Sicurezza:** l'accesso VNC non è autenticato. Usare solo in rete locale o privata. Non esporre le porte `5901`/`6080` su Internet senza un layer di autenticazione (es. reverse proxy con auth, tunnel SSH).
 
-### Volumi
+### Personalizzazione (volumi, porte, PUID/PGID)
 
-| Host | Container | Contenuto |
+Il file `docker-compose.yml` è tracciato da git: **non modificarlo direttamente**, altrimenti ogni `git pull` potrebbe generare conflitti.
+
+Per personalizzare la configurazione usa il meccanismo di override nativo di Docker Compose:
+
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+```
+
+Poi modifica `docker-compose.override.yml` con le tue impostazioni. Il file è già in `.gitignore` quindi le tue modifiche non interferiranno mai con gli aggiornamenti futuri. Docker Compose lo fonde automaticamente con `docker-compose.yml` ad ogni `docker compose up`.
+
+#### PUID / PGID
+
+Per evitare che i file creati nei volumi siano di proprietà di `root` sull'host, imposta `PUID` e `PGID` con i tuoi UID/GID:
+
+```bash
+# Trova i tuoi ID
+id -u && id -g
+```
+
+Nel file `docker-compose.override.yml`:
+
+```yaml
+services:
+  shri-tools:
+    environment:
+      - PUID=1000   # sostituisci con il tuo UID
+      - PGID=1000   # sostituisci con il tuo GID
+```
+
+#### Volumi personalizzati
+
+| Host (default) | Container | Contenuto |
 |---|---|---|
 | `./data` | `/data` | impostazioni Electron e dati sensibili |
 | `./media` | `/media` | file video sorgente da processare |
 | `./output` | `/output` | directory output job (torrent, screenshot, ecc.) |
 
-Per usare percorsi assoluti personalizzati (es. NAS) modifica il `docker-compose.yml`:
+Per usare percorsi diversi (es. NAS) nel file `docker-compose.override.yml`:
 
 ```yaml
-volumes:
-  - /mnt/nas/video:/media
-  - /mnt/nas/output:/output
+services:
+  shri-tools:
+    volumes:
+      - ./data:/data
+      - /mnt/nas/video:/media
+      - /mnt/nas/output:/output
 ```
 
 ### Configurazione percorsi nell'app
