@@ -13,5 +13,9 @@ BRAINSTORMING/
 !package.json
 !package-lock.json
 !README.md
+!.dockerignore
+!Dockerfile
+!docker-compose.yml
+!entrypoint.sh
 !docs/
 !docs/**

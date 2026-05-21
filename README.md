@@ -137,6 +137,50 @@ Il file viene generato in `dist/SHRI-Tools <versione>.exe`.
 
 ---
 
+## Esecuzione con Docker
+
+Il repository include una configurazione Docker per eseguire l'app Electron in un container Ubuntu 22.04 con:
+- server VNC (`Xvfb` + `x11vnc` + `fluxbox`) esposto sulla porta `5901`;
+- `ffmpeg` installato via apt;
+- `mkbrr` disponibile come binario di sistema `mkbrr`;
+- `bdinfo` disponibile come binario di sistema `bdinfo`.
+
+### Build immagine
+
+```bash
+docker compose build
+```
+
+### Avvio container
+
+```bash
+docker compose up -d
+```
+
+### Accesso via VNC
+
+- host: `localhost:5901` (o `<host>:5901` da un'altra macchina);
+- password: valore della variabile `VNC_PASSWORD` (default `changeme`).
+
+Per cambiare password basta aggiornare `VNC_PASSWORD` nel file `docker-compose.yml` oppure esportarla da shell prima del `docker compose up`. **Importante:** cambia subito la password di default prima di esporre il container fuori dalla macchina locale.
+
+### Configurazione percorsi nell'app
+
+Nelle **Impostazioni** dell'app puoi usare direttamente questi path:
+- FFmpeg: `ffmpeg`
+- BDInfo: `bdinfo`
+- mkbrr: `mkbrr`
+
+### Persistenza dati
+
+Il `docker-compose.yml` monta `./data:/data` e il container usa `HOME=/data`, quindi le impostazioni Electron vengono salvate nel profilo dentro `/data/.config/shri-tools` e restano persistenti tra i riavvii del container.
+
+### Nota sul sandbox Electron
+
+Nel container l'app viene avviata con `--no-sandbox`, perché il processo Electron gira come utente root nell'immagine Docker. Questo semplifica l'esecuzione della GUI nel container, ma riduce l'isolamento di sicurezza rispetto a un'installazione desktop tradizionale.
+
+---
+
 ## Diagnostica
 
 In caso di problemi aprire **Impostazioni -> Apri log** per visualizzare il pannello di debug.
