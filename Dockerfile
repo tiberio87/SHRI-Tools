@@ -4,7 +4,6 @@ ARG NODE_MAJOR=20
 
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:1 \
-    VNC_PASSWORD=changeme \
     HOME=/data \
     ELECTRON_DISABLE_SANDBOX=1
 

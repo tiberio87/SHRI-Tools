@@ -12,6 +12,4 @@ services:
       - ./media:/media
       - ./output:/output
       - /tmp/.X11-unix:/tmp/.X11-unix
-    environment:
-      - VNC_PASSWORD=${VNC_PASSWORD:-changeme}
     restart: unless-stopped
