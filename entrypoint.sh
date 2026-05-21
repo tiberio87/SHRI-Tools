@@ -5,6 +5,10 @@ X11_WAIT_TIMEOUT=10
 
 mkdir -p "${HOME:-/data}" /tmp/runtime-root
 export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp/runtime-root}"
+VNC_PASSWD_FILE="$(mktemp)"
+
+x11vnc -storepasswd "${VNC_PASSWORD:-changeme}" "$VNC_PASSWD_FILE" >/dev/null
+chmod 600 "$VNC_PASSWD_FILE"
 
 # Start virtual display
 Xvfb :1 -screen 0 1920x1080x24 &
@@ -25,7 +29,7 @@ fi
 fluxbox &
 
 # Start VNC server
-x11vnc -display :1 -forever -rfbport 5901 -passwd "${VNC_PASSWORD:-changeme}" -shared &
+x11vnc -display :1 -forever -rfbport 5901 -rfbauth "$VNC_PASSWD_FILE" -shared &
 
 echo "VNC server avviato sulla porta 5901"
 echo "Collegati con un client VNC all'indirizzo: <host>:5901"

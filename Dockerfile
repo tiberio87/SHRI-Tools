@@ -1,5 +1,7 @@
 FROM ubuntu:22.04
 
+ARG NODE_MAJOR=20
+
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:1 \
     VNC_PASSWORD=changeme \
@@ -20,7 +22,7 @@ RUN apt-get update \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg \
     && chmod 644 /usr/share/keyrings/nodesource.gpg \
-    && printf 'Types: deb\nURIs: https://deb.nodesource.com/node_20.x\nSuites: nodistro\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/nodesource.gpg\n' \
+    && printf 'Types: deb\nURIs: https://deb.nodesource.com/node_%s.x\nSuites: nodistro\nComponents: main\nArchitectures: amd64\nSigned-By: /usr/share/keyrings/nodesource.gpg\n' "$NODE_MAJOR" \
         > /etc/apt/sources.list.d/nodesource.sources \
     && wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb \
     && dpkg -i /tmp/packages-microsoft-prod.deb \
@@ -44,12 +46,12 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-    mkbrr_redirect_url="$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)"; \
+    mkbrr_redirect_url="$(curl --max-time 15 -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)"; \
     mkbrr_tag="$(basename "$mkbrr_redirect_url")"; \
     mkbrr_version="${mkbrr_tag#v}"; \
-    [ -n "$mkbrr_version" ] || { echo "Unable to determine mkbrr version from $mkbrr_redirect_url" >&2; exit 1; }; \
+    [ -n "$mkbrr_version" ] || { echo "Failed to extract version from mkbrr latest release redirect" >&2; exit 1; }; \
     mkdir -p /tmp/mkbrr-extract; \
-    curl -fsSL "https://github.com/autobrr/mkbrr/releases/download/v${mkbrr_version}/mkbrr_${mkbrr_version}_linux_amd64.tar.gz" -o /tmp/mkbrr.tar.gz; \
+    curl --max-time 60 -fsSL "https://github.com/autobrr/mkbrr/releases/download/v${mkbrr_version}/mkbrr_${mkbrr_version}_linux_amd64.tar.gz" -o /tmp/mkbrr.tar.gz; \
     tar -xzf /tmp/mkbrr.tar.gz -C /tmp/mkbrr-extract; \
     install -m 0755 "$(find /tmp/mkbrr-extract -type f -name mkbrr | head -n 1)" /usr/local/bin/mkbrr; \
     rm -rf /tmp/mkbrr.tar.gz /tmp/mkbrr-extract
@@ -63,13 +65,13 @@ RUN set -eux; \
         "https://github.com/UniqProject/BDInfo/releases/latest/download/BDInfo.CLI-linux-x64.tar.gz" \
         "https://github.com/UniqProject/BDInfo/releases/latest/download/BDInfo-linux-x64.tar.gz" \
         "https://github.com/tetrahydroc/BDInfoCLI/releases/latest/download/BDInfo-linux-x64.tar.gz"; do \
-        if curl -fsSLI "$candidate" > /dev/null; then \
+        if curl --max-time 15 -fsSLI "$candidate" > /dev/null; then \
             bdinfo_url="$candidate"; \
             break; \
         fi; \
     done; \
     [ -n "$bdinfo_url" ] || { echo "Unable to locate a supported BDInfo Linux asset" >&2; exit 1; }; \
-    curl -fsSL "$bdinfo_url" -o /tmp/bdinfo-archive; \
+    curl --max-time 60 -fsSL "$bdinfo_url" -o /tmp/bdinfo-archive; \
     case "$bdinfo_url" in \
         *.zip) unzip -q /tmp/bdinfo-archive -d /opt/bdinfo ;; \
         *.tar.gz) tar -xzf /tmp/bdinfo-archive -C /opt/bdinfo ;; \
