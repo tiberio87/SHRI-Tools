@@ -34,6 +34,7 @@ RUN apt-get update \
         mkvtoolnix \
         novnc \
         websockify \
+        gosu \
         libgtk-3-0 \
         libnotify4 \
         libnss3 \
