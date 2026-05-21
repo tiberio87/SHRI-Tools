@@ -162,7 +162,7 @@ docker compose up -d
 - host: `localhost:5901` (o `<host>:5901` da un'altra macchina);
 - password: valore della variabile `VNC_PASSWORD` (default `changeme`).
 
-Per cambiare password basta aggiornare `VNC_PASSWORD` nel file `docker-compose.yml` oppure esportarla da shell prima del build/up.
+Per cambiare password basta aggiornare `VNC_PASSWORD` nel file `docker-compose.yml` oppure esportarla da shell prima del build/up. **Importante:** cambia subito la password di default prima di esporre il container fuori dalla macchina locale.
 
 ### Configurazione percorsi nell'app
 
@@ -174,6 +174,10 @@ Nelle **Impostazioni** dell'app puoi usare direttamente questi path:
 ### Persistenza dati
 
 Il `docker-compose.yml` monta `./data:/data` e il container usa `HOME=/data`, quindi le impostazioni Electron vengono salvate nel profilo dentro `/data/.config/shri-tools` e restano persistenti tra i riavvii del container.
+
+### Nota sul sandbox Electron
+
+Nel container l'app viene avviata con `--no-sandbox`, perché il processo Electron gira come utente root nell'immagine Docker. Questo semplifica l'esecuzione della GUI nel container, ma riduce l'isolamento di sicurezza rispetto a un'installazione desktop tradizionale.
 
 ---
 

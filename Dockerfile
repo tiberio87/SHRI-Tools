@@ -45,6 +45,7 @@ RUN apt-get update \
 
 RUN set -eux; \
     mkbrr_version="$(basename "$(curl -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)" | sed 's/^v//')"; \
+    [ -n "$mkbrr_version" ]; \
     mkdir -p /tmp/mkbrr-extract; \
     curl -fsSL "https://github.com/autobrr/mkbrr/releases/download/v${mkbrr_version}/mkbrr_${mkbrr_version}_linux_amd64.tar.gz" -o /tmp/mkbrr.tar.gz; \
     tar -xzf /tmp/mkbrr.tar.gz -C /tmp/mkbrr-extract; \
