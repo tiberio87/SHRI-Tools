@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('api', {
   readFileText: (filePath) => ipcRenderer.invoke('read-file-text', filePath),
   mkvGetTracks: (payload) => ipcRenderer.invoke('mkv-get-tracks', payload),
   mkvApplyTags: (payload) => ipcRenderer.invoke('mkv-apply-tags', payload),
+  mkvClearTags: (payload) => ipcRenderer.invoke('mkv-clear-tags', payload),
   getFilePath: (file) => (file ? webUtils.getPathForFile(file) : ''),
   onTorrentProgress: (handler) => {
     const listener = (_event, data) => handler(data);

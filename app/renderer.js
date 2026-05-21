@@ -1497,7 +1497,7 @@ const dupeCheck = createDupeCheckTools({
   logDebug
 });
 
-mkvTagger = createMkvTagger({ ui, loadSettings });
+mkvTagger = createMkvTagger({ ui, loadSettings, saveSettings });
 
 function setIfAuto(input, value) {
   const isCheckbox = input.type === 'checkbox';
@@ -2126,6 +2126,8 @@ async function loadPath(targetPath) {
 
   metadataTools.fillFromMediaInfo();
   await autoDetectFromPath();
+  mkvTagger?.syncMetadata();
+  mkvTagger?.syncTitle();
   schedulePreview();
 }
 
@@ -2274,6 +2276,8 @@ ui.autoDetectToggle.addEventListener('change', async () => {
   updateAutoDetectControls();
   if (ui.autoDetectToggle.checked) {
     await autoDetectFromPath();
+    mkvTagger?.syncMetadata();
+    mkvTagger?.syncTitle();
   }
 });
 

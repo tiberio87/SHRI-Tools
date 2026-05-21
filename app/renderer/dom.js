@@ -303,7 +303,6 @@ export const ui = {
   // MKV Tagger — settings
   settingsMkvpropeditPathInput: document.getElementById('settingsMkvpropeditPathInput'),
   browseMkvpropeditPathBtn: document.getElementById('browseMkvpropeditPathBtn'),
-  settingsMkvTaggerEncoderInput: document.getElementById('settingsMkvTaggerEncoderInput'),
   // MKV Tagger — main section
   mkvTagsSection: document.getElementById('mkvTagsSection'),
   mkvTagsTracksBody: document.getElementById('mkvTagsTracksBody'),
@@ -311,6 +310,8 @@ export const ui = {
   mkvTagsImdb: document.getElementById('mkvTagsImdb'),
   mkvTagsTmdb: document.getElementById('mkvTagsTmdb'),
   mkvTagsTvdb: document.getElementById('mkvTagsTvdb'),
+  mkvTagsEncoder: document.getElementById('mkvTagsEncoder'),
+  clearMkvTagsBtn: document.getElementById('clearMkvTagsBtn'),
   loadMkvTracksBtn: document.getElementById('loadMkvTracksBtn'),
   applyMkvTagsBtn: document.getElementById('applyMkvTagsBtn'),
   mkvTagsLog: document.getElementById('mkvTagsLog')

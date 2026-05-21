@@ -500,9 +500,6 @@ export function createSettingsTools({
     if (ui.settingsMkvpropeditPathInput) {
       ui.settingsMkvpropeditPathInput.value = settings.mkvpropeditPath || '';
     }
-    if (ui.settingsMkvTaggerEncoderInput) {
-      ui.settingsMkvTaggerEncoderInput.value = settings.mkvTaggerEncoder || 'SHRI';
-    }
     if (ui.settingsMkbrrWorkersInput) {
       const workers = Number.isFinite(settings.torrentMkbrrWorkers)
         ? settings.torrentMkbrrWorkers
@@ -602,7 +599,6 @@ export function createSettingsTools({
       torrentMkbrrWorkers: mkbrrWorkers,
       torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked),
       mkvpropeditPath: ui.settingsMkvpropeditPathInput?.value.trim() || '',
-      mkvTaggerEncoder: ui.settingsMkvTaggerEncoderInput?.value.trim() || 'SHRI'
     };
   }
 
