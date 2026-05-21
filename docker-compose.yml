@@ -1,0 +1,14 @@
+version: "3.8"
+
+services:
+  shri-tools:
+    build: .
+    container_name: shri-tools
+    ports:
+      - "5901:5901"
+    volumes:
+      - ./data:/data
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - VNC_PASSWORD=changeme
+    restart: unless-stopped
