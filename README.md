@@ -140,44 +140,78 @@ Il file viene generato in `dist/SHRI-Tools <versione>.exe`.
 ## Esecuzione con Docker
 
 Il repository include una configurazione Docker per eseguire l'app Electron in un container Ubuntu 22.04 con:
-- server VNC (`Xvfb` + `x11vnc` + `fluxbox`) esposto sulla porta `5901`;
-- `ffmpeg` installato via apt;
-- `mkbrr` disponibile come binario di sistema `mkbrr`;
-- `bdinfo` disponibile come binario di sistema `bdinfo`.
+- **TigerVNC** (`Xtigervnc` + `fluxbox`) — accesso GUI via client VNC sulla porta `5901`;
+- **noVNC** — accesso GUI via browser sulla porta `6080` (nessuna installazione richiesta);
+- `ffmpeg`, `mkvtoolnix` installati via apt;
+- `mkbrr` e `bdinfo` scaricati automaticamente durante il build come binari di sistema;
+- percorsi degli strumenti preconfigurati automaticamente al primo avvio su Linux.
 
-### Build immagine
+### Build e avvio
 
 ```bash
-docker compose build
+docker compose up -d --build
 ```
 
-### Avvio container
+Per riavviare senza rebuild:
 
 ```bash
 docker compose up -d
 ```
 
-### Accesso via VNC
+Per fermare il container:
 
-- host: `localhost:5901` (o `<host>:5901` da un'altra macchina);
-- password: valore della variabile `VNC_PASSWORD` (default `changeme`).
+```bash
+docker compose down
+```
 
-Per cambiare password basta aggiornare `VNC_PASSWORD` nel file `docker-compose.yml` oppure esportarla da shell prima del `docker compose up`. **Importante:** cambia subito la password di default prima di esporre il container fuori dalla macchina locale.
+### Accesso alla GUI
+
+**Opzione 1 — Browser (consigliata, nessun client richiesto)**
+
+Apri `http://localhost:6080/vnc.html` e clicca **Connect**.
+
+**Opzione 2 — Client VNC**
+
+Connettiti a `localhost:5901` (o `<host>:5901` da un'altra macchina) con qualsiasi client VNC. Non è richiesta password.
+
+> **Sicurezza:** l'accesso VNC non è autenticato. Usare solo in rete locale o privata. Non esporre le porte `5901`/`6080` su Internet senza un layer di autenticazione (es. reverse proxy con auth, tunnel SSH).
+
+### Volumi
+
+| Host | Container | Contenuto |
+|---|---|---|
+| `./data` | `/data` | impostazioni Electron e dati sensibili |
+| `./media` | `/media` | file video sorgente da processare |
+| `./output` | `/output` | directory output job (torrent, screenshot, ecc.) |
+
+Per usare percorsi assoluti personalizzati (es. NAS) modifica il `docker-compose.yml`:
+
+```yaml
+volumes:
+  - /mnt/nas/video:/media
+  - /mnt/nas/output:/output
+```
 
 ### Configurazione percorsi nell'app
 
-Nelle **Impostazioni** dell'app puoi usare direttamente questi path:
-- FFmpeg: `ffmpeg`
-- BDInfo: `bdinfo`
-- mkbrr: `mkbrr`
+Al primo avvio i percorsi degli strumenti vengono precompilati automaticamente. In **Impostazioni** trovi:
+
+| Strumento | Percorso |
+|---|---|
+| FFmpeg | `/usr/bin/ffmpeg` |
+| BDInfo | `/usr/local/bin/bdinfo` |
+| mkbrr | `/usr/local/bin/mkbrr` |
+| mkvpropedit | `/usr/bin/mkvpropedit` |
+
+La cartella output torrent va impostata a `/output` (mappata sul volume host).
 
 ### Persistenza dati
 
-Il `docker-compose.yml` monta `./data:/data` e il container usa `HOME=/data`, quindi le impostazioni Electron vengono salvate nel profilo dentro `/data/.config/shri-tools` e restano persistenti tra i riavvii del container.
+Le impostazioni Electron vengono salvate in `/data` (volume `./data`), quindi sono persistenti tra i riavvii del container. Se vuoi ripartire da zero basta svuotare la cartella `./data` sull'host.
 
 ### Nota sul sandbox Electron
 
-Nel container l'app viene avviata con `--no-sandbox`, perché il processo Electron gira come utente root nell'immagine Docker. Questo semplifica l'esecuzione della GUI nel container, ma riduce l'isolamento di sicurezza rispetto a un'installazione desktop tradizionale.
+Nel container l'app viene avviata con `--no-sandbox --disable-gpu`, perché il processo Electron gira come utente root nell'immagine Docker e il rendering GPU non è disponibile in ambiente VNC. Questo è normale per un deployment containerizzato.
 
 ---
 
