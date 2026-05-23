@@ -1,5 +1,6 @@
 services:
   shri-tools:
+    image: ghcr.io/tiberio87/shri-tools:latest
     build: .
     container_name: shri-tools
     ports:
