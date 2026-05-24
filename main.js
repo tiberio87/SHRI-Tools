@@ -1938,6 +1938,17 @@ ipcMain.handle('mkv-get-tracks', async (_event, { filePath: mkvFile, mkvmergePat
   }
 });
 
+ipcMain.handle('mkv-clear-tags', async (_event, { filePath: mkvFile, mkvpropeditPath }) => {
+  const bin = String(mkvpropeditPath || 'mkvpropedit').trim() || 'mkvpropedit';
+  try {
+    // Rimuove tutti i tag globali e il titolo del file
+    await runProcess(bin, [mkvFile, '--tags', 'all:', '--edit', 'info', '--delete', 'title']);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
 ipcMain.handle('mkv-apply-tags', async (_event, { filePath: mkvFile, mkvpropeditPath, xmlContent, title, tracks }) => {
   const bin = String(mkvpropeditPath || 'mkvpropedit').trim() || 'mkvpropedit';
   const tmpFiles = [];
