@@ -16,6 +16,7 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Auto-detect di titolo, anno, stagione, episodio dal nome file e dai metadata.
 - Parsing MediaInfo/BDInfo per codec, audio, HDR e sorgente.
 - Rilevamento automatico del tag servizio streaming dal nome originale (NF, AMZN, HMAX, ATVP, DSNP, ecc.) — il tag viene sempre preservato nel nome rinominato anche se non selezionato manualmente.
+- **Popup disambiguazione formato**: quando il formato non è rilevabile dal nome file o da MediaInfo, compare un popup che chiede di selezionare il formato corretto (WEB-DL, WEBRip, Encode, Remux, Full Disc). Se si seleziona Encode viene chiesta anche la sorgente (BluRay, UHD BluRay, WEBRip, DVD, HDTV). Il popup compare anche per contenuti rilevati come Encode che potrebbero essere WEB-DL (es. NF/HMAX).
 - Gestione multi-episode (es. S01E01-E02).
 - Anteprima del piano di rinomina prima di applicare.
 - Regole di naming allineate al tracker (vedi `docs/RULES.txt`).
@@ -53,6 +54,7 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Cattura automatica dei frame tramite FFmpeg con tempi ottimizzati.
 - Supporto HDR con tonemapping automatico (fallback senza tonemap se necessario).
 - Upload su imgBB o PTScreens con fallback automatico.
+- I file screenshot vengono nominati automaticamente con il titolo e l'anno del contenuto (es. `Cast_Away_1996_01.png`, `The_Flash_2022_01.png`).
 - **Pannello log diagnostico** (Impostazioni -> Apri log) per analizzare ogni fase: durata rilevata, calcolo tempi, esito cattura e upload per ogni screen.
 
 ---
@@ -148,14 +150,18 @@ Il repository include una configurazione Docker per eseguire l'app Electron in u
 
 ### Build e avvio
 
+**Opzione consigliata — immagine pre-buildata (nessun build locale)**
+
 ```bash
-docker compose up -d --build
+docker compose pull && docker compose up -d
 ```
 
-Per riavviare senza rebuild:
+L'immagine ufficiale viene pubblicata automaticamente su **GitHub Container Registry** ad ogni release: `ghcr.io/tiberio87/shri-tools:latest`.
+
+**Opzione alternativa — build locale**
 
 ```bash
-docker compose up -d
+docker compose build && docker compose up -d
 ```
 
 Per fermare il container:
