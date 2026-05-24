@@ -44,6 +44,7 @@ let settingsDirty = false;
 let wizardStepIndex = 0;
 let torrentGenerator = 'node';
 let sourceAskedForPath = '';
+let formatAskedForPath = '';
 let refreshPreview = async () => {};
 let schedulePreview = () => {};
 let showMediaInfoReport = async () => {};
@@ -357,6 +358,8 @@ function resetSource() {
   state.tagSuggestion = '';
   state.autoDetectRunning = false;
   state.lastAutoSuggestKey = '';
+  formatAskedForPath = '';
+  sourceAskedForPath = '';
   state.lastTorrentPath = '';
   state.screenshots = [];
   state.screenshotsMeta = null;
@@ -1300,6 +1303,46 @@ function updateFormatServiceSuggest() {
     extraSubs: hasItalianSubsOnly
   });
 
+  // Se formato sconosciuto o rilevato come Encode (potrebbe essere WEB-DL da NF/HMAX), chiedi all'utente
+  if ((!format || format === 'Encode') && state.targetPath !== formatAskedForPath) {
+    const askFormatKey = `ask-format:${state.targetPath}`;
+    if (state.lastAutoSuggestKey !== askFormatKey) {
+      state.lastAutoSuggestKey = askFormatKey;
+      formatAskedForPath = state.targetPath;
+      sourceAskedForPath = state.targetPath; // previeni doppio ask sorgente dal blocco autoKey
+      (async () => {
+        const chosenFormat = await openChoiceModal(
+          'Formato non rilevato',
+          'Non è stato possibile determinare il formato dal nome file o da MediaInfo.<br>Seleziona il formato corretto:',
+          [
+            { value: 'WEB-DL', label: 'WEB-DL' },
+            { value: 'WEBRip', label: 'WEBRip' },
+            { value: 'Encode', label: 'Encode' },
+            { value: 'Remux', label: 'Remux' },
+            { value: 'Full Disc', label: 'Full Disc' }
+          ]
+        );
+        if (!chosenFormat) return;
+        let chosenSource = source;
+        if (chosenFormat === 'Encode' && !chosenSource) {
+          const picked = await openChoiceModal(
+            'Sorgente non rilevata',
+            'Il formato è <b>Encode</b> ma la sorgente non è determinabile dal nome file o da MediaInfo.<br>Seleziona la sorgente corretta:',
+            [
+              { value: 'BluRay', label: 'BluRay' },
+              { value: 'UHD BluRay', label: 'UHD BluRay' },
+              { value: 'WEBRip', label: 'WEBRip' },
+              { value: 'DVD', label: 'DVD' },
+              { value: 'HDTV', label: 'HDTV' }
+            ]
+          );
+          if (picked) chosenSource = picked;
+        }
+        applyNameSuggestions(chosenFormat, service, chosenSource, repack, settings);
+      })();
+    }
+  }
+
   if (!format && !service && !source && !repack && !hasItalianSubsOnly) {
     ui.formatSuggestRow.classList.remove('is-empty');
     const emptyText = 'Suggerimento nome/MediaInfo: Nessun suggerimento specifico disponibile.';
@@ -1411,6 +1454,7 @@ function updateFormatServiceSuggest() {
             [
               { value: 'BluRay', label: 'BluRay' },
               { value: 'UHD BluRay', label: 'UHD BluRay' },
+              { value: 'WEBRip', label: 'WEBRip' },
               { value: 'DVD', label: 'DVD' },
               { value: 'HDTV', label: 'HDTV' }
             ]
@@ -2034,6 +2078,8 @@ async function loadPath(targetPath) {
   clearWizardRulesCheck();
 
   state.lastAutoSuggestKey = '';
+  formatAskedForPath = '';
+  sourceAskedForPath = '';
   state.targetPath = targetPath;
   state.kind = scan.kind;
   state.videoFiles = scan.videoFiles || [];

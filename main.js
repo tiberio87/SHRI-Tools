@@ -2163,9 +2163,21 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
 
     const images = [];
     let index = 0;
+    const screenshotBase = (() => {
+      const title = screensJobTitle;
+      if (!title || title === 'job') return 'shot';
+      const yearMatch = title.match(/\b((?:19|20)\d{2})\b/);
+      if (yearMatch) {
+        const yearIndex = title.indexOf(yearMatch[0]);
+        const titlePart = title.substring(0, yearIndex).replace(/[.\s]+$/, '');
+        const safe = titlePart.replace(/[.\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+        return safe ? `${safe}_${yearMatch[0]}` : `title_${yearMatch[0]}`;
+      }
+      return title.split(/[.\s]+/).slice(0, 3).join('_').replace(/[^a-zA-Z0-9_]/g, '') || 'shot';
+    })();
     for (const time of times) {
       index += 1;
-      const fileName = `shot_${String(index).padStart(2, '0')}.png`;
+      const fileName = `${screenshotBase}_${String(index).padStart(2, '0')}.png`;
       const filePath = path.join(effectiveOutputDir, fileName);
       const options = {
         scaleWidth: needsScale ? scaledWidth : 0,

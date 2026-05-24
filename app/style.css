@@ -1729,13 +1729,28 @@ body.light .badge.error {
 
 .choice-buttons {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 8px;
   margin-top: 12px;
 }
 
+.choice-buttons button {
+  width: 100%;
+  text-align: center;
+  justify-content: center;
+}
+
 #choiceModal .modal-content {
   width: min(480px, 94vw);
+}
+
+#choiceModal .confirm-text {
+  text-align: justify;
+  padding: 4px 0 2px;
+}
+
+#choiceModal .modal-header {
+  justify-content: center;
 }
 
 /* ===== Disambiguation modal ===== */
