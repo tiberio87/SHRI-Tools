@@ -1,0 +1,25 @@
+# Copia questo file in docker-compose.override.yml e personalizzalo.
+# Docker Compose lo fonde automaticamente con docker-compose.yml.
+# Il file docker-compose.override.yml è gitignored: le tue modifiche
+# non causeranno mai conflitti durante i git pull.
+#
+# Esempio di utilizzo:
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+
+services:
+  shri-tools:
+    # Personalizza PUID/PGID con i tuoi UID/GID (comando: id -u && id -g)
+    environment:
+      - PUID=1000
+      - PGID=1000
+
+    # Personalizza i percorsi dei volumi con le tue directory
+    volumes:
+      - ./data:/data
+      - ./media:/media        # oppure: /mnt/nas/video:/media
+      - ./output:/output      # oppure: /mnt/nas/output:/output
+
+    # Personalizza le porte se necessario
+    # ports:
+    #   - "5901:5901"
+    #   - "6080:6080"

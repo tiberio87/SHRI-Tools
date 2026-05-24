@@ -2,6 +2,8 @@
 import { ANNOUNCE_BASE, SETTINGS_STORAGE_KEY } from './constants.js';
 
 // Default settings for a clean install (merged with stored values).
+const _isLinux = typeof navigator !== 'undefined' && navigator.platform.startsWith('Linux');
+
 const DEFAULT_SETTINGS = {
   omdbKey: '',
   tmdbKey: '',
@@ -14,14 +16,14 @@ const DEFAULT_SETTINGS = {
   renameLangInFolders: true,
   renameLangInFiles: true,
   renameOmitNoGroupInPaths: false,
-  bdinfoPath: '',
+  bdinfoPath: _isLinux ? '/usr/local/bin/bdinfo' : '',
   torrentPasskey: '',
   torrentAnnounceUrl: '',
   torrentOutputDir: '',
-  torrentMkbrrPath: '',
+  torrentMkbrrPath: _isLinux ? '/usr/local/bin/mkbrr' : '',
   torrentMkbrrWorkers: 1,
   torrentPrivate: true,
-  ffmpegPath: '',
+  ffmpegPath: _isLinux ? '/usr/bin/ffmpeg' : '',
   screenshotsCount: 6,
   imageHostPrimary: 'imgbb',
   imageHostFallback: 'ptscreens',
@@ -55,7 +57,7 @@ const DEFAULT_SETTINGS = {
   transmissionAutoStart: true,
   transmissionPathMapLocal: '',
   transmissionPathMapRemote: '',
-  mkvpropeditPath: '',
+  mkvpropeditPath: _isLinux ? '/usr/bin/mkvpropedit' : '',
   mkvTaggerEncoder: 'SHRI'
 };
 

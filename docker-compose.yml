@@ -1,0 +1,15 @@
+services:
+  shri-tools:
+    image: ghcr.io/tiberio87/shri-tools:latest
+    container_name: shri-tools
+    ports:
+      - "5901:5901"
+      - "6080:6080"
+    volumes:
+      - ./data:/data
+      - ./media:/media
+      - ./output:/output
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+    restart: unless-stopped

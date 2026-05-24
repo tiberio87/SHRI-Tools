@@ -16,6 +16,7 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Auto-detect di titolo, anno, stagione, episodio dal nome file e dai metadata.
 - Parsing MediaInfo/BDInfo per codec, audio, HDR e sorgente.
 - Rilevamento automatico del tag servizio streaming dal nome originale (NF, AMZN, HMAX, ATVP, DSNP, ecc.) — il tag viene sempre preservato nel nome rinominato anche se non selezionato manualmente.
+- **Popup disambiguazione formato**: quando il formato non è rilevabile dal nome file o da MediaInfo, compare un popup che chiede di selezionare il formato corretto (WEB-DL, WEBRip, Encode, Remux, Full Disc). Se si seleziona Encode viene chiesta anche la sorgente (BluRay, UHD BluRay, WEBRip, DVD, HDTV). Il popup compare anche per contenuti rilevati come Encode che potrebbero essere WEB-DL (es. NF/HMAX).
 - Gestione multi-episode (es. S01E01-E02).
 - Anteprima del piano di rinomina prima di applicare.
 - Regole di naming allineate al tracker (vedi `docs/RULES.txt`).
@@ -27,18 +28,33 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Dupe check automatico sul tracker con filtri dedicati.
 - Upload diretto al tracker + invio al client torrent (qBittorrent / Transmission).
 - Compatibile con **qBittorrent 5.2.0+** (gestione cookie `QBT_SID_<porta>`, header CSRF, risposta HTTP 204).
+- **Cartella job**: al termine del flusso viene creata automaticamente una cartella `<OutputDir>/<Titolo>/` con file a nome fisso:
+  - `BASE.torrent` — torrent generato localmente
+  - `MEDIAINFO.txt` — output MediaInfo completo
+  - `DEBUG.txt` — log diagnostico
+  - `[SHRI]DESCRIPTION.txt` — BBCode della descrizione
+  - `image_data.json` — dati screenshot per ripristino automatico
+  - `image_urls.txt` — URL degli screenshot caricati, uno per riga
 
 ### 3. Analisi Tracker
 - Inserisci un link Unit3D e ottieni:
   - titolo suggerito secondo le rules,
   - MediaInfo sintetico,
   - badge ID meta copiabili,
-  - segnalazione mismatch ID.
+  - segnalazione mismatch ID,
+  - **BBCode generato automaticamente** dai metadati del torrent analizzato.
+- Al termine dell'analisi si apre il **modal BBCode** con i tasti:
+  - **Modifica** — abilita la modifica diretta del testo
+  - **Anteprima** — rendering visivo del BBCode
+  - **Copia** — copia negli appunti
+- Il footer del BBCode generato da analisi riporta `Edited by SHRI-Tools vX.X.X` per distinguerlo da una descrizione creata ex novo.
+- Il **pulsante Anteprima BBCode** nell'area azioni principali apre lo stesso modal in qualsiasi momento, anche senza passare dall'analisi tracker.
 
 ### 4. Generazione Screenshot
 - Cattura automatica dei frame tramite FFmpeg con tempi ottimizzati.
 - Supporto HDR con tonemapping automatico (fallback senza tonemap se necessario).
 - Upload su imgBB o PTScreens con fallback automatico.
+- I file screenshot vengono nominati automaticamente con il titolo e l'anno del contenuto (es. `Cast_Away_1996_01.png`, `The_Flash_2022_01.png`).
 - **Pannello log diagnostico** (Impostazioni -> Apri log) per analizzare ogni fase: durata rilevata, calcolo tempi, esito cattura e upload per ogni screen.
 
 ---
@@ -86,7 +102,7 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 
 **qBittorrent**
 - Host / Porta / HTTPS, Username / Password.
-- Save path, Categoria, Auto-start.
+- Save path, Categoria (supporto **categorie multiple** separate da virgola), Auto-start.
 - Path mapping locale/remoto (quando il client e` su altra macchina).
 
 **Transmission**
@@ -120,6 +136,122 @@ npm run dist
 Il file viene generato in `dist/SHRI-Tools <versione>.exe`.
 
 > Le release ufficiali vengono compilate automaticamente da **GitHub Actions** ad ogni nuovo tag `v*.*.*` e allegate direttamente alla pagina Releases.
+
+---
+
+## Esecuzione con Docker
+
+Il repository include una configurazione Docker per eseguire l'app Electron in un container Ubuntu 22.04 con:
+- **TigerVNC** (`Xtigervnc` + `fluxbox`) — accesso GUI via client VNC sulla porta `5901`;
+- **noVNC** — accesso GUI via browser sulla porta `6080` (nessuna installazione richiesta);
+- `ffmpeg`, `mkvtoolnix` installati via apt;
+- `mkbrr` e `bdinfo` scaricati automaticamente durante il build come binari di sistema;
+- percorsi degli strumenti preconfigurati automaticamente al primo avvio su Linux.
+
+### Build e avvio
+
+**Opzione consigliata — immagine pre-buildata (nessun build locale)**
+
+```bash
+docker compose pull && docker compose up -d
+```
+
+L'immagine ufficiale viene pubblicata automaticamente su **GitHub Container Registry** ad ogni release: `ghcr.io/tiberio87/shri-tools:latest`.
+
+**Opzione alternativa — build locale**
+
+```bash
+docker compose build && docker compose up -d
+```
+
+Per fermare il container:
+
+```bash
+docker compose down
+```
+
+### Accesso alla GUI
+
+**Opzione 1 — Browser (consigliata, nessun client richiesto)**
+
+Apri `http://localhost:6080/vnc.html` e clicca **Connect**.
+
+**Opzione 2 — Client VNC**
+
+Connettiti a `localhost:5901` (o `<host>:5901` da un'altra macchina) con qualsiasi client VNC. Non è richiesta password.
+
+> **Sicurezza:** l'accesso VNC non è autenticato. Usare solo in rete locale o privata. Non esporre le porte `5901`/`6080` su Internet senza un layer di autenticazione (es. reverse proxy con auth, tunnel SSH).
+
+### Personalizzazione (volumi, porte, PUID/PGID)
+
+Il file `docker-compose.yml` è tracciato da git: **non modificarlo direttamente**, altrimenti ogni `git pull` potrebbe generare conflitti.
+
+Per personalizzare la configurazione usa il meccanismo di override nativo di Docker Compose:
+
+```bash
+cp docker-compose.override.yml.example docker-compose.override.yml
+```
+
+Poi modifica `docker-compose.override.yml` con le tue impostazioni. Il file è già in `.gitignore` quindi le tue modifiche non interferiranno mai con gli aggiornamenti futuri. Docker Compose lo fonde automaticamente con `docker-compose.yml` ad ogni `docker compose up`.
+
+#### PUID / PGID
+
+Per evitare che i file creati nei volumi siano di proprietà di `root` sull'host, imposta `PUID` e `PGID` con i tuoi UID/GID:
+
+```bash
+# Trova i tuoi ID
+id -u && id -g
+```
+
+Nel file `docker-compose.override.yml`:
+
+```yaml
+services:
+  shri-tools:
+    environment:
+      - PUID=1000   # sostituisci con il tuo UID
+      - PGID=1000   # sostituisci con il tuo GID
+```
+
+#### Volumi personalizzati
+
+| Host (default) | Container | Contenuto |
+|---|---|---|
+| `./data` | `/data` | impostazioni Electron e dati sensibili |
+| `./media` | `/media` | file video sorgente da processare |
+| `./output` | `/output` | directory output job (torrent, screenshot, ecc.) |
+
+Per usare percorsi diversi (es. NAS) nel file `docker-compose.override.yml`:
+
+```yaml
+services:
+  shri-tools:
+    volumes:
+      - ./data:/data
+      - /mnt/nas/video:/media
+      - /mnt/nas/output:/output
+```
+
+### Configurazione percorsi nell'app
+
+Al primo avvio i percorsi degli strumenti vengono precompilati automaticamente. In **Impostazioni** trovi:
+
+| Strumento | Percorso |
+|---|---|
+| FFmpeg | `/usr/bin/ffmpeg` |
+| BDInfo | `/usr/local/bin/bdinfo` |
+| mkbrr | `/usr/local/bin/mkbrr` |
+| mkvpropedit | `/usr/bin/mkvpropedit` |
+
+La cartella output torrent va impostata a `/output` (mappata sul volume host).
+
+### Persistenza dati
+
+Le impostazioni Electron vengono salvate in `/data` (volume `./data`), quindi sono persistenti tra i riavvii del container. Se vuoi ripartire da zero basta svuotare la cartella `./data` sull'host.
+
+### Nota sul sandbox Electron
+
+Nel container l'app viene avviata con `--no-sandbox --disable-gpu`, perché il processo Electron gira come utente root nell'immagine Docker e il rendering GPU non è disponibile in ambiente VNC. Questo è normale per un deployment containerizzato.
 
 ---
 
