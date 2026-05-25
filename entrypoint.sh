@@ -34,10 +34,15 @@ if [ ! -S /tmp/.X11-unix/X1 ]; then
 fi
 
 # Wait for X to actually accept connections (not just socket present)
-for _ in $(seq 1 "$X11_WAIT_TIMEOUT"); do
-  if DISPLAY=:1 xdpyinfo >/dev/null 2>&1; then break; fi
-  sleep 1
-done
+# Uses xdpyinfo if available, otherwise a short fixed sleep
+if command -v xdpyinfo >/dev/null 2>&1; then
+  for _ in $(seq 1 "$X11_WAIT_TIMEOUT"); do
+    if DISPLAY=:1 xdpyinfo >/dev/null 2>&1; then break; fi
+    sleep 1
+  done
+else
+  sleep 2
+fi
 
 # Allow appuser to connect to the X display
 chmod o+rw /tmp/.X11-unix/X1 2>/dev/null || true
@@ -63,4 +68,4 @@ cd /app
 exec gosu "${RUN_AS}" env \
   DISPLAY=:1 \
   DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-}" \
-  electron . --no-sandbox --disable-gpu
+  ./node_modules/.bin/electron . --no-sandbox --disable-gpu
