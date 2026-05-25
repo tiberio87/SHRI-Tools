@@ -1619,12 +1619,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       imdb,
       tvdb,
       mal: mal || '0',
+      igdb: '0',
       anonymous: useAnonymous ? '1' : '0',
       personal_release: usePersonal ? '1' : '0',
       mod_queue_opt_in: useModQueue ? '1' : '0',
       stream: '0',
       sd: mapping.isSd ? '1' : '0',
-      keywords,
+      keywords: keywords || '',
       internal: '0',
       featured: '0',
       free: '0',
@@ -1721,6 +1722,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     try {
       const data = await buildUnit3dPayload(form, settings, flagOverrides);
       logDebug?.('unit3d upload payload', {
+        name: data.name || '(vuoto)',
         category_id: data.category_id,
         type_id: data.type_id,
         resolution_id: data.resolution_id,
@@ -1729,10 +1731,16 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         tmdb: data.tmdb,
         imdb: data.imdb,
         tvdb: data.tvdb,
+        mal: data.mal,
+        keywords: data.keywords || '(vuoto)',
         anonymous: data.anonymous,
         personal_release: data.personal_release,
         mod_queue_opt_in: data.mod_queue_opt_in,
-        sd: data.sd
+        sd: data.sd,
+        description_len: (data.description || '').length,
+        mediainfo_len: (data.mediainfo || '').length,
+        bdinfo_len: (data.bdinfo || '').length,
+        torrent_path: state.lastTorrentPath || '(vuoto)'
       });
       setHint(ui.uploadTitleHint, 'Upload in corso...');
       const result = await window.api.unit3dUpload({

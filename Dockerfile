@@ -43,6 +43,8 @@ RUN apt-get update \
         libgbm1 \
         libasound2 \
         xauth \
+        x11-utils \
+        dbus-x11 \
         nodejs \
         dotnet-runtime-8.0 \
     && rm -rf /var/lib/apt/lists/*
