@@ -8,6 +8,9 @@ X11_WAIT_TIMEOUT=30
 mkdir -p /data /media /output /tmp/runtime-root
 export XDG_RUNTIME_DIR=/tmp/runtime-root
 
+# Clean up stale X11 lock/socket files that survive container restarts
+rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
+
 # Setup non-root user if PUID/PGID are provided
 if [ "${PUID}" != "0" ]; then
   groupadd -f -g "${PGID}" appgroup 2>/dev/null || true
