@@ -1,9 +1,12 @@
 {
   "name": "shri-tools",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "private": true,
   "description": "SHRI tools",
-  "author": "ExUs",
+  "author": {
+    "name": "tiberio87",
+    "email": "r0cks_7@proton.me"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -26,6 +29,11 @@
       "target": [
         "portable"
       ]
+    },
+    "linux": {
+      "icon": "assets/icons/app.png",
+      "category": "Utility",
+      "maintainer": "tiberio87 <r0cks_7@proton.me>"
     },
     "files": [
       "assets/icons/**/*",
