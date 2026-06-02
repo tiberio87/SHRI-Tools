@@ -1,5 +1,9 @@
 # SHRI-Tools
 
+[![Build & Push Docker Image](https://github.com/tiberio87/SHRI-Tools/actions/workflows/docker.yml/badge.svg?branch=main)](https://github.com/tiberio87/SHRI-Tools/actions/workflows/docker.yml) [![Build & Release](https://github.com/tiberio87/SHRI-Tools/actions/workflows/release.yml/badge.svg)](https://github.com/tiberio87/SHRI-Tools/actions/workflows/release.yml)
+
+[![Node.js](https://img.shields.io/badge/node-20%2B-5FA04E?logo=node.js&logoColor=white)](https://nodejs.org/downloads) [![Electron](https://img.shields.io/badge/electron-40%2B-47848F?logo=electron&logoColor=white)](https://www.electronjs.org/) [![Docker Image](https://img.shields.io/badge/docker-ghcr.io%2Ftiberio87%2Fshri--tools-2496ED?logo=docker&logoColor=white)](https://github.com/tiberio87/SHRI-Tools/pkgs/container/shri-tools) [![Release](https://img.shields.io/github/v/release/tiberio87/SHRI-Tools?display_name=tag&logo=github)](https://github.com/tiberio87/SHRI-Tools/releases) [![License: SHRITPL v1.0](https://img.shields.io/badge/License-SHRITPL%20v1.0-blue.svg)](LICENSE)
+
 Applicazione desktop (Electron) per la gestione completa delle release su tracker **Unit3D**: rinomina file/cartelle secondo le rules del tracker, generazione BBCode, upload integrato e analisi di torrent gia` pubblicati.
 
 ---
@@ -258,6 +262,14 @@ Nel container l'app viene avviata con `--no-sandbox --disable-gpu`, perché il p
 ## Diagnostica
 
 In caso di problemi aprire **Impostazioni -> Apri log** per visualizzare il pannello di debug.
+
+---
+
+## Licenza
+
+Questo progetto e` distribuito sotto la **SHRI - Tools Public License (SHRITPL) v1.0**.
+
+Testo completo: [LICENSE](LICENSE)
 Per gli screenshot, il log riporta in dettaglio: durata video, framerate, calcolo tempi, esito FFmpeg per ogni frame, host e URL di upload.
 
 ---
