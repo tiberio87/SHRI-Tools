@@ -1405,6 +1405,15 @@ function extractYear(value) {
   return String(value).slice(0, 4);
 }
 
+function normalizeTvdbSeriesId(value) {
+  const text = String(value || '').trim();
+  if (!text) {
+    return '';
+  }
+  const numeric = text.match(/\d+/);
+  return numeric ? numeric[0] : '';
+}
+
 function getTmdbLangCode(language) {
   if (!language) {
     return '';
@@ -3370,10 +3379,17 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (details?.imdb_id && !result.imdbId) {
           result.imdbId = details.imdb_id;
         }
-        if (!result.imdbId) {
-          const external = await fetchTmdbExternalIds(type, tmdbId, tmdbKey);
-          if (external?.imdb_id) {
-            result.imdbId = external.imdb_id;
+        let external = null;
+        if (type === 'tv' || !result.imdbId) {
+          external = await fetchTmdbExternalIds(type, tmdbId, tmdbKey);
+        }
+        if (!result.imdbId && external?.imdb_id) {
+          result.imdbId = external.imdb_id;
+        }
+        if (type === 'tv' && !result.tvdbSeriesId) {
+          const tmdbTvdbId = normalizeTvdbSeriesId(external?.tvdb_id || external?.tvdbId);
+          if (tmdbTvdbId) {
+            result.tvdbSeriesId = tmdbTvdbId;
           }
         }
         const originalLang = String(details?.original_language || '');
@@ -3488,10 +3504,17 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
         if (details?.imdb_id && !result.imdbId) {
           result.imdbId = details.imdb_id;
         }
-        if (!result.imdbId) {
-          const external = await fetchTmdbExternalIds(resolvedType, first.id, tmdbKey);
-          if (external?.imdb_id) {
-            result.imdbId = external.imdb_id;
+        let external = null;
+        if (resolvedType === 'tv' || !result.imdbId) {
+          external = await fetchTmdbExternalIds(resolvedType, first.id, tmdbKey);
+        }
+        if (!result.imdbId && external?.imdb_id) {
+          result.imdbId = external.imdb_id;
+        }
+        if (resolvedType === 'tv' && !result.tvdbSeriesId) {
+          const tmdbTvdbId = normalizeTvdbSeriesId(external?.tvdb_id || external?.tvdbId);
+          if (tmdbTvdbId) {
+            result.tvdbSeriesId = tmdbTvdbId;
           }
         }
         const originalLang = String(details?.original_language || '');
@@ -3531,21 +3554,21 @@ ipcMain.handle('fetch-metadata', async (_event, payload) => {
     if (!tvdbKey && tvdbWanted) {
       result.warnings.push('TVDB key mancante: episodi non recuperati.');
       if (tvdbId) {
-        result.tvdbSeriesId = tvdbId;
+        result.tvdbSeriesId = normalizeTvdbSeriesId(tvdbId);
       }
     }
 
     if (tvdbKey && tvdbWanted) {
       result.tvdbAttempted = true;
       const token = await tvdbLogin(tvdbKey);
-      let seriesId = tvdbId;
+      let seriesId = normalizeTvdbSeriesId(tvdbId) || result.tvdbSeriesId || '';
       let seriesName = '';
       let seriesSlug = '';
 
       if (!seriesId) {
         const series = await tvdbSearchSeries(titleGuess || result.title, token, preferredLanguage);
         if (series) {
-          seriesId = String(series.tvdb_id || series.id || '');
+          seriesId = normalizeTvdbSeriesId(series.tvdb_id || series.id || '');
           seriesName = series.name || series.seriesName || '';
           seriesSlug = series.slug || series.slugName || '';
         }
