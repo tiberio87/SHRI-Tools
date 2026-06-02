@@ -18,7 +18,8 @@ export function createAutoDetectFlow({
   getParentPath,
   isDiscStructure,
   fetchMetadata,
-  onAmbiguity
+  onAmbiguity,
+  showToast
 }) {
   async function fetchMetadataAuto(guess) {
     if (state.autoDetectRunning) {
@@ -116,6 +117,16 @@ export function createAutoDetectFlow({
       if (finalData.year) {
         setIfAuto(ui.yearInput, finalData.year);
       }
+      if (finalData.imdbId) {
+        setIfAuto(ui.imdbInput, finalData.imdbId);
+      }
+      const resolvedTvdbId = finalData.tvdbSeriesId || finalData.tvdbId || '';
+      if (resolvedTvdbId) {
+        setIfAuto(ui.tvdbInput, String(resolvedTvdbId));
+      }
+      if (finalData.malId) {
+        setIfAuto(ui.malInput, String(finalData.malId));
+      }
       if (finalData.originalLanguage) {
         const normalizedOriginal = normalizeLangTag(finalData.originalLanguage);
         setInputAuto(ui.originalLanguageInput, normalizedOriginal);
@@ -153,6 +164,9 @@ export function createAutoDetectFlow({
           finalData?.tvdbSeriesId ||
           finalData?.malId
       );
+      if (isTvType && finalHasMatch && !resolvedTvdbId && !payload.tvdbId && typeof showToast === 'function') {
+        showToast('ID TVDB non trovato automaticamente. Inseriscilo manualmente se richiesto dal tracker.', 'warning');
+      }
       if (!finalHasMatch) {
         setFetchBadge('error', 'Auto matching fallito');
       } else {

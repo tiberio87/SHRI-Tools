@@ -1811,7 +1811,8 @@ const autoDetectFlow = createAutoDetectFlow({
   getParentPath,
   isDiscStructure,
   fetchMetadata: (payload) => window.api.fetchMetadata(payload),
-  onAmbiguity: openDisambiguationModal
+  onAmbiguity: openDisambiguationModal,
+  showToast
 });
 
 ({ fetchMetadataAuto, autoDetectFromPath, updateAutoDetectControls, manualDetectFromInputs } = autoDetectFlow);

@@ -1246,8 +1246,10 @@ export function createUploadKit(deps) {
       : '';
     const manualNotes = ui.uploadReleaseNotesInput?.value.trim();
     const isIsland = tag.toLowerCase() === 'island';
+    const isSeasonType = form.type === 'tv-season' || form.type === 'anime-season';
+    const isSeasonDir = state.kind === 'dir' && isSeasonType;
     // Nota repack stagione TV (solo se non ci sono note manuali)
-    if (isSeasonRepack && !manualNotes) {
+    if (isSeasonRepack && isSeasonDir && !manualNotes) {
       const folderName = repackFolderName || 'NOME CARTELLA';
       const repackNote = `Questo è il RE-PACK della stagione completa, se avete scaricato le puntate singole vi basterà creare una cartella nominarla "${folderName}" inserire al suo interno le puntate che avete, a questo punto scaricate il file torrent e fategli riconoscere la cartella appena creata, il client farà il re-check e cosi facendovi riemetterete in seed senza dover riscaricare nulla.`;
       const islandNote = isIsland
@@ -1943,8 +1945,12 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       lastUploadDownloadUrl = '';
       lastTrackerTorrentPath = '';
     }
-    // Popup repack per stagioni TV (chiedi solo alla prima apertura per ogni cartella)
-    const isTvSeasonDir = state.kind === 'dir' && (form.type.includes('tv') || form.type.includes('anime'));
+    // Popup repack solo per stagioni TV/anime (chiedi solo alla prima apertura per ogni cartella)
+    const isTvSeasonDir = state.kind === 'dir' && (form.type === 'tv-season' || form.type === 'anime-season');
+    if (!isTvSeasonDir) {
+      isSeasonRepack = false;
+      repackFolderName = '';
+    }
     if (isTvSeasonDir && state.targetPath !== repackAskedForPath) {
       repackAskedForPath = state.targetPath;
       isSeasonRepack = false;
