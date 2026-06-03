@@ -156,9 +156,13 @@ export function createSettingsTools({
 
   function saveSettings(settings) {
     const sanitized = stripSecretSettings(settings);
+    const nonSecretSettings = {
+      ...DEFAULT_SETTINGS,
+      ...(sanitized.settings && typeof sanitized.settings === 'object' ? sanitized.settings : {})
+    };
     localStorage.setItem(
       SETTINGS_STORAGE_KEY,
-      JSON.stringify(toNonSecretSettingsForStorage(sanitized.settings ?? sanitized))
+      JSON.stringify(toNonSecretSettingsForStorage(nonSecretSettings))
     );
     if (window.api?.setStoredSecrets) {
       window.api.setStoredSecrets(extractSecretSettings(settings));
