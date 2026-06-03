@@ -73,13 +73,19 @@ const SECRET_SETTING_KEYS = [
   'torrentPasskey'
 ];
 
+const NON_SECRET_STORAGE_KEYS = Object.keys(DEFAULT_SETTINGS).filter(
+  (key) => !SECRET_SETTING_KEYS.includes(key)
+);
+
 function toNonSecretSettingsForStorage(settings) {
   const source = settings && typeof settings === 'object' ? settings : {};
-  const clone = { ...source };
-  for (const key of SECRET_SETTING_KEYS) {
-    delete clone[key];
+  const stored = {};
+  for (const key of NON_SECRET_STORAGE_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      stored[key] = source[key];
+    }
   }
-  return clone;
+  return stored;
 }
 
 export function createSettingsTools({
@@ -139,7 +145,7 @@ export function createSettingsTools({
       if (sanitized.hadSecrets) {
         localStorage.setItem(
           SETTINGS_STORAGE_KEY,
-          JSON.stringify(toNonSecretSettingsForStorage(mergeSettings(sanitized.settings, {})))
+          JSON.stringify(toNonSecretSettingsForStorage(sanitized.settings))
         );
       }
       return mergeSettings(sanitized.settings, getStoredSecrets());
