@@ -1381,11 +1381,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (useBdInfo && !getBdInfoSummaryText()) {
       warnings.push('BDInfo mancante: necessario per Full Disc.');
     }
-    if (isFullDisc(form) && !isDvdDisc(form) && !form.region) {
-      warnings.push('Regione non impostata per Full Disc (opzionale).');
-    }
-    if (isDvdDisc(form) && !form.region) {
-      warnings.push('Regione obbligatoria per DVD/HDDVD.');
+    if (isFullDisc(form) && !form.region) {
+      warnings.push('Regione obbligatoria per Full Disc.');
     }
     if (!state.metadata?.title) {
       warnings.push('Titolo non trovato via API: uso fallback dal file.');
@@ -1473,7 +1470,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     const isSeasonPack = isTv && form.type.includes('season');
     const fullDisc = isFullDisc(form);
     const dvdDisc = isDvdDisc(form);
-    const needsRegion = dvdDisc;
+    const needsRegion = fullDisc;
     const region = form.region || '';
     return {
       title: title || '-',
@@ -1515,7 +1512,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
           <input id="confirmRegionInput" class="confirm-input" type="text" placeholder="Es. 1 / 2 / A / B / C" />
         </div>
         <div class="confirm-row confirm-row-hint">
-          <span class="confirm-hint">Regione obbligatoria per DVD/HDDVD.</span>
+          <span class="confirm-hint">Regione obbligatoria per Full Disc.</span>
         </div>`
       : summary.fullDisc
         ? `
@@ -2286,6 +2283,37 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (result?.ok) {
       state.screenshots = result.images || [];
       state.screenshotsMeta = { tonemapped: Boolean(result.tonemapped) };
+
+      // Offer fallback host if any upload failed and fallback is configured.
+      const failedCount = state.screenshots.filter((s) => !s.ok).length;
+      const fallbackHost = settings.imageHostFallback;
+      const fallbackKey = fallbackHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
+      if (failedCount > 0 && fallbackHost && fallbackKey && fallbackHost !== (settings.imageHostPrimary || 'imgbb')) {
+        const primaryLabel = (settings.imageHostPrimary || 'imgbb').toUpperCase();
+        const fallbackLabel = fallbackHost.toUpperCase();
+        const switchConfirmed = await openConfirmModal(
+          `${failedCount} screenshot non caricati su ${primaryLabel}.\nVuoi caricare tutti gli screenshot su ${fallbackLabel}?`,
+          { html: false }
+        );
+        if (switchConfirmed) {
+          setScreensStage('uploading');
+          const reuploadResult = await window.api.reuploadScreenshots({
+            images: state.screenshots,
+            host: fallbackHost,
+            imgbbKey: settings.imgbbKey || '',
+            ptscreensKey: settings.ptscreensKey || ''
+          });
+          if (reuploadResult?.images?.length) {
+            state.screenshots = reuploadResult.images;
+            logDebug?.('screens: reupload result', {
+              host: fallbackHost,
+              ok: reuploadResult.images.filter((s) => s.ok).length,
+              total: reuploadResult.images.length
+            });
+          }
+        }
+      }
+
       const okImages = state.screenshots.filter((s) => s.ok);
       logDebug?.('screens: result', {
         total: state.screenshots.length,

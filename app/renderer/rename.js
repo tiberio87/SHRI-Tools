@@ -13,6 +13,7 @@ import {
   detectAudioMeta,
   mapAudioCodec,
   parseChannels,
+  pickBestItalianAudioFromBdInfo,
   pickBestItalianAudioTrack
 } from './media-utils.js';
 import { extractTokensPresent } from './parsing-tools.js';
@@ -32,6 +33,21 @@ export function createRenameTools(deps) {
 
   // Prefer best ITA audio unless user manually overrides codec/channels/meta.
   function getAudioOverrides() {
+    const form = getFormState();
+    // For Full Disc, BDInfo audio lines take priority over MediaInfo.
+    if (form?.format === 'Full Disc' && state.bdInfoParsed?.audioLines?.length) {
+      const bdBest = pickBestItalianAudioFromBdInfo(state.bdInfoParsed.audioLines);
+      if (bdBest) {
+        const overrides = {};
+        const codecManual = ui.audioCodecInput?.dataset?.manual === 'true' && ui.audioCodecInput?.value;
+        const channelsManual = ui.audioChannelsInput?.dataset?.manual === 'true' && ui.audioChannelsInput?.value;
+        const metaManual = ui.audioMetaInput?.dataset?.manual === 'true' && ui.audioMetaInput?.value;
+        if (!codecManual && bdBest.codec) overrides.audioCodec = bdBest.codec;
+        if (!channelsManual && bdBest.channels) overrides.audioChannels = bdBest.channels;
+        if (!metaManual && bdBest.isAtmos) overrides.audioMeta = 'Atmos';
+        return overrides;
+      }
+    }
     if (!state.mediaInfo) {
       return {};
     }
@@ -224,7 +240,9 @@ export function createRenameTools(deps) {
       }
     } else if (format === 'Full Disc') {
       if (data.source) {
-        tokens.push(data.source);
+        // Normalize "BluRay" → "Blu-ray" (e.g. "UHD BluRay" → "UHD Blu-ray").
+        const discSource = String(data.source).replace(/\bBluRay\b/gi, 'Blu-ray');
+        tokens.push(discSource);
       }
       tokens.push(...hdrTokens);
       if (data.videoCodec) {

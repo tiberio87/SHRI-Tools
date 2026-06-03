@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld('api', {
   transmissionAddTorrent: (payload) => ipcRenderer.invoke('transmission-add-torrent', payload),
   transmissionTest: (payload) => ipcRenderer.invoke('transmission-test', payload),
   generateScreenshots: (payload) => ipcRenderer.invoke('generate-screenshots', payload),
+  reuploadScreenshots: (payload) => ipcRenderer.invoke('reupload-screenshots', payload),
   getAppVersion: () => ipcRenderer.invoke('app-version'),
   checkUpdate: () => ipcRenderer.invoke('check-update'),
   saveFile: (payload) => ipcRenderer.invoke('save-file', payload),

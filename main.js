@@ -2265,7 +2265,9 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         total: totalShots
       });
 
-      const upload = await uploadWithFallback(filePath, primaryHost, fallbackHost, {
+      // No auto-fallback here: use only the primary host so all screenshots
+      // stay on a single host. The renderer will offer a switch if uploads fail.
+      const upload = await uploadWithFallback(filePath, primaryHost, null, {
         imgbbKey,
         ptscreensKey
       });
@@ -2274,9 +2276,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
           stage: 'debug',
           message: `[screens:upload:ok] #${index} host=${upload.host} url="${upload.displayUrl || upload.rawUrl || ''}"`
         });
-        try {
-          if (!useJobDir) await fs.unlink(filePath);
-        } catch {}
+        // Keep file on disk so the renderer can re-upload to fallback if needed.
       } else {
         sendProgress({
           stage: 'debug',
@@ -2336,6 +2336,39 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
     sendProgress({ stage: 'error', error: friendlyError });
     return { ok: false, error: friendlyError };
   }
+});
+
+ipcMain.handle('reupload-screenshots', async (_event, payload) => {
+  const images = payload?.images || [];
+  const host = String(payload?.host || '').trim();
+  const imgbbKey = String(payload?.imgbbKey || '').trim();
+  const ptscreensKey = String(payload?.ptscreensKey || '').trim();
+  if (!host) {
+    return { ok: false, error: 'Host di destinazione mancante.' };
+  }
+  const results = [];
+  for (const img of images) {
+    const filePath = String(img?.filePath || '').trim();
+    if (!filePath || !fsSync.existsSync(filePath)) {
+      results.push({ ...img, ok: false, error: 'File locale non disponibile per il ricalco.' });
+      continue;
+    }
+    try {
+      const upload = await uploadWithFallback(filePath, host, null, { imgbbKey, ptscreensKey });
+      results.push({
+        ...img,
+        ok: upload.ok,
+        host: upload.host,
+        displayUrl: upload.displayUrl || '',
+        viewerUrl: upload.viewerUrl || '',
+        rawUrl: upload.rawUrl || '',
+        error: upload.error || ''
+      });
+    } catch (err) {
+      results.push({ ...img, ok: false, error: err.message || String(err) });
+    }
+  }
+  return { ok: results.some((r) => r.ok), images: results };
 });
 
 ipcMain.handle('select-folder', async () => {
