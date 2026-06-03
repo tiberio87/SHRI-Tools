@@ -61,6 +61,18 @@ const DEFAULT_SETTINGS = {
   mkvTaggerEncoder: 'SHRI'
 };
 
+const SECRET_SETTING_KEYS = [
+  'omdbKey',
+  'tmdbKey',
+  'tvdbKey',
+  'imgbbKey',
+  'ptscreensKey',
+  'unit3dApiKey',
+  'qbitPassword',
+  'transmissionPassword',
+  'torrentPasskey'
+];
+
 export function createSettingsTools({
   ui,
   updateTagSuggestion,
@@ -107,17 +119,68 @@ export function createSettingsTools({
     try {
       const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (!raw) {
-        return { ...DEFAULT_SETTINGS };
+        return mergeSettings({}, getStoredSecrets());
       }
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      const secrets = extractSecretSettings(parsed);
+      if (Object.keys(secrets).length && window.api?.setStoredSecrets) {
+        window.api.setStoredSecrets(secrets);
+      }
+      const sanitized = stripSecretSettings(parsed);
+      if (sanitized.hadSecrets) {
+        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitized.settings));
+      }
+      return mergeSettings(sanitized.settings, getStoredSecrets());
     } catch {
-      return { ...DEFAULT_SETTINGS };
+      return mergeSettings({}, getStoredSecrets());
     }
   }
 
   function saveSettings(settings) {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    const sanitized = stripSecretSettings(settings);
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitized));
+    if (window.api?.setStoredSecrets) {
+      window.api.setStoredSecrets(extractSecretSettings(settings));
+    }
+  }
+
+  function mergeSettings(settings = {}, secrets = {}) {
+    return { ...DEFAULT_SETTINGS, ...settings, ...secrets };
+  }
+
+  function getStoredSecrets() {
+    if (!window.api?.getStoredSecrets) {
+      return {};
+    }
+    return window.api.getStoredSecrets() || {};
+  }
+
+  function extractSecretSettings(settings = {}) {
+    const secretSettings = {};
+    for (const key of SECRET_SETTING_KEYS) {
+      if (String(settings?.[key] || '').trim()) {
+        secretSettings[key] = String(settings[key]).trim();
+      }
+    }
+    return secretSettings;
+  }
+
+  function stripSecretSettings(settings = {}) {
+    const {
+      omdbKey,
+      tmdbKey,
+      tvdbKey,
+      imgbbKey,
+      ptscreensKey,
+      unit3dApiKey,
+      qbitPassword,
+      transmissionPassword,
+      torrentPasskey,
+      ...rest
+    } = settings || {};
+    return { settings: rest, hadSecrets: Boolean(
+      omdbKey || tmdbKey || tvdbKey || imgbbKey || ptscreensKey || unit3dApiKey || qbitPassword || transmissionPassword || torrentPasskey
+    ) };
   }
 
   function updateFfmpegHint(settings) {

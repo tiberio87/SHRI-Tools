@@ -1,6 +1,8 @@
 const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
+  getStoredSecrets: () => ipcRenderer.sendSync('secret-store:get'),
+  setStoredSecrets: (settings) => ipcRenderer.sendSync('secret-store:set', settings),
   selectFile: () => ipcRenderer.invoke('select-file'),
   selectAnyFile: () => ipcRenderer.invoke('select-any-file'),
   selectFolder: () => ipcRenderer.invoke('select-folder'),
