@@ -388,3 +388,70 @@ export function formatLangName(tag) {
   };
   return map[normalized] || normalized;
 }
+
+// BDInfo audio-line helpers: parse and rank audio tracks from BDInfo text output.
+function mapBdInfoCodecName(name) {
+  const n = String(name || '').toUpperCase();
+  if (n.includes('TRUEHD')) return 'TrueHD';
+  if (n.includes('DTS:X')) return 'DTS:X';
+  if (n.includes('DTS-HD') && n.includes('MASTER')) return 'DTS-HD MA';
+  if (n.includes('DTS-HD') && n.includes('HIGH')) return 'DTS-HD HRA';
+  if (n.includes('DTS')) return 'DTS';
+  if (n.includes('DIGITAL PLUS') || n.includes('DD PLUS') || n.includes('E-AC')) return 'DD+';
+  if (n.includes('DOLBY DIGITAL') || n.includes('AC-3') || n.includes('AC3')) return 'DD';
+  if (n.includes('LPCM') || n.includes('PCM')) return 'PCM';
+  if (n.includes('FLAC')) return 'FLAC';
+  if (n.includes('AAC')) return 'AAC';
+  return '';
+}
+
+function parseBdInfoAudioLine(line) {
+  const cols = String(line || '').trim().split(/\s{2,}/).map((s) => s.trim()).filter(Boolean);
+  if (cols.length < 2) return null;
+  const codecName = cols[0];
+  const language = cols[1];
+  const chanStr = cols[3] || '';
+  const bitrateStr = cols[2] || '';
+
+  const codec = mapBdInfoCodecName(codecName);
+  const chanMatch = chanStr.match(/(\d+\.\d+)/);
+  const channels = chanMatch ? chanMatch[1] : '';
+  const bitrateMatch = bitrateStr.match(/(\d+)/);
+  const bitrate = bitrateMatch ? parseInt(bitrateMatch[1], 10) : 0;
+  const isItalian = /\b(italian|italiano|ita)\b/i.test(language);
+  const isLossless = ['TrueHD', 'DTS-HD MA', 'DTS-HD HRA', 'DTS:X', 'PCM', 'FLAC'].includes(codec);
+  const isAtmos = /atmos/i.test(codecName);
+
+  return { codec, channels, bitrate, isItalian, isLossless, isAtmos };
+}
+
+const BDINFO_CODEC_SCORE = {
+  TrueHD: 100, 'DTS-HD MA': 90, 'DTS:X': 88, PCM: 85, FLAC: 85,
+  'DTS-HD HRA': 80, 'DD+': 60, DTS: 50, DD: 40, AAC: 30
+};
+
+export function pickBestItalianAudioFromBdInfo(audioLines) {
+  if (!Array.isArray(audioLines) || !audioLines.length) return null;
+  const parsed = audioLines.map(parseBdInfoAudioLine).filter(Boolean);
+  if (!parsed.length) return null;
+
+  const italianTracks = parsed.filter((t) => t.isItalian);
+  const pool = italianTracks.length ? italianTracks : parsed;
+
+  return pool.reduce((best, track) => {
+    if (!best) return track;
+    const key = (t) => [
+      t.isLossless ? 1 : 0,
+      parseFloat(t.channels) || 0,
+      t.isAtmos ? 1 : 0,
+      BDINFO_CODEC_SCORE[t.codec] || 0,
+      t.bitrate
+    ];
+    const bk = key(best);
+    const tk = key(track);
+    for (let i = 0; i < tk.length; i += 1) {
+      if (tk[i] !== bk[i]) return tk[i] > bk[i] ? track : best;
+    }
+    return best;
+  }, null);
+}
