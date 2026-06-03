@@ -139,7 +139,7 @@ export function createSettingsTools({
       if (sanitized.hadSecrets) {
         localStorage.setItem(
           SETTINGS_STORAGE_KEY,
-          JSON.stringify(toNonSecretSettingsForStorage(sanitized.settings))
+          JSON.stringify(toNonSecretSettingsForStorage(mergeSettings(sanitized.settings, {})))
         );
       }
       return mergeSettings(sanitized.settings, getStoredSecrets());
