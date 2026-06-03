@@ -251,7 +251,11 @@ La cartella output torrent va impostata a `/output` (mappata sul volume host).
 
 ### Persistenza dati
 
-Le impostazioni Electron vengono salvate in `/data` (volume `./data`), quindi sono persistenti tra i riavvii del container. Se vuoi ripartire da zero basta svuotare la cartella `./data` sull'host.
+Le impostazioni Electron vengono salvate in `/data` (volume `./data`), quindi sono persistenti tra i riavvii del container. Le API key e le password vengono archiviate in una store separata cifrata; se l'ambiente supporta `safeStorage`, Electron usa quello, altrimenti usa un fallback cifrato persistito nel volume.
+
+I segreti non vengono richiesti a ogni avvio finché resta presente il volume `./data`. Se vuoi ripartire da zero basta svuotare la cartella `./data` sull'host.
+
+Se preferisci controllare esplicitamente la chiave di cifratura del fallback, puoi impostare `SHRI_TOOLS_SECRET_KEY` nel container.
 
 ### Nota sul sandbox Electron
 
