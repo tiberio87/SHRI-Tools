@@ -981,7 +981,7 @@ async function getVideoDurationSeconds(ffprobePath, videoPath) {
 }
 
 function buildScreenshotTimes(duration, count) {
-  const safeCount = Math.max(3, Math.min(12, Number(count) || 6));
+  const safeCount = Math.max(2, Math.min(12, Number(count) || 6));
   const start = duration * 0.1;
   const end = duration * 0.9;
   const step = safeCount > 1 ? (end - start) / (safeCount - 1) : 0;
@@ -2325,8 +2325,16 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
     return { ok: true, outputDir: effectiveOutputDir, images, tonemapped: tonemapApplied };
   } catch (error) {
     sendProgress({ stage: 'debug', message: `[screens:fatal] ${error.message || error}` });
-    sendProgress({ stage: 'error', error: String(error) });
-    return { ok: false, error: String(error) };
+    const errMsg = String(error.message || error);
+    const noDecoderMatch = errMsg.match(/no decoder found for:\s*(\S+)/i);
+    const friendlyError = noDecoderMatch
+      ? `Codec non supportato da FFmpeg: ${noDecoderMatch[1].toUpperCase()}. ` +
+        `Installa la versione completa di FFmpeg con supporto al codec. ` +
+        `Fedora: "sudo dnf swap ffmpeg-free ffmpeg --allowerasing" (richiede RPM Fusion). ` +
+        `Ubuntu/Debian: "sudo apt install ffmpeg" (da universe/multiverse, oppure usa una build statica da ffmpeg.org).`
+      : errMsg;
+    sendProgress({ stage: 'error', error: friendlyError });
+    return { ok: false, error: friendlyError };
   }
 });
 

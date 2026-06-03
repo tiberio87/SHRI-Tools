@@ -15,7 +15,7 @@ function normalizeCategory(category) {
 
 function sanitizeCount(count) {
   const num = Math.round(clampNumber(count, 6));
-  return Math.max(3, Math.min(12, num));
+  return Math.max(2, Math.min(12, num));
 }
 
 function buildUaScreenshotTimes(options) {
