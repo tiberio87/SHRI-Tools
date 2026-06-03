@@ -61,6 +61,33 @@ const DEFAULT_SETTINGS = {
   mkvTaggerEncoder: 'SHRI'
 };
 
+const SECRET_SETTING_KEYS = [
+  'omdbKey',
+  'tmdbKey',
+  'tvdbKey',
+  'imgbbKey',
+  'ptscreensKey',
+  'unit3dApiKey',
+  'qbitPassword',
+  'transmissionPassword',
+  'torrentPasskey'
+];
+
+const NON_SECRET_STORAGE_KEYS = Object.keys(DEFAULT_SETTINGS).filter(
+  (key) => !SECRET_SETTING_KEYS.includes(key)
+);
+
+function toNonSecretSettingsForStorage(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const stored = {};
+  for (const key of NON_SECRET_STORAGE_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(source, key)) {
+      stored[key] = source[key];
+    }
+  }
+  return stored;
+}
+
 export function createSettingsTools({
   ui,
   updateTagSuggestion,
@@ -107,17 +134,78 @@ export function createSettingsTools({
     try {
       const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (!raw) {
-        return { ...DEFAULT_SETTINGS };
+        return mergeSettings({}, getStoredSecrets());
       }
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_SETTINGS, ...parsed };
+      const secrets = extractSecretSettings(parsed);
+      if (Object.keys(secrets).length && window.api?.setStoredSecrets) {
+        window.api.setStoredSecrets(secrets);
+      }
+      const sanitized = stripSecretSettings(parsed);
+      if (sanitized.hadSecrets) {
+        localStorage.setItem(
+          SETTINGS_STORAGE_KEY,
+          JSON.stringify(toNonSecretSettingsForStorage(sanitized.settings))
+        );
+      }
+      return mergeSettings(sanitized.settings, getStoredSecrets());
     } catch {
-      return { ...DEFAULT_SETTINGS };
+      return mergeSettings({}, getStoredSecrets());
     }
   }
 
   function saveSettings(settings) {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    const sanitized = stripSecretSettings(settings);
+    const nonSecretSettings = {
+      ...DEFAULT_SETTINGS,
+      ...(sanitized.settings && typeof sanitized.settings === 'object' ? sanitized.settings : {})
+    };
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify(toNonSecretSettingsForStorage(nonSecretSettings))
+    );
+    if (window.api?.setStoredSecrets) {
+      window.api.setStoredSecrets(extractSecretSettings(settings));
+    }
+  }
+
+  function mergeSettings(settings = {}, secrets = {}) {
+    return { ...DEFAULT_SETTINGS, ...settings, ...secrets };
+  }
+
+  function getStoredSecrets() {
+    if (!window.api?.getStoredSecrets) {
+      return {};
+    }
+    return window.api.getStoredSecrets() || {};
+  }
+
+  function extractSecretSettings(settings = {}) {
+    const secretSettings = {};
+    for (const key of SECRET_SETTING_KEYS) {
+      if (String(settings?.[key] || '').trim()) {
+        secretSettings[key] = String(settings[key]).trim();
+      }
+    }
+    return secretSettings;
+  }
+
+  function stripSecretSettings(settings = {}) {
+    const {
+      omdbKey,
+      tmdbKey,
+      tvdbKey,
+      imgbbKey,
+      ptscreensKey,
+      unit3dApiKey,
+      qbitPassword,
+      transmissionPassword,
+      torrentPasskey,
+      ...rest
+    } = settings || {};
+    return { settings: rest, hadSecrets: Boolean(
+      omdbKey || tmdbKey || tvdbKey || imgbbKey || ptscreensKey || unit3dApiKey || qbitPassword || transmissionPassword || torrentPasskey
+    ) };
   }
 
   function updateFfmpegHint(settings) {

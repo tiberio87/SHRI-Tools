@@ -7,6 +7,7 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const { spawn } = require('child_process');
 const { buildUaScreenshotTimes, buildUaScreenshotTimesDebug } = require('./app/screenshot-times');
+const { loadStoredSecrets, saveStoredSecrets } = require('./app/secret-store');
 
 function createFormData() {
   if (!global.FormData) {
@@ -1917,6 +1918,22 @@ ipcMain.handle('select-any-file', async () => {
 });
 
 ipcMain.handle('app-version', () => app.getVersion());
+
+ipcMain.on('secret-store:get', (event) => {
+  try {
+    event.returnValue = loadStoredSecrets();
+  } catch {
+    event.returnValue = {};
+  }
+});
+
+ipcMain.on('secret-store:set', (event, settings) => {
+  try {
+    event.returnValue = saveStoredSecrets(settings);
+  } catch {
+    event.returnValue = false;
+  }
+});
 
 ipcMain.handle('save-file', async (_event, { defaultName, content }) => {
   const safeName = String(defaultName || 'export').replace(/[/\\:*?"<>|]/g, '_');
