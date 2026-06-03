@@ -651,7 +651,7 @@ export function createSettingsTools({
       autoTagDetect: Boolean(ui.autoTagDetectToggle?.checked),
       autoNoGroupTag: Boolean(ui.autoNoGroupTagToggle?.checked),
       ffmpegPath: ui.ffmpegPathInput?.value.trim() || '',
-      screenshotsCount: parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6,
+      screenshotsCount: Math.max(2, parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6),
       imageHostPrimary: ui.imageHostPrimarySelect?.value || 'imgbb',
       imageHostFallback: ui.imageHostFallbackSelect?.value || 'ptscreens',
       unit3dBaseUrl: ui.unit3dBaseUrlInput?.value.trim() || 'https://shareisland.org',

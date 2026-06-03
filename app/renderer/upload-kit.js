@@ -686,7 +686,7 @@ export function createUploadKit(deps) {
   function getJobFileTitle() {
     const raw = String(ui.torrentNameInput?.value || '').trim();
     return raw
-      .replace(/[\\/:*?"<>|]+/g, '')
+      .replace(/[\\/:*?"<>|']+/g, '')
       .replace(/\s+/g, '.')
       .replace(/\.+$/g, '') || 'job';
   }
@@ -697,7 +697,7 @@ export function createUploadKit(deps) {
       return '';
     }
     const safeTitle = String(title || 'job')
-      .replace(/[\\/:*?"<>|]+/g, '')
+      .replace(/[\\/:*?"<>|']+/g, '')
       .replace(/\s+/g, '.')
       .replace(/\.+$/g, '') || 'job';
     const separator = baseDir.includes('\\') ? '\\' : '/';
@@ -1944,6 +1944,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       uploadTitleSourcePath = state.targetPath;
       lastUploadDownloadUrl = '';
       lastTrackerTorrentPath = '';
+      state.screenshots = [];
+      state.screenshotsMeta = null;
     }
     // Popup repack solo per stagioni TV/anime (chiedi solo alla prima apertura per ogni cartella)
     const isTvSeasonDir = state.kind === 'dir' && (form.type === 'tv-season' || form.type === 'anime-season');
@@ -2101,6 +2103,113 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     }
   }
 
+  function buildDebugFileContent(buffer, jobTitle) {
+    const now = new Date();
+    const bar  = '═'.repeat(64);
+    const thin = '─'.repeat(64);
+    const dateStr = now.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    const timeStr = now.toLocaleTimeString('it-IT');
+    const header = [
+      bar,
+      '  SHRI-Tools  ·  Debug Log',
+      `  Job   : ${jobTitle || 'n/a'}`,
+      `  Data  : ${dateStr}  ${timeStr}`,
+      bar,
+      ''
+    ].join('\n');
+
+    const SECTION_LABELS = {
+      screens:         '[ SCREENSHOTS ]',
+      unit3d:          '[ UPLOAD UNIT3D ]',
+      restoreJobState: '[ RIPRISTINO JOB ]',
+      transmission:    '[ TORRENT CLIENT — Transmission ]',
+      qbit:            '[ TORRENT CLIENT — qBittorrent ]',
+      services:        '[ SERVIZI ]'
+    };
+
+    function detectSection(line) {
+      // "[HH:MM:SS] [screens:init] ..."
+      const m1 = line.match(/^\[\d{2}:\d{2}:\d{2}\] \[(\w+):/);
+      if (m1) return m1[1];
+      // "[HH:MM:SS] unit3d upload ..."
+      const m2 = line.match(/^\[\d{2}:\d{2}:\d{2}\] (\w+)[\s:]/);
+      if (m2) return m2[1];
+      return '';
+    }
+
+    // Parses "key=value key2=value2 ..." respecting quoted strings and [...] arrays.
+    function parseKvPairs(kvStr) {
+      const pairs = [];
+      let cur = '';
+      let depth = 0;
+      let inQuote = false;
+      for (const ch of kvStr) {
+        if (ch === '"' && depth === 0) { inQuote = !inQuote; cur += ch; continue; }
+        if (!inQuote && ch === '[') { depth++; cur += ch; continue; }
+        if (!inQuote && ch === ']') { depth--; cur += ch; continue; }
+        if (!inQuote && depth === 0 && ch === ' ') {
+          if (cur) { pairs.push(cur); cur = ''; }
+          continue;
+        }
+        cur += ch;
+      }
+      if (cur) pairs.push(cur);
+      return pairs;
+    }
+
+    let prevSection = '';
+    const out = [];
+
+    for (const rawLine of buffer) {
+      const section = detectSection(rawLine);
+
+      // Section header on change
+      if (section && section !== prevSection) {
+        if (out.length) out.push('');
+        const label = SECTION_LABELS[section];
+        if (label) {
+          out.push(thin);
+          out.push(`  ${label}`);
+          out.push(thin);
+        }
+        prevSection = section;
+      }
+
+      // Try to find and pretty-print a trailing JSON object or array.
+      // Find the last occurrence of ' {' or ' [' that starts valid JSON.
+      const jsonMatch = rawLine.match(/^(.+?) (\{[\s\S]*\}|\[[\s\S]*\])$/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[2]);
+          const pretty = JSON.stringify(parsed, null, 2);
+          out.push(jsonMatch[1]);
+          for (const jLine of pretty.split('\n')) {
+            out.push(`    ${jLine}`);
+          }
+          continue;
+        } catch { /* not JSON – fall through */ }
+      }
+
+      // For [screens:tag] lines with many key=value pairs, indent each pair.
+      const kvLineMatch = rawLine.match(/^(\[\d{2}:\d{2}:\d{2}\] \[\w+(?::\w+)+\]) (.+)$/);
+      if (kvLineMatch) {
+        const linePrefix = kvLineMatch[1];
+        const pairs = parseKvPairs(kvLineMatch[2]);
+        if (pairs.length > 3) {
+          out.push(linePrefix);
+          for (const pair of pairs) {
+            out.push(`    ${pair}`);
+          }
+          continue;
+        }
+      }
+
+      out.push(rawLine);
+    }
+
+    return header + out.join('\n');
+  }
+
   async function generateScreenshots() {
     const settings = loadSettings();
     const form = getFormState();
@@ -2160,7 +2269,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     const payload = {
       videoPath,
       ffmpegPath: settings.ffmpegPath,
-      count: settings.screenshotsCount || 6,
+      count: settings.screenshotsCount >= 2 ? settings.screenshotsCount : 6,
       primaryHost: settings.imageHostPrimary || 'imgbb',
       fallbackHost: settings.imageHostFallback || 'ptscreens',
       imgbbKey: settings.imgbbKey || '',
@@ -2200,7 +2309,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       if (jobDirLog && debugState.buffer.length) {
         const safeTitleLog = getJobFileTitle();
         const sepLog = jobDirLog.includes('\\') ? '\\' : '/';
-        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}DEBUG.txt`, content: debugState.buffer.join('\n') }); } catch {}
+        const debugContent = buildDebugFileContent(debugState.buffer, safeTitleLog);
+        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}DEBUG.txt`, content: debugContent }); } catch {}
       }
       // salva metadata screenshots per ripristino automatico
       if (jobDirLog && state.screenshots.length) {

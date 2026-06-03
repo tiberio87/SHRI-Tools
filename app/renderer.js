@@ -2402,7 +2402,7 @@ if (ui.generateTorrentBtn) {
     let outputDir = '';
     if (baseOutputDir) {
       const safeTitle = outputName
-        .replace(/[\\/:*?"<>|]+/g, '')
+        .replace(/[\\/:*?"<>|']+/g, '')
         .replace(/\s+/g, '.')
         .replace(/\.+$/g, '') || 'job';
       const separator = baseOutputDir.includes('\\') ? '\\' : '/';
