@@ -73,6 +73,15 @@ const SECRET_SETTING_KEYS = [
   'torrentPasskey'
 ];
 
+function toNonSecretSettingsForStorage(settings) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const clone = { ...source };
+  for (const key of SECRET_SETTING_KEYS) {
+    delete clone[key];
+  }
+  return clone;
+}
+
 export function createSettingsTools({
   ui,
   updateTagSuggestion,
@@ -128,7 +137,10 @@ export function createSettingsTools({
       }
       const sanitized = stripSecretSettings(parsed);
       if (sanitized.hadSecrets) {
-        localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitized.settings));
+        localStorage.setItem(
+          SETTINGS_STORAGE_KEY,
+          JSON.stringify(toNonSecretSettingsForStorage(sanitized.settings))
+        );
       }
       return mergeSettings(sanitized.settings, getStoredSecrets());
     } catch {
@@ -138,7 +150,10 @@ export function createSettingsTools({
 
   function saveSettings(settings) {
     const sanitized = stripSecretSettings(settings);
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(sanitized));
+    localStorage.setItem(
+      SETTINGS_STORAGE_KEY,
+      JSON.stringify(toNonSecretSettingsForStorage(sanitized.settings ?? sanitized))
+    );
     if (window.api?.setStoredSecrets) {
       window.api.setStoredSecrets(extractSecretSettings(settings));
     }
