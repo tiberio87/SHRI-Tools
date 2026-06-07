@@ -131,6 +131,42 @@ const LANGUAGE_WORDS = new Set([
   'KOREAN'
 ]);
 
+// Technical/release markers that always follow the title+year block. Used to
+// bound the search for the release year so a leading year that is part of the
+// title (e.g. "2001 A Space Odyssey", "1917") is not mistaken for it.
+const RELEASE_INFO_RE = /\b(?:\d{3,4}[pi]|4k|uhd|web[-_.]?dl|web[-_.]?rip|webmux|dlmux|hdtv|blu[-_.]?ray|bd(?:remux|rip|mux)?|br[-_.]?rip|remux|hdrip|dvdrip|x26[45]|h[-_.]?26[45]|hevc|avc|av1)\b/i;
+
+// Pick the release year out of a name, correctly handling titles that start
+// with a year. Returns { year, index } where index is where the chosen year
+// begins (-1 when none). A year at position 0 is treated as part of the title.
+function findReleaseYear(rawText) {
+  const text = String(rawText || '');
+  const parenMatch = text.match(/\((19\d{2}|20\d{2})\)/);
+  if (parenMatch) {
+    return { year: parenMatch[1], index: parenMatch.index };
+  }
+  const yearRe = /\b(19\d{2}|20\d{2})\b/g;
+  const matches = [];
+  let match;
+  while ((match = yearRe.exec(text)) !== null) {
+    matches.push({ year: match[1], index: match.index });
+  }
+  if (!matches.length) {
+    return { year: '', index: -1 };
+  }
+  const releaseMatch = text.match(RELEASE_INFO_RE);
+  const releaseIndex = releaseMatch ? releaseMatch.index : text.length;
+  const beforeRelease = matches.filter((entry) => entry.index < releaseIndex);
+  const pool = beforeRelease.length ? beforeRelease : matches;
+  // A leading year belongs to the title; the real release year is the last
+  // remaining (non-leading) year token in the candidate pool.
+  const nonLeading = pool.filter((entry) => entry.index > 0);
+  if (!nonLeading.length) {
+    return { year: '', index: -1 };
+  }
+  return nonLeading[nonLeading.length - 1];
+}
+
 export function hasCjkChars(value) {
   const text = String(value || '');
   return /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uF900-\uFAFF]/.test(text);
@@ -248,13 +284,7 @@ export function createMetadataTools(deps) {
   }
 
   function extractYear(raw) {
-    const text = String(raw || '');
-    const parenMatch = text.match(/\((19\d{2}|20\d{2})\)/);
-    if (parenMatch) {
-      return parenMatch[1];
-    }
-    const match = text.match(/\b(19|20)\d{2}\b/);
-    return match ? match[0] : '';
+    return findReleaseYear(raw).year;
   }
 
   function isNoiseTag(token) {
@@ -538,9 +568,16 @@ export function createMetadataTools(deps) {
         cutIndex = seasonOnly.index;
       }
     }
-    const yearMatch = cleaned.match(/\b(19|20)\d{2}\b/);
-    if (yearMatch && yearMatch.index < cutIndex) {
-      cutIndex = yearMatch.index;
+    const releaseYear = findReleaseYear(cleaned);
+    if (releaseYear.index > 0 && releaseYear.index < cutIndex) {
+      cutIndex = releaseYear.index;
+    }
+    // Safety net: cut at the technical/release block too, so a title that
+    // starts with a year but has no separate release year (e.g. "1917")
+    // still drops the trailing resolution/source/codec tokens.
+    const releaseInfoMatch = cleaned.match(RELEASE_INFO_RE);
+    if (releaseInfoMatch && releaseInfoMatch.index > 0 && releaseInfoMatch.index < cutIndex) {
+      cutIndex = releaseInfoMatch.index;
     }
     const titleChunk = cleaned.slice(0, cutIndex).trim();
     const tokens = titleChunk

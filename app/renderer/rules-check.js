@@ -341,7 +341,7 @@ export function createRulesCheckTools({
     }
   }
 
-  function buildRulesCheckSummary({ namePath, baseName, form, settings, typeOverride }) {
+  function buildRulesCheckSummary({ namePath, baseName, form, settings, typeOverride, isDisc }) {
     if (!namePath) {
       return null;
     }
@@ -355,7 +355,13 @@ export function createRulesCheckTools({
     const actualEpisodeTitle = guess.episodeTitle || '';
     const actualLanguages = extractLanguagesFromName(baseName);
     const actualResolution = extractResolutionFromName(baseName);
-    const actualFormat = detectFormatFromName(baseName);
+    // For physical disc structures (BDMV/VIDEO_TS) the format is authoritative
+    // from the folder structure, not the name: a Full Disc release rarely
+    // carries a "BDMV"/"FULL DISC" token in its name, so name-based detection
+    // would wrongly report ENCODE.
+    const actualFormat = isDisc
+      ? { value: 'FULL DISC', isWeb: false }
+      : detectFormatFromName(baseName);
     const serviceOptions = buildServiceOptions(settings).map((item) => item.code);
     const actualService = extractTokensPresent(baseName, serviceOptions)[0] || '';
     const actualSource = detectSourceFromName(baseName);
@@ -772,7 +778,8 @@ export function createRulesCheckTools({
         baseName: folderName,
         form,
         settings,
-        typeOverride: form.type.includes('episode') ? 'tv-season' : form.type
+        typeOverride: form.type.includes('episode') ? 'tv-season' : form.type,
+        isDisc: isDiscStructure
       });
       renderRulesCheckSection(
         {
@@ -889,7 +896,8 @@ export function createRulesCheckTools({
         baseName: folderName,
         form,
         settings,
-        typeOverride: form.type.includes('episode') ? 'tv-season' : form.type
+        typeOverride: form.type.includes('episode') ? 'tv-season' : form.type,
+        isDisc: isDiscStructure
       });
       renderRulesCheckSection(
         {
