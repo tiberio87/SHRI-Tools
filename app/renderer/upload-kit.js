@@ -1675,6 +1675,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       showToast('Per i Full Disc serve il BDInfo: seleziona una playlist e avvia la scansione.', 'warning');
       return;
     }
+    if (isFullDisc(form) && !form.region) {
+      showToast('Regione obbligatoria per Full Disc: imposta la regione prima di procedere.', 'error');
+      if (ui.regionInput) {
+        ui.regionInput.focus();
+      }
+      return;
+    }
     const summary = buildUploadSummaryData(form, settings);
     const summaryHtml = buildUploadSummaryHtml(summary, settings);
     const confirmed = await openConfirmModal(

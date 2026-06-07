@@ -1,4 +1,5 @@
 // Auto-detect flow: parse names, set inputs, and fetch metadata when possible.
+import { extractRegionFromName } from './parsing-tools.js';
 export function createAutoDetectFlow({
   ui,
   state,
@@ -255,6 +256,19 @@ export function createAutoDetectFlow({
 
     logDebug('autoDetect: guess', guess);
     updateVisibility();
+
+    // Auto-fill region from folder/file name for Blu-ray Full Disc releases.
+    if (!ui.regionInput?.value?.trim() || ui.regionInput?.dataset?.manual !== 'true') {
+      const nameForRegion = state.kind === 'dir'
+        ? getPathBaseName(state.targetPath)
+        : getPathBaseName(state.mainVideo || state.targetPath || '');
+      const inferredRegion = extractRegionFromName(nameForRegion);
+      if (inferredRegion) {
+        setInputAuto(ui.regionInput, inferredRegion);
+        logDebug('autoDetect: region from name', { region: inferredRegion, name: nameForRegion });
+      }
+    }
+
     const result = await fetchMetadataAuto(guess);
     if (!result?.hasMatch && state.kind !== 'dir' && state.mainVideo) {
       const parentPath = getParentPath(state.mainVideo);
