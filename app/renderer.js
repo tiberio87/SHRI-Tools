@@ -623,6 +623,14 @@ function openUploadWizard(step = 0) {
     showToast('Carica un file o una cartella per avviare il wizard.', 'warning');
     return;
   }
+  const form = getFormState();
+  if (form?.format === 'Full Disc' && !form.region) {
+    showToast('Regione obbligatoria per Full Disc: imposta la regione prima di procedere.', 'error');
+    if (ui.regionInput) {
+      ui.regionInput.focus();
+    }
+    return;
+  }
   ui.uploadWizardModal.classList.remove('hidden');
   setWizardStep(step);
 }

@@ -1,5 +1,6 @@
 import { LANG_MAP } from './constants.js';
 import { normalizeLangTag, getTrackLang, parseChannels, mapAudioCodec, scoreAudioTrack } from './media-utils.js';
+import { extractRegionFromName } from './parsing-tools.js';
 
 // Tracker analysis (Unit3D): fetch payload, parse MediaInfo, and build title suggestion.
 const SECTION_HEADER_PATTERN = /^(general|video|audio|text|menu)(\s+#\d+)?$/i;
@@ -448,6 +449,14 @@ export function createTrackerAnalysis({
     const inferredSource = extractSourceFromName(nameForGuess || name);
     if (inferredSource && !ui.sourceInput.value.trim()) {
       setInputAuto(ui.sourceInput, inferredSource);
+    }
+
+    // Auto-fill region from name for Blu-ray Full Disc releases.
+    if (inferredSource && (inferredSource === 'BluRay' || inferredSource === 'UHD BluRay')) {
+      const inferredRegion = extractRegionFromName(nameForGuess || name);
+      if (inferredRegion && !ui.regionInput?.value?.trim()) {
+        setInputAuto(ui.regionInput, inferredRegion);
+      }
     }
 
     const audioTracks = Array.isArray(mediaInfo?.media?.track)

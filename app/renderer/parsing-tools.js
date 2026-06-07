@@ -530,11 +530,30 @@ function extractTokensPresent(name, tokens) {
   return matches;
 }
 
+// Known region codes that can appear as tokens in a Blu-ray/DVD release name.
+const KNOWN_REGION_CODES = new Set([
+  'USA', 'EUR', 'GBR', 'GER', 'FRA', 'ITA', 'ESP', 'NLD', 'SWE', 'NOR', 'DNK',
+  'FIN', 'AUS', 'NZL', 'JPN', 'KOR', 'TWN', 'HKG', 'CHN', 'CAN', 'BRA', 'ARG',
+  'MEX', 'RUS', 'POL', 'CZE', 'HUN', 'PRT', 'BEL', 'CHE', 'AUT', 'TUR'
+]);
+
+function extractRegionFromName(name) {
+  // Strip group tag (trailing -TAG) then tokenize.
+  const tokens = String(name || '').replace(/[-][^.\s]+$/, '').split(/[.\s_-]+/);
+  for (const token of tokens) {
+    if (KNOWN_REGION_CODES.has(token.toUpperCase())) {
+      return token.toUpperCase();
+    }
+  }
+  return '';
+}
+
 export {
   detectFormatFromName,
   detectSourceFromName,
   detectRepackFromName,
   detectFormatFromMediaInfo,
+  extractRegionFromName,
   extractTokensPresent,
   isDiscStructure,
   getDiscSourceHint
