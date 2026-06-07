@@ -9,6 +9,7 @@ import {
 } from './constants.js';
 import { renderBbcodePreview } from './bbcode.js';
 import { getParentPath } from './path-utils.js';
+import { isDiscStructure } from './parsing-tools.js';
 import {
   formatLangName,
   getAudioTracks,
@@ -338,7 +339,11 @@ export function createUploadKit(deps) {
     const fallback = !metaTitle && Boolean(baseForm.title);
     let tag = baseForm.tag || '';
     if (!tag && settings.autoNoGroupTag !== false) {
-      const path = state.mainVideo || state.targetPath || '';
+      // Disc structures keep the group tag in the folder name, not in the
+      // internal m2ts file referenced by state.mainVideo.
+      const path = isDiscStructure()
+        ? (state.targetPath || state.mainVideo || '')
+        : (state.mainVideo || state.targetPath || '');
       tag = metadataTools?.extractGroupTagFromName?.(path, [], { allowNoGroup: true }) || '';
     }
     const form = { ...baseForm, title, tag };
@@ -2647,6 +2652,12 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       ui.bbcodePreviewContent.innerHTML = renderBbcodePreview(String(content || ''));
       ui.bbcodePreviewModal.classList.remove('hidden');
     },
-    syncUploadTitleOverride
+    syncUploadTitleOverride,
+    resetUploadTitleState() {
+      uploadTitleOverride = '';
+      uploadTitleBase = '';
+      uploadTitleFallback = false;
+      uploadTitleSourcePath = '';
+    }
   };
 }
