@@ -323,6 +323,21 @@ function resetAllInputs(options = {}) {
     ui.renameBadge.textContent = '';
   }
 
+  // Ripristina lo stato del titolo upload: se era in modifica manuale, lo
+  // stato "editing" bloccherebbe l'aggiornamento della preview (regione,
+  // tag, ecc.) anche dopo il caricamento di una nuova sorgente.
+  if (ui.mainUploadTitleInput) {
+    ui.mainUploadTitleInput.readOnly = true;
+    ui.mainUploadTitleInput.dataset.editing = 'false';
+    ui.mainUploadTitleInput.classList.remove('editing');
+  }
+  if (ui.editMainUploadTitleBtn) {
+    ui.editMainUploadTitleBtn.classList.remove('editing');
+    ui.editMainUploadTitleBtn.setAttribute('aria-label', 'Modifica titolo upload');
+    ui.editMainUploadTitleBtn.title = 'Modifica titolo';
+  }
+  uploadKit?.resetUploadTitleState?.();
+
   updateAutoDetectControls();
   updateVisibility();
   mkvTagger?.reset();

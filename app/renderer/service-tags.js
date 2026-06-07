@@ -1,4 +1,5 @@
 import { DEFAULT_GROUP_TAGS } from './constants.js';
+import { isDiscStructure } from './parsing-tools.js';
 
 const DEFAULT_SERVICES = [];
 let serviceDefaultsLoaded = false;
@@ -209,9 +210,14 @@ export function createServiceTagTools({ ui, state, logDebug, metadataTools }) {
     const isTracker = state.kind === 'tracker';
     const trackerName = state.trackerName || '';
     const fileName = state.mainVideo || '';
+    // For disc structures (BDMV/VIDEO_TS) the main video is a tag-less internal
+    // file (e.g. 00800.m2ts), so the release group lives in the folder name.
+    const isDiscDir = !isTracker && isDiscStructure();
     const path = isTracker
       ? (trackerName || fileName || state.targetPath)
-      : (state.mainVideo || state.targetPath);
+      : (isDiscDir
+        ? (state.targetPath || state.mainVideo)
+        : (state.mainVideo || state.targetPath));
     if (!path) {
       state.tagSuggestion = '';
       return;

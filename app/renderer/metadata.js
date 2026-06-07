@@ -17,6 +17,10 @@ import {
 } from './media-utils.js';
 import { getParentPath, getPathBaseName, pad2, stripExtension } from './path-utils.js';
 
+// Real video container extensions. Used to strip extensions only for actual
+// media files, so folder names like "...DDP.7.1-Tib7" keep their group tag.
+const MEDIA_FILE_EXT_PATTERN = /\.(mkv|mp4|m4v|avi|mov|wmv|flv|webm|ts|m2ts|mts|mpg|mpeg|m2v|vob|iso|ogm|divx|rmvb|3gp|asf)$/i;
+
 const CLEAN_TITLE_TOKENS = new Set([
   'HD',
   'UHD',
@@ -282,9 +286,12 @@ export function createMetadataTools(deps) {
     const allowNoGroup = options?.allowNoGroup === true;
     const isTrackerContext = options?.source === 'tracker';
     const rawBase = getPathBaseName(filePath).trim();
+    // Strip only real media-file extensions. A naive stripExtension would treat
+    // the trailing token of folder names like "...DDP.7.1-Tib7" as an extension
+    // (".1-Tib7") and remove the group tag along with the channel layout.
     const base = (isTrackerContext
       ? rawBase
-      : stripExtension(rawBase)
+      : rawBase.replace(MEDIA_FILE_EXT_PATTERN, '')
     ).trim();
     if (!base) {
       return '';
