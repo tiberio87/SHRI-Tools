@@ -1291,6 +1291,25 @@ function updateFormatServiceSuggest() {
         : 'Rilevato da parsing del nome file: token WEB/servizio';
     }
   }
+  // "Encode sicuro": MediaInfo mostra una firma encoder reale (es. libreria x264/x265
+  // o encoding settings) e la sorgente è un supporto fisico (BluRay/UHD/DVD) senza
+  // marker streaming (servizio o token WEB nel nome). In questo caso il formato Encode
+  // è certo e non serve il popup di disambiguazione (che esiste per i casi ambigui
+  // tipo WEB-DL da NF/HMAX).
+  const miSignals = mediaInfoFormat.debug || {};
+  const hasRealEncoderSignature = Boolean(
+    miSignals.hasEncoderTool || miSignals.hasEncodeSignature || miSignals.hasEncodingSettings
+  );
+  const nameHasWebMarker =
+    nameFormat === 'WEB-DL' || nameFormat === 'WEBRip' || /\bWEB\b/i.test(baseName);
+  const sourceIsPhysical = /\b(?:blu[-\s.]?ray|uhd|dvd)\b/i.test(String(source || ''));
+  const isConfidentEncode =
+    format === 'Encode' &&
+    !isRemuxWithEncodeMarker &&
+    hasRealEncoderSignature &&
+    sourceIsPhysical &&
+    !service &&
+    !nameHasWebMarker;
   const hasItalianSubsOnly = (() => {
     if (!state.mediaInfo || state.mediaInfo.error) {
       return false;
@@ -1323,11 +1342,13 @@ function updateFormatServiceSuggest() {
     formatReason,
     finalSource: source || '',
     sourceReason,
+    isConfidentEncode,
     extraSubs: hasItalianSubsOnly
   });
 
-  // Se formato sconosciuto o rilevato come Encode (potrebbe essere WEB-DL da NF/HMAX), chiedi all'utente
-  if ((!format || format === 'Encode') && state.targetPath !== formatAskedForPath) {
+  // Se formato sconosciuto o rilevato come Encode (potrebbe essere WEB-DL da NF/HMAX), chiedi all'utente.
+  // Eccezione: un Encode "sicuro" (firma encoder reale + sorgente fisica) non viene messo in dubbio.
+  if ((!format || (format === 'Encode' && !isConfidentEncode)) && state.targetPath !== formatAskedForPath) {
     const askFormatKey = `ask-format:${state.targetPath}`;
     if (state.lastAutoSuggestKey !== askFormatKey) {
       state.lastAutoSuggestKey = askFormatKey;

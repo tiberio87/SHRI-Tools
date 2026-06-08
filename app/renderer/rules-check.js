@@ -146,8 +146,15 @@ function detectSourceFromName(name) {
   return '';
 }
 
-function extractVideoCodecFromName(name) {
+function extractVideoCodecFromName(name, releaseFormat) {
   const upper = String(name || '').toUpperCase();
+  // Convenzione di naming per il tag VCodec (cfr. RULES.txt):
+  //  - Encode / WEBRip   -> x264 / x265 (re-encode)
+  //  - WEB-DL            -> H.264 / H.265 (stream copy da streaming)
+  //  - Remux / Full Disc -> HEVC / AVC (stream copy da disco)
+  const fmt = String(releaseFormat || '').toUpperCase();
+  const isEncodeStyle = fmt === 'ENCODE' || fmt === 'WEBRIP';
+  const isWebDl = fmt === 'WEB-DL' || fmt === 'WEBDL';
   if (/\bAV1\b/.test(upper)) {
     return 'AV1';
   }
@@ -158,10 +165,10 @@ function extractVideoCodecFromName(name) {
     return 'VC-1';
   }
   if (/\bX265\b/.test(upper) || /\bH\.?265\b/.test(upper) || /\bHEVC\b/.test(upper)) {
-    return 'H.265';
+    return isEncodeStyle ? 'x265' : isWebDl ? 'H.265' : 'HEVC';
   }
   if (/\bX264\b/.test(upper) || /\bH\.?264\b/.test(upper) || /\bAVC\b/.test(upper)) {
-    return 'H.264';
+    return isEncodeStyle ? 'x264' : isWebDl ? 'H.264' : 'AVC';
   }
   return '';
 }
@@ -365,7 +372,7 @@ export function createRulesCheckTools({
     const serviceOptions = buildServiceOptions(settings).map((item) => item.code);
     const actualService = extractTokensPresent(baseName, serviceOptions)[0] || '';
     const actualSource = detectSourceFromName(baseName);
-    const actualVideoCodec = extractVideoCodecFromName(baseName);
+    const actualVideoCodec = extractVideoCodecFromName(baseName, actualFormat.value || form.format);
     const actualAudioCodec = extractAudioCodecFromName(baseName);
     const actualAudioChannels = extractAudioChannelsFromName(baseName);
 
