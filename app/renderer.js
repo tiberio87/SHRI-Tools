@@ -2239,7 +2239,9 @@ const uploadKit = createUploadKit({
   setHint,
   showToast,
   updateFfmpegHint,
-  onUploadTitleChange: () => refreshMainUploadTitle()
+  onUploadTitleChange: () => refreshMainUploadTitle(),
+  resetSource,
+  closeUploadWizard
 });
 uploadKit.initUploadKitEvents();
 

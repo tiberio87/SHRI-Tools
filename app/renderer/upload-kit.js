@@ -41,7 +41,9 @@ export function createUploadKit(deps) {
     setHint,
     showToast,
     updateFfmpegHint,
-    onUploadTitleChange
+    onUploadTitleChange,
+    resetSource,
+    closeUploadWizard
   } = deps;
 
   let uploadMiMode = 'short';
@@ -779,6 +781,18 @@ export function createUploadKit(deps) {
       setPostUploadHint(`${baseHint} | Salvataggio in: ${outputDir}`);
     }
     ui.postUploadModal.classList.remove('hidden');
+  }
+
+  function closePostUploadModal() {
+    ui.postUploadModal?.classList.add('hidden');
+    // Dopo un upload reale (non in modalità riapertura dell'ultimo upload),
+    // riporta l'utente alla schermata iniziale pulita: chiudi il wizard e
+    // azzera la sorgente analizzata, altrimenti il vecchio file resterebbe
+    // visibile nella zona sorgente dopo il caricamento.
+    if (!reopenMode) {
+      closeUploadWizard?.();
+      resetSource?.();
+    }
   }
 
   async function downloadTrackerTorrent() {
@@ -1969,7 +1983,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       const confirmed = await openConfirmModal(
         '<div class="confirm-intro">Questa stagione è un <strong>RE-PACK</strong> di episodi già caricati singolarmente?</div>' +
         '<div style="margin-top:8px;font-size:12px;opacity:0.75;">Se sì, verrà aggiunta una nota nelle Release Notes per guidare gli utenti nel re-seed senza dover riscaricare.</div>',
-        { html: true }
+        {
+          html: true,
+          title: 'Controllo RE-PACK',
+          centerTitle: true,
+          okLabel: 'Si',
+          cancelLabel: 'No e procedi'
+        }
       );
       if (confirmed) {
         isSeasonRepack = true;
@@ -2538,7 +2558,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     }
     if (ui.closePostUploadBtn) {
       ui.closePostUploadBtn.addEventListener('click', () => {
-        ui.postUploadModal?.classList.add('hidden');
+        closePostUploadModal();
       });
     }
     if (ui.postUploadTorrentLinkAnchor) {
@@ -2551,7 +2571,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (ui.postUploadModal) {
       ui.postUploadModal.addEventListener('click', (event) => {
         if (event.target?.classList.contains('modal-backdrop')) {
-          ui.postUploadModal.classList.add('hidden');
+          closePostUploadModal();
         }
       });
     }

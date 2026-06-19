@@ -1727,6 +1727,11 @@ body.light .badge.error {
   margin-top: 16px;
 }
 
+.confirm-title-centered {
+  flex: 1;
+  text-align: center;
+}
+
 .choice-buttons {
   display: flex;
   flex-direction: column;

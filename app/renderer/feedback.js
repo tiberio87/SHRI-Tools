@@ -3,6 +3,7 @@ export function createFeedbackTools({ ui }) {
   let toastHideTimer = null;
   let confirmResolver = null;
   let choiceResolver = null;
+  let confirmDefaults = null;
 
   function showToast(message, tone = 'info') {
     if (!ui.toast) {
@@ -104,10 +105,30 @@ export function createFeedbackTools({ ui }) {
     if (!ui.confirmModal || !ui.confirmMessage) {
       return Promise.resolve(false);
     }
+    // Cattura i testi di default dell'HTML una sola volta, prima che una
+    // chiamata con opzioni personalizzate possa sovrascriverli, così gli usi
+    // generici del modale tornano sempre a "Conferma" / "Procedi" / "Annulla".
+    if (!confirmDefaults) {
+      confirmDefaults = {
+        title: ui.confirmTitle ? ui.confirmTitle.textContent : 'Conferma',
+        ok: ui.confirmOkBtn ? ui.confirmOkBtn.textContent : 'Procedi',
+        cancel: ui.confirmCancelBtn ? ui.confirmCancelBtn.textContent : 'Annulla'
+      };
+    }
     if (options.html) {
       ui.confirmMessage.innerHTML = message;
     } else {
       ui.confirmMessage.textContent = message;
+    }
+    if (ui.confirmTitle) {
+      ui.confirmTitle.textContent = options.title || confirmDefaults.title;
+      ui.confirmTitle.classList.toggle('confirm-title-centered', Boolean(options.centerTitle));
+    }
+    if (ui.confirmOkBtn) {
+      ui.confirmOkBtn.textContent = options.okLabel || confirmDefaults.ok;
+    }
+    if (ui.confirmCancelBtn) {
+      ui.confirmCancelBtn.textContent = options.cancelLabel || confirmDefaults.cancel;
     }
     if (typeof options.onOpen === 'function') {
       options.onOpen();

@@ -45,21 +45,32 @@ export function applyFolderRenamePath(value, folderFrom, folderTo) {
   if (!value || !folderFrom || !folderTo) {
     return value;
   }
-  const normValue = normalizePathValue(value);
-  const normFrom = normalizePathValue(folderFrom);
-  const normTo = normalizePathValue(folderTo);
-  const valueLower = normValue.toLowerCase();
-  const fromLower = normFrom.toLowerCase();
+  // Compare paths using a canonical separator so the prefix match works on any
+  // platform, but reconstruct the result preserving the native separators of the
+  // original paths (Linux keeps '/', Windows keeps '\\'). normalizePathValue must
+  // not be used for reconstruction or it would corrupt POSIX paths into backslash
+  // paths that no longer exist on disk.
+  const toCanonical = (input) => String(input || '').replace(/\\/g, '/');
+  const canonValue = toCanonical(value);
+  const canonFrom = toCanonical(folderFrom);
+  const valueLower = canonValue.toLowerCase();
+  const fromLower = canonFrom.toLowerCase();
 
   if (valueLower === fromLower) {
-    return normTo;
+    return folderTo;
   }
 
-  const prefix = fromLower.endsWith('\\') ? fromLower : `${fromLower}\\`;
-  if (valueLower.startsWith(prefix)) {
-    return `${normTo}\\${normValue.slice(prefix.length)}`;
+  const prefix = fromLower.endsWith('/') ? fromLower : `${fromLower}/`;
+  if (!valueLower.startsWith(prefix)) {
+    return value;
   }
-  return value;
+
+  // canonValue and value have the same length (1:1 separator swap), so slicing the
+  // original value at the prefix length yields the remainder with native separators.
+  const remainder = value.slice(prefix.length);
+  const separator = folderTo.includes('\\') && !folderTo.includes('/') ? '\\' : '/';
+  const base = folderTo.replace(/[\\/]+$/, '');
+  return `${base}${separator}${remainder}`;
 }
 
 export function stripExtension(name) {
