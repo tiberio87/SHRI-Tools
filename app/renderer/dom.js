@@ -202,6 +202,7 @@ export const ui = {
   saveSettingsBtn: document.getElementById('saveSettingsBtn'),
   settingsHint: document.getElementById('settingsHint'),
   confirmModal: document.getElementById('confirmModal'),
+  confirmTitle: document.getElementById('confirmTitle'),
   confirmMessage: document.getElementById('confirmMessage'),
   confirmCancelBtn: document.getElementById('confirmCancelBtn'),
   confirmOkBtn: document.getElementById('confirmOkBtn'),
