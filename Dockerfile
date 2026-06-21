@@ -5,6 +5,7 @@ ARG NODE_MAJOR=20
 ENV DEBIAN_FRONTEND=noninteractive \
     DISPLAY=:1 \
     HOME=/data \
+    TZ=Etc/UTC \
     ELECTRON_DISABLE_SANDBOX=1
 
 WORKDIR /app
@@ -17,6 +18,7 @@ RUN apt-get update \
         wget \
         unzip \
         gnupg \
+        tzdata \
     && mkdir -p /usr/share/keyrings \
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
         | gpg --dearmor -o /usr/share/keyrings/nodesource.gpg \

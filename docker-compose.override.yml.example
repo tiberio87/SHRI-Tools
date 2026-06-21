@@ -9,9 +9,13 @@
 services:
   shri-tools:
     # Personalizza PUID/PGID con i tuoi UID/GID (comando: id -u && id -g)
+    # TZ imposta il fuso orario del container (default Etc/UTC) così gli orari
+    # mostrati nell'app corrispondono all'ora locale. Elenco fusi validi:
+    # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     environment:
       - PUID=1000
       - PGID=1000
+      - TZ=Europe/Rome
 
     # Personalizza i percorsi dei volumi con le tue directory
     volumes:
@@ -19,7 +23,9 @@ services:
       - ./media:/media        # oppure: /mnt/nas/video:/media
       - ./output:/output      # oppure: /mnt/nas/output:/output
 
-    # Personalizza le porte se necessario
+    # Personalizza le porte se necessario.
+    # 6080 = accesso da browser (noVNC): basta questa per l'uso normale.
+    # 5901 = VNC nativo: opzionale, solo se usi un client VNC desktop.
     # ports:
-    #   - "5901:5901"
-    #   - "6080:6080"
+    #   - "6080:6080"   # http://localhost:6080/vnc.html
+    #   - "5901:5901"   # opzionale
