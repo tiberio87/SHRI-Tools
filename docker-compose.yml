@@ -3,8 +3,8 @@ services:
     image: ghcr.io/tiberio87/shri-tools:latest
     container_name: shri-tools
     ports:
-      - "5901:5901"
-      - "6080:6080"
+      - "6080:6080"   # noVNC: accesso da browser su http://localhost:6080/vnc.html
+      - "5901:5901"   # VNC nativo: opzionale, solo per client VNC desktop
     volumes:
       - ./data:/data
       - ./media:/media
@@ -12,4 +12,5 @@ services:
     environment:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
+      - TZ=${TZ:-Etc/UTC}
     restart: unless-stopped

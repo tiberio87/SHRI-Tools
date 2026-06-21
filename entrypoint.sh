@@ -8,6 +8,13 @@ X11_WAIT_TIMEOUT=30
 mkdir -p /data /media /output /tmp/runtime-root
 export XDG_RUNTIME_DIR=/tmp/runtime-root
 
+# Apply the timezone from the TZ env var (defaults to UTC) so timestamps shown in
+# the app match the user's local time. Runs as root before privileges are dropped.
+if [ -n "${TZ}" ] && [ -f "/usr/share/zoneinfo/${TZ}" ]; then
+  ln -snf "/usr/share/zoneinfo/${TZ}" /etc/localtime
+  echo "${TZ}" > /etc/timezone
+fi
+
 # Clean up stale X11 lock/socket files that survive container restarts
 rm -f /tmp/.X1-lock /tmp/.X11-unix/X1 2>/dev/null || true
 
