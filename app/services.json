@@ -8,5 +8,10 @@
   {"code": "DSCP", "label": "Discovery+"},
   {"code": "CR", "label": "Crunchyroll"},
   {"code": "iT", "label": "iTunes"},
-  {"code": "HMAX", "label": "Max (HBO Max)"}
+  {"code": "HMAX", "label": "Max (HBO Max)"},
+  {"code": "PMTP", "label": "Paramount+"},
+  {"code": "TIMV", "label": "TIMvision"},
+  {"code": "RKTN", "label": "Rakuten TV"},
+  {"code": "PLTV", "label": "Pluto TV"},
+  {"code": "MUBI", "label": "MUBI"}
 ]

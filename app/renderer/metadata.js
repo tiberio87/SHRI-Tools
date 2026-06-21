@@ -91,7 +91,12 @@ const CLEAN_TITLE_TOKENS = new Set([
   'DAZN',
   'DSCP',
   'CR',
-  'IT'
+  'IT',
+  'PMTP',
+  'TIMV',
+  'RKTN',
+  'PLTV',
+  'MUBI'
 ]);
 const SEARCH_CLEAN_TOKENS = new Set([
   'UNRATED',
