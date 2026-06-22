@@ -2684,7 +2684,11 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       }
       setUploadKitCollapsed(sectionId, section.classList.contains('collapsed'));
       section.addEventListener('click', (event) => {
-        if (event.target?.closest('.section-actions') || event.target?.closest('button')) {
+        if (
+          event.target?.closest('.section-actions') ||
+          event.target?.closest('button') ||
+          event.target?.closest('.collapsible-body')
+        ) {
           return;
         }
         const isCollapsed = section.classList.contains('collapsed');
