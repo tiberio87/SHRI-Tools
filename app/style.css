@@ -1720,6 +1720,12 @@ body.light .badge.error {
   gap: 8px;
 }
 
+.confirm-flag-free select {
+  width: auto;
+  padding: 2px 6px;
+  font-size: 12px;
+}
+
 .confirm-actions {
   display: flex;
   justify-content: flex-end;

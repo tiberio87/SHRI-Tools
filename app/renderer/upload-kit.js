@@ -1509,10 +1509,36 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     };
   }
 
+  const FREE_PERCENT_OPTIONS = [0, 25, 50, 75, 100];
+
+  function normalizeFreePercent(value) {
+    if (value === true) {
+      return 100;
+    }
+    const num = Math.round(Number(value));
+    if (!Number.isFinite(num) || num <= 0) {
+      return 0;
+    }
+    if (num >= 100) {
+      return 100;
+    }
+    return FREE_PERCENT_OPTIONS.reduce(
+      (closest, opt) => (Math.abs(opt - num) < Math.abs(closest - num) ? opt : closest),
+      0
+    );
+  }
+
   function buildUploadSummaryHtml(summary, settings) {
     const anonymousChecked = settings.unit3dAnonymous ? 'checked' : '';
     const personalChecked = settings.unit3dPersonalRelease ? 'checked' : '';
     const modQueueChecked = settings.unit3dModQueue ? 'checked' : '';
+    const internalChecked = settings.unit3dInternal ? 'checked' : '';
+    const refundableChecked = settings.unit3dRefundable ? 'checked' : '';
+    const freeDefault = normalizeFreePercent(settings.unit3dFree);
+    const freeOptions = FREE_PERCENT_OPTIONS
+      .map((pct) => `<option value="${pct}"${pct === freeDefault ? ' selected' : ''}>${pct}%</option>`)
+      .join('');
+    const doubleupChecked = settings.unit3dDoubleup ? 'checked' : '';
     const tvInfo = summary.isTv
       ? `
         <div class="confirm-row">
@@ -1584,6 +1610,22 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
               <input id="confirmFlagModQueue" type="checkbox" ${modQueueChecked} />
               Coda moderazione
             </label>
+            <label class="checkbox inline">
+              <input id="confirmFlagInternal" type="checkbox" ${internalChecked} />
+              Internal
+            </label>
+            <label class="checkbox inline">
+              <input id="confirmFlagRefundable" type="checkbox" ${refundableChecked} />
+              Refundable
+            </label>
+            <label class="checkbox inline confirm-flag-free">
+              Free
+              <select id="confirmFlagFree">${freeOptions}</select>
+            </label>
+            <label class="checkbox inline">
+              <input id="confirmFlagDoubleup" type="checkbox" ${doubleupChecked} />
+              Double Upload
+            </label>
           </div>
         </div>
       </div>
@@ -1594,10 +1636,18 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     const anonymous = document.getElementById('confirmFlagAnonymous');
     const personal = document.getElementById('confirmFlagPersonal');
     const modQueue = document.getElementById('confirmFlagModQueue');
+    const internal = document.getElementById('confirmFlagInternal');
+    const refundable = document.getElementById('confirmFlagRefundable');
+    const free = document.getElementById('confirmFlagFree');
+    const doubleup = document.getElementById('confirmFlagDoubleup');
     return {
       anonymous: anonymous ? anonymous.checked : settings.unit3dAnonymous,
       personal: personal ? personal.checked : settings.unit3dPersonalRelease,
-      modQueue: modQueue ? modQueue.checked : settings.unit3dModQueue
+      modQueue: modQueue ? modQueue.checked : settings.unit3dModQueue,
+      internal: internal ? internal.checked : Boolean(settings.unit3dInternal),
+      refundable: refundable ? refundable.checked : Boolean(settings.unit3dRefundable),
+      free: free ? normalizeFreePercent(free.value) : normalizeFreePercent(settings.unit3dFree),
+      doubleup: doubleup ? doubleup.checked : Boolean(settings.unit3dDoubleup)
     };
   }
 
@@ -1627,6 +1677,10 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     const useAnonymous = flagOverrides.anonymous ?? settings.unit3dAnonymous;
     const usePersonal = flagOverrides.personal ?? settings.unit3dPersonalRelease;
     const useModQueue = flagOverrides.modQueue ?? settings.unit3dModQueue;
+    const useInternal = flagOverrides.internal ?? Boolean(settings.unit3dInternal);
+    const useRefundable = flagOverrides.refundable ?? Boolean(settings.unit3dRefundable);
+    const useFree = normalizeFreePercent(flagOverrides.free ?? settings.unit3dFree);
+    const useDoubleup = flagOverrides.doubleup ?? Boolean(settings.unit3dDoubleup);
 
     const payload = {
       name: title || '',
@@ -1644,10 +1698,11 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       stream: '0',
       sd: mapping.isSd ? '1' : '0',
       keywords: keywords || '',
-      internal: '0',
+      internal: useInternal ? '1' : '0',
+      refundable: useRefundable ? '1' : '0',
       featured: '0',
-      free: '0',
-      doubleup: '0',
+      free: String(useFree),
+      doubleup: useDoubleup ? '1' : '0',
       sticky: '0'
     };
     if (categoryId !== null) {
@@ -1761,6 +1816,10 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         anonymous: data.anonymous,
         personal_release: data.personal_release,
         mod_queue_opt_in: data.mod_queue_opt_in,
+        internal: data.internal,
+        refundable: data.refundable,
+        free: data.free,
+        doubleup: data.doubleup,
         sd: data.sd,
         description_len: (data.description || '').length,
         mediainfo_len: (data.mediainfo || '').length,
