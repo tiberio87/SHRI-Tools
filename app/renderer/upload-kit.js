@@ -1466,6 +1466,18 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       const sep = jobDir.includes('\\') ? '\\' : '/';
       try { await window.api?.saveFileDirect({ filePath: `${jobDir}${sep}MEDIAINFO.txt`, content: uploadMiFullCache }); } catch {}
     }
+    if (jobDir && state.sceneInfo?.scene && state.sceneInfo?.nfoPath) {
+      try {
+        const res = await window.api?.saveNfoToJob({
+          nfoPath: state.sceneInfo.nfoPath,
+          jobDir,
+          fileName: state.sceneInfo.sceneName || getJobFileTitle()
+        });
+        if (res?.ok && res.path) {
+          state.sceneInfo.nfoJobPath = res.path;
+        }
+      } catch {}
+    }
     return uploadMiFullCache;
   }
 
@@ -1831,6 +1843,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         baseUrl,
         apiKey,
         torrentPath: state.lastTorrentPath,
+        nfoPath: state.sceneInfo?.nfoJobPath || state.sceneInfo?.nfoPath || '',
         data
       });
       logDebug?.('unit3d upload response', {

@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('api', {
   saveFileDirect: (payload) => ipcRenderer.invoke('save-file-direct', payload),
   listDir: (dirPath) => ipcRenderer.invoke('list-dir', dirPath),
   readFileText: (filePath) => ipcRenderer.invoke('read-file-text', filePath),
+  detectScene: (payload) => ipcRenderer.invoke('scene-detect', payload),
+  saveNfoToJob: (payload) => ipcRenderer.invoke('scene-save-nfo', payload),
   mkvGetTracks: (payload) => ipcRenderer.invoke('mkv-get-tracks', payload),
   mkvApplyTags: (payload) => ipcRenderer.invoke('mkv-apply-tags', payload),
   mkvClearTags: (payload) => ipcRenderer.invoke('mkv-clear-tags', payload),

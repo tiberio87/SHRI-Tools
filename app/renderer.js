@@ -33,6 +33,7 @@ import { createRulesCheckTools } from './renderer/rules-check.js';
 import { setupSourceDragDrop } from './renderer/drag-drop.js';
 import { createRenameFlow } from './renderer/rename-flow.js';
 import { createAutoDetectFlow } from './renderer/auto-detect.js';
+import { createSceneManager } from './renderer/scene-manager.js';
 import { createTrackerAnalysis } from './renderer/tracker-analysis.js';
 import { createDupeCheckTools } from './renderer/dupe-check.js';
 import { createMkvTagger } from './renderer/mkv-tagger.js';
@@ -370,6 +371,10 @@ function resetSource() {
   state.audioLangs = [];
   state.episodeMap = {};
   state.metadata = null;
+  state.sceneInfo = null;
+  if (ui.sceneIndicator) {
+    ui.sceneIndicator.classList.add('hidden');
+  }
   state.tagSuggestion = '';
   state.autoDetectRunning = false;
   state.lastAutoSuggestKey = '';
@@ -2145,6 +2150,7 @@ async function loadPath(targetPath) {
   state.bdInfoProgressDone = 0;
   state.bdInfoShowAllPlaylists = false;
   state.metadata = null;
+  state.sceneInfo = null;
   state.screenshots = [];
   state.lastTorrentPath = '';
   state.episodeMap = {};
@@ -2217,6 +2223,7 @@ async function loadPath(targetPath) {
 
   metadataTools.fillFromMediaInfo();
   await autoDetectFromPath();
+  await sceneManager.runSceneDetection();
   mkvTagger?.syncMetadata();
   mkvTagger?.syncTitle();
   schedulePreview();
@@ -2244,6 +2251,17 @@ const uploadKit = createUploadKit({
   closeUploadWizard
 });
 uploadKit.initUploadKitEvents();
+
+// ===== Scene detection (srrdb + predb) =====
+const sceneManager = createSceneManager({
+  ui,
+  logDebug,
+  showToast,
+  loadSettings,
+  isDiscStructure,
+  refreshMainUploadTitle: () => refreshMainUploadTitle()
+});
+sceneManager.initSceneEvents();
 
 // ===== Titolo Upload (pagina principale) =====
 function refreshMainUploadTitle() {
