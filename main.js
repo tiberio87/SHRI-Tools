@@ -8,6 +8,7 @@ const fsSync = require('fs');
 const { spawn } = require('child_process');
 const { buildUaScreenshotTimes, buildUaScreenshotTimesDebug } = require('./app/screenshot-times');
 const { loadStoredSecrets, saveStoredSecrets } = require('./app/secret-store');
+const { detectScene } = require('./app/scene-detect');
 
 function createFormData() {
   if (!global.FormData) {
@@ -494,7 +495,7 @@ async function searchUnit3dDuplicates({
   return result;
 }
 
-async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, data }) {
+async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, nfoPath, data }) {
   if (!baseUrl || !apiKey) {
     return { ok: false, error: 'Base URL o API key mancanti.' };
   }
@@ -509,6 +510,16 @@ async function uploadUnit3dTorrent({ baseUrl, apiKey, torrentPath, data }) {
   }
   const torrentBlob = new global.Blob([torrentBytes], { type: 'application/x-bittorrent' });
   form.append('torrent', torrentBlob, path.basename(torrentPath));
+
+  if (nfoPath) {
+    try {
+      const nfoBytes = await fs.readFile(nfoPath);
+      const nfoBlob = new global.Blob([nfoBytes], { type: 'application/octet-stream' });
+      form.append('nfo', nfoBlob, path.basename(nfoPath));
+    } catch {
+      // NFO opzionale: se non leggibile si procede con l'upload senza allegarlo.
+    }
+  }
 
   Object.entries(data || {}).forEach(([key, value]) => {
     appendFormField(form, key, value);
@@ -2046,6 +2057,36 @@ ipcMain.handle('read-file-text', async (_event, filePath) => {
     return { ok: true, content };
   } catch (err) {
     return { ok: false, content: '', error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle('scene-detect', async (_event, payload) => {
+  try {
+    const cacheDir = path.join(app.getPath('temp'), 'shri-tools', 'srrdb');
+    return await detectScene({ ...(payload || {}), cacheDir });
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
+  }
+});
+
+ipcMain.handle('scene-save-nfo', async (_event, payload) => {
+  try {
+    const src = String(payload?.nfoPath || '');
+    const jobDir = String(payload?.jobDir || '');
+    const rawName = String(payload?.fileName || '').trim();
+    if (!src || !jobDir || !fsSync.existsSync(src)) {
+      return { ok: false };
+    }
+    const safeName = rawName
+      .replace(/[\\/:*?"<>|]+/g, '')
+      .replace(/\.nfo$/i, '')
+      .trim() || 'release';
+    const dest = path.join(jobDir, `${safeName}.nfo`);
+    await fs.mkdir(jobDir, { recursive: true });
+    await fs.copyFile(src, dest);
+    return { ok: true, path: dest };
+  } catch (err) {
+    return { ok: false, error: String(err?.message || err) };
   }
 });
 

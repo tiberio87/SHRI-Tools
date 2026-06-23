@@ -23,6 +23,7 @@ export const state = {
   audioLangs: [],
   episodeMap: {},
   metadata: null,
+  sceneInfo: null,
   tagSuggestion: '',
   autoDetectRunning: false,
   lastTagSuggestion: '',

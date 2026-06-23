@@ -1726,6 +1726,30 @@ body.light .badge.error {
   font-size: 12px;
 }
 
+.scene-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.scene-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #2ea043;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.scene-name {
+  font-size: 12px;
+  opacity: 0.85;
+  word-break: break-all;
+}
+
 .confirm-actions {
   display: flex;
   justify-content: flex-end;
