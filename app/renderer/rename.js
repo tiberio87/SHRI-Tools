@@ -148,13 +148,17 @@ export function createRenameTools(deps) {
     if (format === 'Full Disc' && data.region) {
       tokens.push(data.region);
     }
-    const uhdFromEncodeBluray = format === 'Encode' &&
-      typeof data.source === 'string' &&
-      /BLURAY/i.test(data.source) &&
-      /2160p/i.test(String(data.resolution || ''));
+    const is2160p = /2160p/i.test(String(data.resolution || ''));
+    const sourceIsBluray = typeof data.source === 'string' && /BLURAY/i.test(data.source);
+    const uhdFromEncodeBluray = format === 'Encode' && sourceIsBluray && is2160p;
+    // Il tag UHD va indicato solo per Full Disc, Remux o Encode BluRay in 2160p.
+    // Le release WEB (WEB-DL/WEBRip), anche in 2160p, non devono avere il tag UHD.
+    const uhdEligibleFormat = format === 'Full Disc'
+      || format === 'Remux'
+      || uhdFromEncodeBluray;
     const isTv = isEpisode || isSeason;
     const wantsUhd = data.tokenStyle === 'title'
-      ? (data.uhd && !isTv)
+      ? (data.uhd && !isTv && is2160p && uhdEligibleFormat)
       : uhdFromEncodeBluray;
     if (wantsUhd) {
       const sourceHasUhd = typeof data.source === 'string' && /\bUHD\b/i.test(data.source);
