@@ -92,11 +92,11 @@ In aggiunta è fortemente consigliato includere anche le lingue audio (massimo d
 9.1 Film
 
 WEB-DL
-Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
-Transformers One 2024 ITA IMAX REPACK 2160p UHD NF WEB-DL DD+ 5.1 Atmos DV HDR H.265-iSlaNd
+Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
+Transformers One 2024 ITA IMAX REPACK 2160p NF WEB-DL DD+ 5.1 Atmos DV HDR H.265-iSlaNd
 WEBRip
-Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
-El Camino A Breaking Bad Movie 2019 ITA REPACK 2160p UHD NF WEBRip DD+ 5.1 Atmos x264-BlackBit
+Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
+El Camino A Breaking Bad Movie 2019 ITA REPACK 2160p NF WEBRip DD+ 5.1 Atmos x264-BlackBit
 Encode
 Titolo Anno LINGUA Edizione Hybrid REPACK Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag
 Oppenheimer 2023 ITA IMAX 2160p UHD BluRay DTS-HD MA 5.1 DV HDR x265-iSlaNd
@@ -111,11 +111,11 @@ Avatar 2009 3D IMAX 2160p EUR UHD Blu-ray HDR DV HEVC TrueHD 7.1 Atmos-B0MBARDiE
 Se l'anno di uscita dello spettacolo è incluso nel titolo presente su TVDB, allora deve essere incluso anche nel nome della release.
 
 WEB-DL
-Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
-Invincible 2021 S02 ITA REPACK 2160p UHD AMZN WEB-DL DD+ 5.1 Atmos DV HDR H.265-Kitsune
+Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02 ITA REPACK 2160p AMZN WEB-DL DD+ 5.1 Atmos DV HDR H.265-Kitsune
 WEBRip
-Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
-Invincible 2021 S02 ITA 2160p UHD AMZN WEBRip DD+ 5.1 x264-Kitsune
+Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02 ITA 2160p AMZN WEBRip DD+ 5.1 x264-Kitsune
 Encode
 Titolo Anno S## LINGUA Edizione Hybrid REPACK Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag
 Halo 2022 S01 ITA 2160p UHD BluRay TrueHD 7.1 Atmos DV HDR x265-Stelks
@@ -130,11 +130,11 @@ Game of Thrones S07 2160p USA UHD Blu-ray DV HDR10+ HEVC TrueHD 7.1 Atmos-FraMeS
 Se l'anno di uscita dello spettacolo è incluso nel titolo su TVDB, deve essere inserito.
 
 WEB-DL
-Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
-Invincible 2021 S02E01 A Lesson for Your Next Life ITA 2160p UHD AMZN WEB-DL DD+ 5.1 Atmos HDR H.265-Kitsune
+Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione Servizio WEB-DL ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02E01 A Lesson for Your Next Life ITA 2160p AMZN WEB-DL DD+ 5.1 Atmos HDR H.265-Kitsune
 WEBRip
-Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione UHD Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
-Invincible 2021 S02E01 A Lesson for Your Next Life ITA 2160p UHD AMZN WEBRip DD+ 5.1 x264-Kitsune
+Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione Servizio WEBRip ACodec Canali Meta HDR VCodec-Tag
+Invincible 2021 S02E01 A Lesson for Your Next Life ITA 2160p AMZN WEBRip DD+ 5.1 x264-Kitsune
 Encode
 Titolo Anno S##E## Tit_Ep Parte LINGUA Edizione Hybrid REPACK Risoluzione UHD Src ACodec Canali Meta HDR VCodec-Tag
 Halo 2022 S01E01 Contact ITA 2160p UHD BluRay TrueHD 7.1 Atmos DV HDR x265-Stelks
@@ -165,7 +165,7 @@ Fare riferimento alle Regole della Lingua per avere la certezza che il contenuto
 9.5.8 Hybrid: incluso solo quando la traccia video e la traccia audio provengono da sorgenti diverse o quando in una traccia video non-Dolby Vision, viene iniettato il set di metadati prelevati da una traccia video Dolby Vision.
 9.5.9 REPACK: incluso solo quando viene rilasciata nuovamente la stessa release ma con eventuali errori e difetti corretti ed eliminati. Un Repack trumpa la release precedente (regola Trump 3.2.1). Lo stesso vale per PROPER o RERIP. Nel caso, applicare il Tag corretto.
 9.5.10 Risoluzione: risoluzione video (480i, 480p, 576i, 576p, 720p, 1080p, 1080i, 2160p).
-9.5.11 UHD: Tag per contenuti a risoluzione 2160p (4K Ultra HD). Facoltativo in presenza del Tag Risoluzione 2160p.
+9.5.11 UHD: Tag per i contenuti a risoluzione 2160p (4K Ultra HD) provenienti da disco fisico, ovvero i formati Full Disc, Remux ed Encode BluRay. Le release WEB (WEB-DL e WEBRip), anche se in 2160p, NON devono includere il Tag UHD.
 9.5.12 Regione: vale solo per il formato Full Disc e indica il paese di rilascio del disco (USA, EUR, IT, JP, ecc.).
 9.5.13 Servizio: vale solo per i contenuti WEB ed è semplicemente l'abbreviazione del servizio di streaming (es. NF per Netflix, AMZN per Amazon, DSNP per Disney+, iT per Itunes, ecc.).
 9.5.14 Src: web (WEB-DL, WEBRip) oppure disco fisico (NTSC DVD, PAL DVD, DVDRip, HD DVD, BluRay, UHD BluRay). Per il disco completo, la dicitura deve essere più specifica (e.g. NTSC DVD5, NTSC DVD9, PAL DVD5, HD DVD, Blu-ray, UHD Blu-ray). Nota bene! Si usi "BluRay" (senza trattino) per Remux ed Encode, ma "Blu-ray" (con trattino) per Full Disc;

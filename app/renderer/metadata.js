@@ -772,7 +772,7 @@ export function createMetadataTools(deps) {
         setInputAuto(ui.videoCodecInput, videoCodec);
       }
 
-      if (resolution === '2160p') {
+      if (resolution === '2160p' && format !== 'WEB-DL' && format !== 'WEBRip') {
         ui.uhdCheckbox.checked = true;
       }
     }
