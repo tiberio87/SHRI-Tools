@@ -93,7 +93,8 @@
                   <button class="dropdown-item" type="button" data-value="">Seleziona sorgente</button>
                   <button class="dropdown-item" type="button" data-value="BluRay">BluRay</button>
                   <button class="dropdown-item" type="button" data-value="UHD BluRay">UHD BluRay</button>
-                  <button class="dropdown-item" type="button" data-value="DVD">DVD</button>
+                  <button class="dropdown-item" type="button" data-value="DVD5">DVD5</button>
+                  <button class="dropdown-item" type="button" data-value="DVD9">DVD9</button>
                   <button class="dropdown-item" type="button" data-value="HDTV">HDTV (obsoleta)</button>
                 </div>
                 <input id="sourceInput" type="hidden" value="" />
@@ -777,14 +778,11 @@
             <textarea id="qbitCategoriesInput" rows="3" placeholder="Es.&#10;Films&#10;Serie TV&#10;Anime"></textarea>
           </div>
         </div>
-        <div class="row settings-grid">
+        <div class="row">
           <div class="field">
-            <label for="qbitPathMapLocalInput">Mapping percorso locale</label>
-            <input id="qbitPathMapLocalInput" type="text" placeholder="Es. Z:\\tv_series" />
-          </div>
-          <div class="field">
-            <label for="qbitPathMapRemoteInput">Mapping percorso remoto</label>
-            <input id="qbitPathMapRemoteInput" type="text" placeholder="Es. /mnt/media/tv_series" />
+            <label>Mapping percorsi (locale &rarr; remoto)</label>
+            <div id="qbitPathMapList" class="path-map-list"></div>
+            <button id="qbitPathMapAddBtn" class="secondary small path-map-add" type="button">+ Aggiungi mapping</button>
           </div>
         </div>
         <div class="row">
@@ -847,14 +845,11 @@
             Avvia torrent automaticamente
           </label>
         </div>
-        <div class="row settings-grid">
+        <div class="row">
           <div class="field">
-            <label for="transmissionPathMapLocalInput">Mapping percorso locale</label>
-            <input id="transmissionPathMapLocalInput" type="text" placeholder="Es. Z:\\tv_series" />
-          </div>
-          <div class="field">
-            <label for="transmissionPathMapRemoteInput">Mapping percorso remoto</label>
-            <input id="transmissionPathMapRemoteInput" type="text" placeholder="Es. /mnt/media/tv_series" />
+            <label>Mapping percorsi (locale &rarr; remoto)</label>
+            <div id="transmissionPathMapList" class="path-map-list"></div>
+            <button id="transmissionPathMapAddBtn" class="secondary small path-map-add" type="button">+ Aggiungi mapping</button>
           </div>
         </div>
         <div class="row">

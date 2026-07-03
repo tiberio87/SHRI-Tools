@@ -17,13 +17,30 @@ function isDiscStructure() {
   );
 }
 
+// Rileva SOLO le strutture Blu-ray (BDMV/STREAM), escludendo i DVD (VIDEO_TS).
+// Serve per avviare lo scan BDInfo unicamente sui Blu-ray: i DVD non hanno una
+// struttura BD e vanno analizzati con MediaInfo.
+function isBdmvStructure() {
+  if (state.kind !== 'dir' || !Array.isArray(state.videoFiles) || !state.videoFiles.length) {
+    return false;
+  }
+  return state.videoFiles.some((filePath) =>
+    /[\\\/]BDMV[\\\/]+STREAM[\\\/]/i.test(filePath || '')
+  );
+}
+
 function getDiscSourceHint(width, height) {
   const files = Array.isArray(state.videoFiles) ? state.videoFiles : [];
   const hasVideoTs = files.some((filePath) => /[\\\/]VIDEO_TS[\\\/]/i.test(filePath || ''));
   if (hasVideoTs) {
+    // DVD5 (single layer) fino a ~4.7 GB, oltre è DVD9 (dual layer).
+    const DVD5_MAX_BYTES = 4700000000;
+    const totalSize = Number(state.totalSize) || 0;
+    const layer = totalSize > DVD5_MAX_BYTES ? 'DVD9' : 'DVD5';
+    const sizeGb = totalSize ? ` (${(totalSize / 1e9).toFixed(2)} GB)` : '';
     return {
-      source: 'DVD',
-      sourceReason: 'Rilevato da struttura disco: VIDEO_TS'
+      source: layer,
+      sourceReason: `Rilevato da struttura disco VIDEO_TS: ${layer}${sizeGb}`
     };
   }
   const isUhd = width >= 3800 || height >= 2100;
@@ -556,5 +573,6 @@ export {
   extractRegionFromName,
   extractTokensPresent,
   isDiscStructure,
+  isBdmvStructure,
   getDiscSourceHint
 };

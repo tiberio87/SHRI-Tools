@@ -13,6 +13,7 @@ export function createRenameFlow({
   updateWizardRulesCheck,
   getPathBaseName,
   isDiscStructure,
+  isBdmvStructure,
   showToast,
   openMediaInfoModal,
   cancelBdInfo,
@@ -448,7 +449,8 @@ export function createRenameFlow({
       itemsContainer.appendChild(empty);
     }
 
-    if (discStructure) {
+    // La sezione BDInfo riguarda solo i Blu-ray (BDMV); i DVD (VIDEO_TS) usano MediaInfo.
+    if (isBdmvStructure()) {
       const infoHeader = document.createElement('div');
       infoHeader.className = 'plan-label-row';
 
@@ -634,7 +636,7 @@ export function createRenameFlow({
 
         ui.renamePlanList.appendChild(playlistWrap);
       }
-    } else if (state.kind === 'file' && state.mainVideo) {
+    } else if (state.mainVideo && (state.kind === 'file' || discStructure)) {
       const infoHeader = document.createElement('div');
       infoHeader.className = 'plan-label-row';
 

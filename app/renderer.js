@@ -18,7 +18,8 @@ import {
   detectRepackFromName,
   detectFormatFromMediaInfo,
   extractTokensPresent,
-  isDiscStructure
+  isDiscStructure,
+  isBdmvStructure
 } from './renderer/parsing-tools.js';
 import { createUploadKit } from './renderer/upload-kit.js';
 import { createMetadataTools, hasCjkChars } from './renderer/metadata.js';
@@ -353,6 +354,7 @@ function resetSource() {
   state.videoFiles = [];
   state.mainVideo = null;
   state.mediaInfo = null;
+  state.totalSize = 0;
   state.bdInfoRaw = '';
   state.bdInfoParsed = null;
   state.bdInfoError = '';
@@ -1268,6 +1270,10 @@ function updateFormatServiceSuggest() {
   if (!source && mediaInfoFormat.source) {
     source = mediaInfoFormat.source;
     sourceReason = mediaInfoFormat.sourceReason;
+  } else if (source === 'DVD' && /^DVD[59]$/.test(mediaInfoFormat.source || '')) {
+    // La struttura VIDEO_TS distingue DVD5/DVD9: più specifico del generico "DVD" dal nome.
+    source = mediaInfoFormat.source;
+    sourceReason = mediaInfoFormat.sourceReason;
   } else if (source) {
     sourceReason = 'Rilevato da parsing del nome file: token sorgente';
   }
@@ -1557,6 +1563,7 @@ const {
   updateAppHealthStatus,
   updateFfmpegHint,
   updateQbitMappingHint,
+  initPathMapUi,
   updateClientSections,
   updateSettingsVisibility,
   applySettingsToUI,
@@ -1766,6 +1773,7 @@ const renameFlow = createRenameFlow({
   updateWizardRulesCheck,
   getPathBaseName,
   isDiscStructure,
+  isBdmvStructure,
   showToast,
   openMediaInfoModal,
   cancelBdInfo,
@@ -2135,6 +2143,7 @@ async function loadPath(targetPath) {
   state.videoFiles = scan.videoFiles || [];
   state.mainVideo = scan.mainVideo;
   state.mediaInfo = scan.mediaInfo;
+  state.totalSize = scan.totalSize || 0;
   state.bdInfoRaw = '';
   state.bdInfoParsed = null;
   state.bdInfoError = '';
@@ -2213,7 +2222,9 @@ async function loadPath(targetPath) {
     }
   }
 
-  if (scan.kind === 'dir' && isDiscStructure()) {
+  // Solo le strutture Blu-ray (BDMV) usano lo scan BDInfo.
+  // I DVD (VIDEO_TS) non hanno struttura BD: si affidano a MediaInfo.
+  if (scan.kind === 'dir' && isBdmvStructure()) {
     loadBdInfoPlaylists(targetPath);
   }
 
@@ -3011,6 +3022,8 @@ if (ui.transmissionSavePathInput) {
     updateQbitMappingHint({ torrentClient: 'transmission', transmissionSavePath: ui.transmissionSavePathInput.value.trim() });
   });
 }
+
+initPathMapUi();
 
 if (ui.multiEpisodeToggle) {
   ui.multiEpisodeToggle.addEventListener('change', () => {
