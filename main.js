@@ -1296,10 +1296,24 @@ async function runMkbrrCreate({
   });
 }
 
-async function pickMainVideo(videoFiles) {
-  if (!videoFiles.length) {
-    return null;
+async function getMediaDurationSeconds(filePath) {
+  try {
+    const info = await analyzeMedia(filePath);
+    const tracks = info?.media?.track || [];
+    let best = 0;
+    for (const track of tracks) {
+      const dur = parseFloat(track?.Duration);
+      if (Number.isFinite(dur) && dur > best) {
+        best = dur;
+      }
+    }
+    return best;
+  } catch {
+    return 0;
   }
+}
+
+async function pickMainVideoBySize(videoFiles) {
   let best = null;
   let bestSize = 0;
   for (const filePath of videoFiles) {
@@ -1314,6 +1328,111 @@ async function pickMainVideo(videoFiles) {
     }
   }
   return best;
+}
+
+async function pickMainVideo(videoFiles) {
+  if (!videoFiles.length) {
+    return null;
+  }
+  // Per i DVD (VOB in VIDEO_TS) non analizziamo i singoli VOB: sui DVD-Video il
+  // file di informazioni del titolo (VTS_xx_0.IFO) contiene i metadati aggregati
+  // (durata, risoluzione, tracce audio) ed è ciò che scansionano i tracker.
+  const isDvdVob = videoFiles.some(
+    (filePath) => /[\\/]VIDEO_TS[\\/]/i.test(filePath) || /\.vob$/i.test(filePath)
+  );
+  if (isDvdVob) {
+    const videoTsFile =
+      videoFiles.find((filePath) => /[\\/]VIDEO_TS[\\/]/i.test(filePath)) || videoFiles[0];
+    const videoTsDir = path.dirname(videoTsFile);
+    try {
+      const entries = await fs.readdir(videoTsDir, { withFileTypes: true });
+      const titleIfos = entries
+        .filter((entry) => entry.isFile() && /^VTS_\d+_0\.IFO$/i.test(entry.name))
+        .map((entry) => path.join(videoTsDir, entry.name));
+
+      if (titleIfos.length) {
+        // 1) Preferiamo l'IFO del titolo con durata (MediaInfo) maggiore.
+        let bestIfo = null;
+        let bestIfoDuration = 0;
+        for (const ifoPath of titleIfos) {
+          const duration = await getMediaDurationSeconds(ifoPath);
+          if (duration > bestIfoDuration) {
+            bestIfo = ifoPath;
+            bestIfoDuration = duration;
+          }
+        }
+        if (bestIfo) {
+          return bestIfo;
+        }
+
+        // 2) Se MediaInfo non espone la durata, scegliamo l'IFO del title set
+        //    i cui VOB sono complessivamente più grandi (il film principale).
+        const titleSizes = new Map();
+        for (const filePath of videoFiles) {
+          const match = path.basename(filePath).toUpperCase().match(/^VTS_(\d+)_\d+\.VOB$/);
+          if (!match) {
+            continue;
+          }
+          let size = 0;
+          try {
+            size = (await fs.stat(filePath)).size;
+          } catch {
+            // Skip unreadable files
+          }
+          titleSizes.set(match[1], (titleSizes.get(match[1]) || 0) + size);
+        }
+        let biggestTitle = null;
+        let biggestTitleSize = 0;
+        for (const [titleId, totalSize] of titleSizes) {
+          if (totalSize > biggestTitleSize) {
+            biggestTitle = titleId;
+            biggestTitleSize = totalSize;
+          }
+        }
+        if (biggestTitle) {
+          const targetIfoName = `VTS_${biggestTitle}_0.IFO`.toUpperCase();
+          const ifoForTitle = titleIfos.find(
+            (ifoPath) => path.basename(ifoPath).toUpperCase() === targetIfoName
+          );
+          if (ifoForTitle) {
+            return ifoForTitle;
+          }
+        }
+      }
+    } catch {
+      // Se non riusciamo a leggere la cartella IFO ripieghiamo sui VOB.
+    }
+
+    // 3) Fallback: nessun IFO utilizzabile, scegliamo tra i VOB del film
+    //    (menu esclusi) per durata e poi dimensione.
+    const isMenuVob = (filePath) => {
+      const base = path.basename(filePath).toUpperCase();
+      return base === 'VIDEO_TS.VOB' || /^VTS_\d+_0\.VOB$/.test(base);
+    };
+    const contentVobs = videoFiles.filter((filePath) => !isMenuVob(filePath));
+    const candidates = contentVobs.length ? contentVobs : videoFiles;
+    let best = null;
+    let bestDuration = 0;
+    let bestSize = 0;
+    for (const filePath of candidates) {
+      const duration = await getMediaDurationSeconds(filePath);
+      let size = 0;
+      try {
+        size = (await fs.stat(filePath)).size;
+      } catch {
+        // Skip unreadable files
+      }
+      if (duration > bestDuration || (duration === bestDuration && size > bestSize)) {
+        best = filePath;
+        bestDuration = duration;
+        bestSize = size;
+      }
+    }
+    if (best) {
+      return best;
+    }
+  }
+  return pickMainVideoBySize(videoFiles);
 }
 
 // ===== Metadata providers (OMDb/TMDb/TVDb/AniList) =====
@@ -2450,11 +2569,26 @@ ipcMain.handle('scan-path', async (_event, targetPath) => {
     }
   }
 
+  // La dimensione totale distingue DVD5 (single layer) da DVD9 (dual layer):
+  // la calcoliamo solo per le strutture disco per non scandire cartelle enormi.
+  let totalSize = 0;
+  const isDiscDir =
+    kind === 'dir' &&
+    videoFiles.some((filePath) => /[\\/](VIDEO_TS|BDMV)[\\/]/i.test(filePath));
+  if (isDiscDir) {
+    try {
+      totalSize = await getTotalSize(targetPath);
+    } catch {
+      totalSize = 0;
+    }
+  }
+
   return {
     kind,
     videoFiles,
     mainVideo,
-    mediaInfo
+    mediaInfo,
+    totalSize
   };
 });
 

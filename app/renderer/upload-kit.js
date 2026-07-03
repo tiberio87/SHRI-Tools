@@ -552,6 +552,43 @@ export function createUploadKit(deps) {
     return `${remoteTrimmed}${remoteSep}${normalizedRemainder}`;
   }
 
+  function getClientMappings(settings, useTransmission) {
+    const list = useTransmission ? settings?.transmissionPathMappings : settings?.qbitPathMappings;
+    if (Array.isArray(list) && list.length) {
+      return list
+        .map((item) => ({
+          local: String(item?.local || '').trim(),
+          remote: String(item?.remote || '').trim()
+        }))
+        .filter((item) => item.local && item.remote);
+    }
+    // Fallback per configurazioni non ancora migrate (vecchio formato a campo singolo).
+    const local = String(
+      (useTransmission ? settings?.transmissionPathMapLocal : settings?.qbitPathMapLocal) || ''
+    ).trim();
+    const remote = String(
+      (useTransmission ? settings?.transmissionPathMapRemote : settings?.qbitPathMapRemote) || ''
+    ).trim();
+    if (local && remote) {
+      return [{ local, remote }];
+    }
+    return [];
+  }
+
+  function applyPathMappings(pathValue, mappings) {
+    const source = String(pathValue || '').trim();
+    if (!source || !Array.isArray(mappings) || !mappings.length) {
+      return source;
+    }
+    for (const mapping of mappings) {
+      const mapped = applyPathMapping(source, mapping.local, mapping.remote);
+      if (mapped !== source) {
+        return mapped;
+      }
+    }
+    return source;
+  }
+
   function resolveClientSavePath(settings, client) {
     const useTransmission = client === 'transmission';
     let basePath = '';
@@ -570,14 +607,9 @@ export function createUploadKit(deps) {
     if (hasExplicitSavePath) {
       return basePath;
     }
-    const localMap = String(
-      useTransmission ? settings?.transmissionPathMapLocal : settings?.qbitPathMapLocal || ''
-    ).trim();
-    const remoteMap = String(
-      useTransmission ? settings?.transmissionPathMapRemote : settings?.qbitPathMapRemote || ''
-    ).trim();
-    if (localMap && remoteMap) {
-      return applyPathMapping(basePath, localMap, remoteMap);
+    const mappings = getClientMappings(settings, useTransmission);
+    if (mappings.length) {
+      return applyPathMappings(basePath, mappings);
     }
     return basePath;
   }
@@ -891,12 +923,13 @@ export function createUploadKit(deps) {
       showToast('Imposta un Save path nelle impostazioni per riaprire l\'ultimo upload.', 'warning');
       return;
     }
-    const mapLocal = isTransmission ? settings.transmissionPathMapLocal : settings.qbitPathMapLocal;
-    const mapRemote = isTransmission ? settings.transmissionPathMapRemote : settings.qbitPathMapRemote;
+    const clientMappings = isTransmission ? settings.transmissionPathMappings : settings.qbitPathMappings;
+    const hasPartialMapping = Array.isArray(clientMappings)
+      && clientMappings.some((m) => (m?.local && !m?.remote) || (!m?.local && m?.remote));
     const hasSavePathSetting = Boolean(
       isTransmission ? settings.transmissionSavePath : settings.qbitSavePath
     );
-    if (!hasSavePathSetting && ((mapLocal && !mapRemote) || (!mapLocal && mapRemote))) {
+    if (!hasSavePathSetting && hasPartialMapping) {
       showToast('Completa il mapping locale/remoto (entrambi i campi).', 'warning');
       return;
     }
@@ -2348,8 +2381,9 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
           })[0];
         const streamDir = state.mainVideo ? getParentPath(state.mainVideo) : '';
         const discRoot = state.bdInfoTarget || getParentPath(streamDir);
+        const streamSep = streamDir.includes('\\') ? '\\' : '/';
         const candidate = streamDir
-          ? `${streamDir}\\${longest.file}`
+          ? `${streamDir.replace(/[\\/]+$/, '')}${streamSep}${longest.file}`
           : buildStreamPath(discRoot, longest.file);
         if (candidate) {
           videoPath = candidate;

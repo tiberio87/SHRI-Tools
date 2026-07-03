@@ -46,8 +46,7 @@ const DEFAULT_SETTINGS = {
   qbitSavePath: '',
   qbitCategories: '',
   qbitAutoStart: true,
-  qbitPathMapLocal: '',
-  qbitPathMapRemote: '',
+  qbitPathMappings: [],
   transmissionHost: '',
   transmissionPort: '',
   transmissionUsername: '',
@@ -55,8 +54,7 @@ const DEFAULT_SETTINGS = {
   transmissionHttps: false,
   transmissionSavePath: '',
   transmissionAutoStart: true,
-  transmissionPathMapLocal: '',
-  transmissionPathMapRemote: '',
+  transmissionPathMappings: [],
   mkvpropeditPath: _isLinux ? '/usr/bin/mkvpropedit' : '',
   mkvTaggerEncoder: 'SHRI'
 };
@@ -86,6 +84,39 @@ function toNonSecretSettingsForStorage(settings) {
     }
   }
   return stored;
+}
+
+// Normalizza i mapping di percorso in un array di { local, remote }.
+// Supporta il vecchio formato a campo singolo (legacyLocal/legacyRemote) per
+// migrare le configurazioni esistenti alla nuova lista multipla.
+function normalizePathMappings(value, legacyLocal, legacyRemote) {
+  let list = [];
+  if (Array.isArray(value)) {
+    list = value;
+  } else if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        list = parsed;
+      }
+    } catch {
+      list = [];
+    }
+  }
+  const cleaned = list
+    .map((item) => ({
+      local: String(item?.local || '').trim(),
+      remote: String(item?.remote || '').trim()
+    }))
+    .filter((item) => item.local || item.remote);
+  if (!cleaned.length) {
+    const local = String(legacyLocal || '').trim();
+    const remote = String(legacyRemote || '').trim();
+    if (local || remote) {
+      cleaned.push({ local, remote });
+    }
+  }
+  return cleaned;
 }
 
 export function createSettingsTools({
@@ -170,7 +201,22 @@ export function createSettingsTools({
   }
 
   function mergeSettings(settings = {}, secrets = {}) {
-    return { ...DEFAULT_SETTINGS, ...settings, ...secrets };
+    const merged = { ...DEFAULT_SETTINGS, ...settings, ...secrets };
+    merged.qbitPathMappings = normalizePathMappings(
+      merged.qbitPathMappings,
+      merged.qbitPathMapLocal,
+      merged.qbitPathMapRemote
+    );
+    merged.transmissionPathMappings = normalizePathMappings(
+      merged.transmissionPathMappings,
+      merged.transmissionPathMapLocal,
+      merged.transmissionPathMapRemote
+    );
+    delete merged.qbitPathMapLocal;
+    delete merged.qbitPathMapRemote;
+    delete merged.transmissionPathMapLocal;
+    delete merged.transmissionPathMapRemote;
+    return merged;
   }
 
   function getStoredSecrets() {
@@ -220,6 +266,100 @@ export function createSettingsTools({
     ui.ffmpegHint.innerHTML = `FFmpeg non configurato. Scaricalo da <a href="https://ffmpeg.org/download.html" data-external="https://ffmpeg.org/download.html">ffmpeg.org</a> e inserisci il percorso completo del file eseguibile (es. ffmpeg.exe).`;
   }
 
+  function pathMapContainer(client) {
+    return client === 'transmission' ? ui.transmissionPathMapList : ui.qbitPathMapList;
+  }
+
+  function createPathMapRow(client, local = '', remote = '') {
+    const row = document.createElement('div');
+    row.className = 'path-map-row';
+
+    const localInput = document.createElement('input');
+    localInput.type = 'text';
+    localInput.className = 'path-map-local';
+    localInput.placeholder = 'Percorso locale (es. Z:\\tv_series)';
+    localInput.value = local;
+
+    const arrow = document.createElement('span');
+    arrow.className = 'path-map-arrow';
+    arrow.textContent = '\u2192';
+    arrow.setAttribute('aria-hidden', 'true');
+
+    const remoteInput = document.createElement('input');
+    remoteInput.type = 'text';
+    remoteInput.className = 'path-map-remote';
+    remoteInput.placeholder = 'Percorso remoto (es. /mnt/media/tv_series)';
+    remoteInput.value = remote;
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'secondary small path-map-remove';
+    removeBtn.textContent = '\u2212';
+    removeBtn.setAttribute('aria-label', 'Rimuovi mapping');
+    removeBtn.addEventListener('click', () => {
+      const container = pathMapContainer(client);
+      row.remove();
+      if (container) {
+        container.dispatchEvent(new Event('input', { bubbles: true }));
+      }
+    });
+
+    row.append(localInput, arrow, remoteInput, removeBtn);
+    return row;
+  }
+
+  function renderPathMapRows(client, mappings) {
+    const container = pathMapContainer(client);
+    if (!container) {
+      return;
+    }
+    container.replaceChildren();
+    const list = Array.isArray(mappings) ? mappings : [];
+    if (!list.length) {
+      container.appendChild(createPathMapRow(client));
+      return;
+    }
+    list.forEach((item) => {
+      container.appendChild(createPathMapRow(client, item?.local || '', item?.remote || ''));
+    });
+  }
+
+  function readPathMapRows(client) {
+    const container = pathMapContainer(client);
+    if (!container) {
+      return [];
+    }
+    const result = [];
+    container.querySelectorAll('.path-map-row').forEach((row) => {
+      const local = row.querySelector('.path-map-local')?.value.trim() || '';
+      const remote = row.querySelector('.path-map-remote')?.value.trim() || '';
+      if (local || remote) {
+        result.push({ local, remote });
+      }
+    });
+    return result;
+  }
+
+  function addPathMapRow(client) {
+    const container = pathMapContainer(client);
+    if (!container) {
+      return;
+    }
+    const row = createPathMapRow(client);
+    container.appendChild(row);
+    row.querySelector('.path-map-local')?.focus();
+    container.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function initPathMapUi() {
+    if (ui.qbitPathMapAddBtn) {
+      ui.qbitPathMapAddBtn.addEventListener('click', () => addPathMapRow('qbit'));
+    }
+    if (ui.transmissionPathMapAddBtn) {
+      ui.transmissionPathMapAddBtn.addEventListener('click', () => addPathMapRow('transmission'));
+    }
+  }
+
   function updateQbitMappingHint(settings) {
     const client = settings?.torrentClient || 'qbit';
     const isTransmission = client === 'transmission';
@@ -227,18 +367,6 @@ export function createSettingsTools({
       ? String(settings?.transmissionSavePath || '').trim()
       : String(settings?.qbitSavePath || '').trim();
     const disableMapping = Boolean(savePath);
-    if (ui.qbitPathMapLocalInput) {
-      ui.qbitPathMapLocalInput.disabled = false;
-    }
-    if (ui.qbitPathMapRemoteInput) {
-      ui.qbitPathMapRemoteInput.disabled = false;
-    }
-    if (ui.transmissionPathMapLocalInput) {
-      ui.transmissionPathMapLocalInput.disabled = false;
-    }
-    if (ui.transmissionPathMapRemoteInput) {
-      ui.transmissionPathMapRemoteInput.disabled = false;
-    }
     if (ui.qbitMappingHint) {
       ui.qbitMappingHint.textContent = disableMapping
         ? 'Mapping ignorato quando Save path è impostato.'
@@ -541,12 +669,7 @@ export function createSettingsTools({
     if (ui.qbitAutoStartToggle) {
       ui.qbitAutoStartToggle.checked = settings.qbitAutoStart !== false;
     }
-    if (ui.qbitPathMapLocalInput) {
-      ui.qbitPathMapLocalInput.value = settings.qbitPathMapLocal || '';
-    }
-    if (ui.qbitPathMapRemoteInput) {
-      ui.qbitPathMapRemoteInput.value = settings.qbitPathMapRemote || '';
-    }
+    renderPathMapRows('qbit', settings.qbitPathMappings);
     if (ui.transmissionHostInput) {
       ui.transmissionHostInput.value = settings.transmissionHost || '';
     }
@@ -568,12 +691,7 @@ export function createSettingsTools({
     if (ui.transmissionAutoStartToggle) {
       ui.transmissionAutoStartToggle.checked = settings.transmissionAutoStart !== false;
     }
-    if (ui.transmissionPathMapLocalInput) {
-      ui.transmissionPathMapLocalInput.value = settings.transmissionPathMapLocal || '';
-    }
-    if (ui.transmissionPathMapRemoteInput) {
-      ui.transmissionPathMapRemoteInput.value = settings.transmissionPathMapRemote || '';
-    }
+    renderPathMapRows('transmission', settings.transmissionPathMappings);
     updateQbitMappingHint(settings);
     if (ui.settingsAnnounceInput) {
       const passkey = settings.torrentPasskey || '';
@@ -671,8 +789,7 @@ export function createSettingsTools({
       qbitSavePath: ui.qbitSavePathInput?.value.trim() || '',
       qbitCategories: ui.qbitCategoriesInput?.value.trim() || '',
       qbitAutoStart: Boolean(ui.qbitAutoStartToggle?.checked),
-      qbitPathMapLocal: ui.qbitPathMapLocalInput?.value.trim() || '',
-      qbitPathMapRemote: ui.qbitPathMapRemoteInput?.value.trim() || '',
+      qbitPathMappings: readPathMapRows('qbit'),
       transmissionHost: ui.transmissionHostInput?.value.trim() || '',
       transmissionPort: ui.transmissionPortInput?.value.trim() || '',
       transmissionUsername: ui.transmissionUsernameInput?.value.trim() || '',
@@ -680,8 +797,7 @@ export function createSettingsTools({
       transmissionHttps: Boolean(ui.transmissionHttpsToggle?.checked),
       transmissionSavePath: ui.transmissionSavePathInput?.value.trim() || '',
       transmissionAutoStart: Boolean(ui.transmissionAutoStartToggle?.checked),
-      transmissionPathMapLocal: ui.transmissionPathMapLocalInput?.value.trim() || '',
-      transmissionPathMapRemote: ui.transmissionPathMapRemoteInput?.value.trim() || '',
+      transmissionPathMappings: readPathMapRows('transmission'),
       torrentPasskey: passkey,
       torrentAnnounceUrl: announceUrl,
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
@@ -700,6 +816,7 @@ export function createSettingsTools({
     saveSettings,
     updateFfmpegHint,
     updateQbitMappingHint,
+    initPathMapUi,
     updateClientSections,
     buildAppHealthStatus,
     updateAppHealthStatus,

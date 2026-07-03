@@ -5,6 +5,7 @@ export const state = {
   videoFiles: [],
   mainVideo: null,
   mediaInfo: null,
+  totalSize: 0,
   bdInfoRaw: '',
   bdInfoParsed: null,
   bdInfoError: '',
