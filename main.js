@@ -233,6 +233,59 @@ async function analyzeMediaText(filePath) {
   }
 }
 
+/**
+ * mediainfo.js (WASM) analizza il file tramite callback a blocchi e NON conosce
+ * il nome del file: perciò l'output di testo NON contiene la riga "Complete name".
+ * Il tracker (UNIT3D/Shareisland) mostra il nome file proprio da "Complete name":
+ * senza di essa la sezione MediaInfo risulta "sconosciuto". Qui iniettiamo la riga
+ * "Complete name" (solo il nome del file, non il percorso) nella sezione General,
+ * subito dopo "Unique ID" come nel MediaInfo nativo, mantenendo l'allineamento.
+ */
+function ensureMediaInfoCompleteName(text, filePath) {
+  if (typeof text !== 'string' || !text) {
+    return text;
+  }
+  if (/^[ \t]*Complete name[ \t]*:/m.test(text)) {
+    return text;
+  }
+  const name = String(filePath || '').split(/[\\/]/).pop();
+  if (!name) {
+    return text;
+  }
+  const lines = text.split(/\r?\n/);
+  let generalIdx = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    if (!lines[i].includes(' : ') && /^general\b/i.test(lines[i].trim())) {
+      generalIdx = i;
+      break;
+    }
+  }
+  if (generalIdx === -1) {
+    return text;
+  }
+  let colonCol = -1;
+  let insertAt = generalIdx + 1;
+  for (let i = generalIdx + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (!line.includes(' : ')) {
+      break; // fine della sezione General
+    }
+    if (colonCol === -1) {
+      colonCol = line.indexOf(' : ') + 1;
+    }
+    if (/^[ \t]*Unique ID[ \t]*:/.test(line)) {
+      insertAt = i + 1;
+    }
+  }
+  if (colonCol === -1) {
+    colonCol = 41;
+  }
+  const label = 'Complete name';
+  const pad = Math.max(1, colonCol - label.length);
+  lines.splice(insertAt, 0, `${label}${' '.repeat(pad)}: ${name}`);
+  return lines.join('\n');
+}
+
 function getVideoTrack(mediaInfo) {
   const tracks = mediaInfo?.media?.track || [];
   return tracks.find((track) => track['@type'] === 'Video');
@@ -2598,7 +2651,7 @@ ipcMain.handle('mediainfo-text', async (_event, filePath) => {
   }
   try {
     const text = await analyzeMediaText(filePath);
-    return { text };
+    return { text: ensureMediaInfoCompleteName(text, filePath) };
   } catch (error) {
     return { text: '', error: String(error) };
   }
