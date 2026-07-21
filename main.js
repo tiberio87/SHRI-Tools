@@ -3020,6 +3020,24 @@ ipcMain.handle('preview-rename', async (_event, payload) => {
   return buildRenamePlan(payload);
 });
 
+// Rimappa un percorso attraverso le rinomine di cartella già eseguite, così che
+// un file/cartella figlio venga spostato sotto il nuovo nome del genitore.
+// Rende l'applicazione delle rinomine indipendente dall'ordine di esecuzione.
+function remapPathThroughFolders(inputPath, folderRenames) {
+  let result = inputPath;
+  for (const { from, to } of folderRenames) {
+    if (path.resolve(result) === path.resolve(from)) {
+      result = to;
+      continue;
+    }
+    const rel = path.relative(from, result);
+    if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) {
+      result = path.join(to, rel);
+    }
+  }
+  return result;
+}
+
 ipcMain.handle('apply-rename', async (_event, payload) => {
   const plan = buildRenamePlan(payload);
   if (!plan.ops.length) {
@@ -3030,13 +3048,33 @@ ipcMain.handle('apply-rename', async (_event, payload) => {
     return { ok: false, warnings: plan.warnings, results: [] };
   }
 
-  const sortedOps = [...plan.ops].sort((a, b) => b.from.length - a.from.length);
+  // I file vanno sempre rinominati PRIMA delle cartelle che li contengono,
+  // altrimenti il loro percorso non esisterebbe più (errore "percorso non
+  // trovato"). Ordina: prima i file, poi le cartelle; a parità di tipo prima i
+  // percorsi più profondi. In più, rimappa ogni percorso attraverso le cartelle
+  // già rinominate, così l'operazione è corretta qualunque sia l'ordine.
+  const pathDepth = (value) => String(value || '').split(/[\\/]/).filter(Boolean).length;
+  const sortedOps = [...plan.ops].sort((a, b) => {
+    const rankA = a.type === 'folder' ? 1 : 0;
+    const rankB = b.type === 'folder' ? 1 : 0;
+    if (rankA !== rankB) {
+      return rankA - rankB;
+    }
+    return pathDepth(b.from) - pathDepth(a.from);
+  });
+
   const results = [];
+  const completedFolderRenames = [];
 
   for (const op of sortedOps) {
+    const actualFrom = remapPathThroughFolders(op.from, completedFolderRenames);
+    const actualTo = remapPathThroughFolders(op.to, completedFolderRenames);
     try {
-      await fs.rename(op.from, op.to);
+      await fs.rename(actualFrom, actualTo);
       results.push({ from: op.from, to: op.to, ok: true });
+      if (op.type === 'folder') {
+        completedFolderRenames.push({ from: op.from, to: op.to });
+      }
     } catch (error) {
       results.push({ from: op.from, to: op.to, ok: false, error: String(error) });
     }

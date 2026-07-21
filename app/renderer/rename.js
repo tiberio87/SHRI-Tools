@@ -403,15 +403,15 @@ export function createRenameTools(deps) {
           const season = guess.season || seasonValue;
           const episode = guess.episode;
           const episodeEnd = form.multiEpisode ? (guess.episodeEnd || range.episodeEnd || '') : '';
-          const key = episodeKey(season, episode);
-          const episodeTitle = key && state.episodeMap[key] ? state.episodeMap[key] : guess.episodeTitle;
           const baseName = computeBaseName(form, {
             type: episodeType,
             separatorStyle: 'dots',
             season,
             episode,
             episodeEnd,
-            episodeTitle: episodeEnd ? '' : (episodeTitle || form.episodeTitle),
+            // Gli episodi in una cartella usano solo il marcatore SxxExx,
+            // senza titolo episodio.
+            episodeTitle: '',
             languageTag: useLangFiles ? form.languageTag : '',
             tag: resolvedTag,
             ...audioOverride
