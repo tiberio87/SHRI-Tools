@@ -2214,9 +2214,10 @@ async function loadPath(targetPath) {
     if (scan.kind === 'dir') {
       const discStructure = isDiscStructure();
       ui.renameFileCheckbox.disabled = discStructure;
-      if (discStructure) {
-        ui.renameFileCheckbox.checked = false;
-      }
+      // Per le cartelle con episodi singoli (non strutture disco) abilita di
+      // default la rinomina dei file, così anche i singoli episodi vengono
+      // rinominati insieme alla cartella.
+      ui.renameFileCheckbox.checked = !discStructure;
     } else {
       ui.renameFileCheckbox.disabled = false;
     }
@@ -2456,8 +2457,21 @@ ui.applyRenameBtn.addEventListener('click', async () => {
     showToast('Rinomina completata.', 'success');
     renameTools.applyRenameResults(result, payload);
   } else {
-    const warning = result.warnings.length ? result.warnings.join(' | ') : 'Errore nella rinomina.';
+    // Applica comunque le rinomine riuscite, così lo stato resta allineato al
+    // disco ed evita errori di "percorso non trovato" nelle anteprime successive.
+    renameTools.applyRenameResults(result, payload);
+    const failed = (result.results || []).filter((item) => item && !item.ok);
+    let warning;
+    if (failed.length) {
+      const sample = failed[0];
+      const sampleName = getPathBaseName(sample.from);
+      const reason = String(sample.error || '').replace(/^Error:\s*/, '');
+      warning = `${failed.length} elemento/i non rinominati (es. ${sampleName}): ${reason}`;
+    } else {
+      warning = result.warnings.length ? result.warnings.join(' | ') : 'Errore nella rinomina.';
+    }
     setHint(ui.renameHint, warning);
+    showToast(warning, 'error');
   }
   schedulePreview();
 });
