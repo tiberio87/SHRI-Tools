@@ -187,7 +187,7 @@ export const RULES_SECTIONS = [
       },
       {
         label: 'Lingue audio',
-        pattern: 'Tag in maiuscolo, più lingue separate da "-": ITA-ENG / ITA-MULTI.'
+        pattern: 'Tag in maiuscolo; 2 lingue in ordine di qualità (ITA-ENG o ENG-ITA), 3+ lingue: ITA-MULTI.'
       },
       {
         label: 'Tag gruppo',

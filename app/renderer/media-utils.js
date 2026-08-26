@@ -111,6 +111,22 @@ export function scoreAudioTrack(track) {
   return scoreBase * 1000 + channelsValue * 10 + bitrateValue / 1000000;
 }
 
+// Order unique audio language tags with the best-quality track first (for naming).
+export function orderAudioLangsByQuality(tracks) {
+  const bestScore = new Map();
+  for (const track of tracks || []) {
+    const lang = normalizeLangTag(getTrackLang(track));
+    if (!lang) {
+      continue;
+    }
+    const score = scoreAudioTrack(track);
+    if (!bestScore.has(lang) || score > bestScore.get(lang)) {
+      bestScore.set(lang, score);
+    }
+  }
+  return [...bestScore.keys()].sort((a, b) => bestScore.get(b) - bestScore.get(a));
+}
+
 function getChannelCount(track) {
   const match = String(track?.Channels || track?.['Channel(s)'] || '').match(/\d+/);
   return match ? parseInt(match[0], 10) : 0;

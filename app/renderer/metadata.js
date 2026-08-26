@@ -12,6 +12,7 @@ import {
   mapAudioCodec,
   mapVideoCodec,
   normalizeLangTag,
+  orderAudioLangsByQuality,
   parseChannels,
   scoreAudioTrack
 } from './media-utils.js';
@@ -270,6 +271,7 @@ export function createMetadataTools(deps) {
     }
 
     const separator = ' - ';
+    // 3 o più lingue: si usa il tag MULTI (ITA anteposto se presente).
     if (langs.length >= 3) {
       if (langs.includes('ITA')) {
         return `ITA${separator}MULTI`;
@@ -281,10 +283,7 @@ export function createMetadataTools(deps) {
       return langs[0];
     }
 
-    if (langs.includes('ITA')) {
-      const other = langs.find((lang) => lang !== 'ITA') || '';
-      return other ? `ITA${separator}${other}` : 'ITA';
-    }
+    // 2 lingue: l'ordine riflette la qualità audio (traccia migliore per prima).
     return langs.join(separator);
   }
 
@@ -785,10 +784,8 @@ export function createMetadataTools(deps) {
         return !title.includes('commentary');
       });
 
-      const audioLangs = cleanAudio
-        .map((track) => normalizeLangTag(getTrackLang(track)))
-        .filter(Boolean);
-      const uniqueLangs = [...new Set(audioLangs)];
+      // Ordina le lingue in base alla qualità della miglior traccia audio (migliore per prima).
+      const uniqueLangs = orderAudioLangsByQuality(cleanAudio);
       state.audioLangs = uniqueLangs;
       ui.audioLangHint.textContent = uniqueLangs.length
         ? `Lingue audio rilevate: ${uniqueLangs.join(', ')}`
