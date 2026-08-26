@@ -1,5 +1,5 @@
 import { LANG_MAP } from './constants.js';
-import { normalizeLangTag, getTrackLang, parseChannels, mapAudioCodec, scoreAudioTrack } from './media-utils.js';
+import { normalizeLangTag, getTrackLang, parseChannels, mapAudioCodec, scoreAudioTrack, orderAudioLangsByQuality } from './media-utils.js';
 import { extractRegionFromName } from './parsing-tools.js';
 
 // Tracker analysis (Unit3D): fetch payload, parse MediaInfo, and build title suggestion.
@@ -462,11 +462,9 @@ export function createTrackerAnalysis({
     const audioTracks = Array.isArray(mediaInfo?.media?.track)
       ? mediaInfo.media.track.filter((track) => track['@type'] === 'Audio')
       : [];
-    const audioLangs = audioTracks
-      .map((track) => normalizeLangTag(getTrackLang(track)))
-      .filter(Boolean);
+    const orderedAudioLangs = orderAudioLangsByQuality(audioTracks);
     const nameLangs = extractLangsFromName(nameForGuess || name || fileName);
-    const finalLangs = audioLangs.length ? audioLangs : nameLangs;
+    const finalLangs = orderedAudioLangs.length ? orderedAudioLangs : nameLangs;
     if (finalLangs.length && (!ui.languageTagInput.dataset.manual || ui.languageTagInput.dataset.manual === 'false')) {
       const computedLang = metadataTools.buildLanguageTag(finalLangs, ui.originalLanguageInput.value);
       if (computedLang) {
