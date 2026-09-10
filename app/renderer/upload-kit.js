@@ -31,6 +31,7 @@ export function createUploadKit(deps) {
     copyToClipboard,
     getFormState,
     getAudioOverrides,
+    getTorrentNameSuggestion,
     getMissingRenameRequirements,
     getPathBaseName,
     loadSettings,
@@ -53,6 +54,8 @@ export function createUploadKit(deps) {
   let uploadIdsText = '';
   let screensProgressUnsub = null;
   let screensProgressRequestId = '';
+  let screensBusy = false;
+  let screensSourcePath = '';
   let uploadTitleOverride = '';
   let uploadTitleBase = '';
   let uploadTitleFallback = false;
@@ -723,7 +726,12 @@ export function createUploadKit(deps) {
   }
 
   function getJobFileTitle() {
-    const raw = String(ui.torrentNameInput?.value || '').trim();
+    let raw = String(ui.torrentNameInput?.value || '').trim();
+    if (!raw) {
+      // Durante la generazione in background il campo non è ancora popolato:
+      // ricava il nome dalla proposta di rinomina per usare la cartella corretta.
+      raw = String(getTorrentNameSuggestion?.() || '').trim();
+    }
     return raw
       .replace(/[\\/:*?"<>|']+/g, '')
       .replace(/\s+/g, '.')
@@ -2072,8 +2080,11 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       uploadTitleSourcePath = state.targetPath;
       lastUploadDownloadUrl = '';
       lastTrackerTorrentPath = '';
-      state.screenshots = [];
-      state.screenshotsMeta = null;
+      // Mantieni gli screenshot già generati in background per questa stessa sorgente.
+      if (screensSourcePath !== state.targetPath) {
+        state.screenshots = [];
+        state.screenshotsMeta = null;
+      }
     }
     // Popup repack solo per stagioni TV/anime (chiedi solo alla prima apertura per ogni cartella)
     const isTvSeasonDir = state.kind === 'dir' && (form.type === 'tv-season' || form.type === 'anime-season');
@@ -2230,6 +2241,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
           if (Array.isArray(saved?.screenshots) && saved.screenshots.length) {
             state.screenshots = saved.screenshots;
             state.screenshotsMeta = saved.meta || null;
+            screensSourcePath = state.targetPath || '';
             logDebug?.('restoreJobState: screenshots ripristinati', state.screenshots.length);
           }
         } catch {}
@@ -2344,19 +2356,38 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     return header + out.join('\n');
   }
 
-  async function generateScreenshots() {
+  async function runScreenshots(options = {}) {
+    const { auto = false } = options;
+    if (screensBusy) {
+      return;
+    }
     const settings = loadSettings();
     const form = getFormState();
     let videoPath = state.mainVideo || state.videoFiles[0];
     if (!videoPath) {
-      ui.screensHint.textContent = 'Nessun file video disponibile.';
+      if (!auto) {
+        ui.screensHint.textContent = 'Nessun file video disponibile.';
+      }
       return;
     }
     if (!settings.ffmpegPath) {
-      ui.screensHint.textContent = 'FFmpeg non configurato.';
+      if (auto) {
+        showToast?.('FFmpeg non configurato: screenshot automatici non generati.', 'warning');
+      } else {
+        ui.screensHint.textContent = 'FFmpeg non configurato.';
+      }
       return;
     }
+    if (auto) {
+      const primaryHost = settings.imageHostPrimary || 'imgbb';
+      const primaryKey = primaryHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
+      if (!primaryKey) {
+        showToast?.('Host immagini non configurato: screenshot automatici non generati.', 'warning');
+        return;
+      }
+    }
 
+    screensBusy = true;
     if (ui.generateScreensBtn) {
       ui.generateScreensBtn.disabled = true;
     }
@@ -2365,6 +2396,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     setScreensProgress(0);
     setScreensStage('start');
     ui.screensHint.textContent = 'Generazione screenshot in corso...';
+    showToast?.('Generazione screenshot iniziata...', 'info');
     let skipFrame = '';
     let seekMode = 'fast';
     if (isFullDisc(form) && state.bdInfoRaw) {
@@ -2421,12 +2453,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (result?.ok) {
       state.screenshots = result.images || [];
       state.screenshotsMeta = { tonemapped: Boolean(result.tonemapped) };
+      screensSourcePath = state.targetPath || '';
 
       // Offer fallback host if any upload failed and fallback is configured.
       const failedCount = state.screenshots.filter((s) => !s.ok).length;
       const fallbackHost = settings.imageHostFallback;
       const fallbackKey = fallbackHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
-      if (failedCount > 0 && fallbackHost && fallbackKey && fallbackHost !== (settings.imageHostPrimary || 'imgbb')) {
+      if (!auto && failedCount > 0 && fallbackHost && fallbackKey && fallbackHost !== (settings.imageHostPrimary || 'imgbb')) {
         const primaryLabel = (settings.imageHostPrimary || 'imgbb').toUpperCase();
         const fallbackLabel = fallbackHost.toUpperCase();
         const switchConfirmed = await openConfirmModal(
@@ -2466,6 +2499,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         }))
       });
       ui.screensHint.textContent = `Screenshot caricati: ${okImages.length}/${state.screenshots.length}`;
+      showToast?.(`Generazione screenshot completata: ${okImages.length}/${state.screenshots.length}`, 'success');
       refreshUploadDescription();
       setScreensProgress(1);
       setScreensStage('done');
@@ -2488,11 +2522,49 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       logDebug?.('screens: error', { error: result?.error || 'unknown' });
       ui.screensHint.textContent = result?.error || 'Errore durante la generazione.';
       setScreensStage('error', { error: result?.error });
+      showToast?.('Errore durante la generazione degli screenshot.', 'error');
     }
     renderScreensList();
+    screensBusy = false;
     if (ui.generateScreensBtn) {
       ui.generateScreensBtn.disabled = false;
     }
+  }
+
+  async function generateScreenshots() {
+    if (screensBusy) {
+      showToast?.('Generazione screenshot già in corso...', 'info');
+      return;
+    }
+    const okCount = state.screenshots.filter((s) => s.ok).length;
+    if (okCount > 0) {
+      const regenerate = await openConfirmModal(
+        `Sono già disponibili ${okCount} screenshot generati per questo file.\nVuoi rigenerarli da capo?`,
+        { html: false, okLabel: 'Rigenera', cancelLabel: 'Mantieni' }
+      );
+      if (!regenerate) {
+        renderScreensList();
+        refreshUploadDescription();
+        if (ui.screensHint) {
+          ui.screensHint.textContent = `Screenshot disponibili: ${okCount}/${state.screenshots.length}`;
+        }
+        setScreensProgress(1);
+        setScreensStage('done');
+        return;
+      }
+    }
+    await runScreenshots({ auto: false });
+  }
+
+  async function autoGenerateScreens() {
+    if (screensBusy) {
+      return;
+    }
+    if (state.screenshots && state.screenshots.some((s) => s.ok)) {
+      return;
+    }
+    logDebug?.('screens: auto-generazione avviata', { targetPath: state.targetPath });
+    await runScreenshots({ auto: true });
   }
 
   function refreshUploadDescription() {
@@ -2770,6 +2842,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     buildUploadTitle,
     closeUploadKitModal,
     generateScreenshots,
+    autoGenerateScreens,
     initUploadKitEvents,
     openUploadKitModal,
     prepareUploadKitStep,

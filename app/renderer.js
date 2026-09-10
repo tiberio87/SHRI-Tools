@@ -2238,6 +2238,16 @@ async function loadPath(targetPath) {
   await sceneManager.runSceneDetection();
   mkvTagger?.syncMetadata();
   mkvTagger?.syncTitle();
+  // Finalizza il piano di rinomina (format/source/nome) prima di generare gli
+  // screenshot, così vengono salvati nella stessa cartella job del torrent.
+  await refreshPreview();
+  // Avvia la generazione screenshot in background appena il file/cartella è
+  // analizzato (esclusi i Full Disc BDMV/VIDEO_TS che richiedono la scelta della playlist).
+  if (scan.mainVideo && !isDiscStructure()) {
+    uploadKit.autoGenerateScreens?.().catch((err) => {
+      logDebug('screens: auto-generazione fallita', { error: err?.message || String(err) });
+    });
+  }
   schedulePreview();
 }
 
@@ -2246,6 +2256,7 @@ const uploadKit = createUploadKit({
   buildMediaInfoShort: metadataTools.buildMediaInfoShort,
   computeBaseName: renameTools.computeBaseName,
   getAudioOverrides: renameTools.getAudioOverrides,
+  getTorrentNameSuggestion: renameTools.getTorrentNameSuggestion,
   copyToClipboard,
   getFormState,
   getMissingRenameRequirements: renameTools.getMissingRenameRequirements,
