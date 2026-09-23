@@ -164,6 +164,7 @@ export const ui = {
   qbitCategoriesInput: document.getElementById('qbitCategoriesInput'),
   qbitCategorySelect: document.getElementById('qbitCategorySelect'),
   qbitAutoStartToggle: document.getElementById('qbitAutoStartToggle'),
+  qbitSkipCheckingToggle: document.getElementById('qbitSkipCheckingToggle'),
   qbitPathMapList: document.getElementById('qbitPathMapList'),
   qbitPathMapAddBtn: document.getElementById('qbitPathMapAddBtn'),
   qbitTestBtn: document.getElementById('qbitTestBtn'),
