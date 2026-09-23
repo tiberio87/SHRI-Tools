@@ -46,6 +46,7 @@ const DEFAULT_SETTINGS = {
   qbitSavePath: '',
   qbitCategories: '',
   qbitAutoStart: true,
+  qbitSkipChecking: true,
   qbitPathMappings: [],
   transmissionHost: '',
   transmissionPort: '',
@@ -669,6 +670,9 @@ export function createSettingsTools({
     if (ui.qbitAutoStartToggle) {
       ui.qbitAutoStartToggle.checked = settings.qbitAutoStart !== false;
     }
+    if (ui.qbitSkipCheckingToggle) {
+      ui.qbitSkipCheckingToggle.checked = settings.qbitSkipChecking !== false;
+    }
     renderPathMapRows('qbit', settings.qbitPathMappings);
     if (ui.transmissionHostInput) {
       ui.transmissionHostInput.value = settings.transmissionHost || '';
@@ -789,6 +793,7 @@ export function createSettingsTools({
       qbitSavePath: ui.qbitSavePathInput?.value.trim() || '',
       qbitCategories: ui.qbitCategoriesInput?.value.trim() || '',
       qbitAutoStart: Boolean(ui.qbitAutoStartToggle?.checked),
+      qbitSkipChecking: Boolean(ui.qbitSkipCheckingToggle?.checked),
       qbitPathMappings: readPathMapRows('qbit'),
       transmissionHost: ui.transmissionHostInput?.value.trim() || '',
       transmissionPort: ui.transmissionPortInput?.value.trim() || '',

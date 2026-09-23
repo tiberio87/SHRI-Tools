@@ -744,7 +744,7 @@ async function loginQbittorrent(baseUrl, username, password) {
   return { ok: true, cookie: `${match[1]}=${match[2]}` };
 }
 
-async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused }) {
+async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused, skipChecking }) {
   if (!baseUrl || !username || !password) {
     return { ok: false, error: 'Credenziali qBittorrent mancanti.' };
   }
@@ -767,6 +767,9 @@ async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath,
   }
   if (paused) {
     form.append('paused', 'true');
+  }
+  if (skipChecking) {
+    form.append('skip_checking', 'true');
   }
   const response = await fetch(`${baseUrl}/api/v2/torrents/add`, {
     method: 'POST',

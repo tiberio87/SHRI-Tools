@@ -992,13 +992,15 @@ export function createUploadKit(deps) {
           torrentPath: lastTrackerTorrentPath,
           savePath,
           category: qbitCategory,
-          paused: settings.qbitAutoStart === false
+          paused: settings.qbitAutoStart === false,
+          skipChecking: settings.qbitSkipChecking !== false
         });
         logDebug?.('qbit add payload', {
           baseUrl,
           savePath,
           category: qbitCategory,
-          paused: settings.qbitAutoStart === false
+          paused: settings.qbitAutoStart === false,
+          skipChecking: settings.qbitSkipChecking !== false
         });
         logDebug?.('qbit add response', result);
       }
