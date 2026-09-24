@@ -455,8 +455,8 @@
       </div>
       <div class="settings-body">
       <div class="settings-block" data-settings-scope="all">
-        <h3 class="settings-title">Lingua</h3>
-        <div class="row">
+        <h3 class="settings-title">Generale</h3>
+        <div class="row settings-grid">
           <div class="field">
             <label for="preferredLanguageSelect">Lingua preferita per i titoli da rinominare</label>
             <select id="preferredLanguageSelect">
@@ -465,11 +465,18 @@
               <option value="">Originale</option>
             </select>
           </div>
+          <div class="field">
+            <label for="settingsTorrentOutputInput">Cartella output job (torrent, screen, bbcode)</label>
+            <div class="input-with-action">
+              <input id="settingsTorrentOutputInput" type="text" placeholder="Seleziona cartella" />
+              <button id="browseTorrentOutputSettingsBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+          </div>
         </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
-        <h3 class="settings-title">Torrent</h3>
-        <div class="row">
+        <h3 class="settings-title">Tracker &amp; Upload (Shareisland)</h3>
+        <div class="row settings-grid">
           <div class="field">
             <label for="settingsAnnounceInput">PID announce (SHRI)</label>
             <div class="input-with-action">
@@ -483,37 +490,45 @@
             </div>
           </div>
           <div class="field">
-            <label for="settingsTorrentOutputInput">Cartella output job (torrent, screen, bbcode)</label>
-            <div class="input-with-action">
-              <input id="settingsTorrentOutputInput" type="text" placeholder="Seleziona cartella" />
-              <button id="browseTorrentOutputSettingsBtn" class="secondary small" type="button">Sfoglia</button>
-            </div>
+            <label for="unit3dBaseUrlInput">Base URL</label>
+            <input id="unit3dBaseUrlInput" type="text" placeholder="https://shareisland.org" />
           </div>
         </div>
         <div class="row">
           <div class="field">
-            <label for="settingsMkbrrPathInput">Percorso mkbrr (opzionale)</label>
-            <div class="input-with-action">
-              <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
-              <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
+            <label for="unit3dApiKeyInput">API Key</label>
+            <div class="input-with-icon">
+              <input id="unit3dApiKeyInput" type="password" placeholder="API key UNIT3D" />
+              <button class="icon-button key-verify" type="button" data-service="unit3d" data-input="unit3dApiKeyInput" data-base="unit3dBaseUrlInput" aria-label="Verifica chiave UNIT3D">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M5 12l4 4 10-10"></path>
+                </svg>
+              </button>
+              <button class="icon-button" type="button" data-target="unit3dApiKeyInput" aria-label="Mostra chiave UNIT3D">
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
+                  <circle cx="12" cy="12" r="3.5"></circle>
+                </svg>
+              </button>
             </div>
           </div>
-          <div class="field">
-            <label for="settingsMkbrrWorkersInput">Workers mkbrr</label>
-            <input
-              id="settingsMkbrrWorkersInput"
-              type="number"
-              min="0"
-              step="1"
-              placeholder="1 (0=Auto)"
-            />
-          </div>
         </div>
-        <div class="row">
+        <div class="row settings-row">
           <label class="checkbox">
-            <input id="settingsTorrentPrivateToggle" type="checkbox" checked />
-            Torrent privato (default)
+            <input id="unit3dAnonymousToggle" type="checkbox" />
+            Upload anonimo
           </label>
+          <label class="checkbox">
+            <input id="unit3dPersonalReleaseToggle" type="checkbox" />
+            Personal release
+          </label>
+          <label class="checkbox">
+            <input id="unit3dModQueueToggle" type="checkbox" />
+            Coda moderazione
+          </label>
+        </div>
+        <div class="row">
+          <div class="hint">PID e API key sono usati per l’upload automatico (Step 3).</div>
         </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
@@ -590,33 +605,20 @@
             Ometti tag -NoGroup in file/cartelle
           </label>
         </div>
-
-        <div class="row">
-          <div class="field">
-            <label for="settingsBdinfoPathInput">Percorso BDInfo (opzionale)</label>
-            <div class="input-with-action">
-              <input id="settingsBdinfoPathInput" type="text" placeholder="Seleziona BDInfoCLI.exe" />
-              <button id="browseBdinfoPathBtn" class="secondary small" type="button">Sfoglia</button>
-            </div>
-            <div class="hint">Puoi scaricarlo <a href="https://github.com/Audionut/BDInfoCLI-ng/releases" data-external="https://github.com/Audionut/BDInfoCLI-ng/releases">QUI</a>.</div>
-          </div>
-        </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
         <h3 class="settings-title">Screenshot & Image Host</h3>
         <div class="row settings-grid">
           <div class="field">
-            <label for="ffmpegPathInput">Percorso FFmpeg</label>
-            <div class="input-with-action">
-              <input id="ffmpegPathInput" type="text" placeholder="Seleziona ffmpeg.exe" />
-              <button id="browseFfmpegBtn" class="secondary small" type="button">Sfoglia</button>
-            </div>
-            <div id="ffmpegHint" class="hint"></div>
-          </div>
-          <div class="field">
             <label for="screenshotsCountInput">Numero screenshot</label>
             <input id="screenshotsCountInput" type="number" min="2" max="12" step="1" placeholder="6" />
           </div>
+        </div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="screenshotTonemapToggle" type="checkbox" checked />
+            Tonemapping screenshot HDR &rarr; SDR
+          </label>
         </div>
         <div class="row settings-grid">
           <div class="field">
@@ -672,8 +674,52 @@
         </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
-        <h3 class="settings-title">MKV Tags (MKVToolNix)</h3>
+        <h3 class="settings-title">Creazione torrent</h3>
         <div class="row">
+          <div class="field">
+            <label for="settingsMkbrrPathInput">Percorso mkbrr (opzionale)</label>
+            <div class="input-with-action">
+              <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
+              <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+          </div>
+          <div class="field">
+            <label for="settingsMkbrrWorkersInput">Workers mkbrr</label>
+            <input
+              id="settingsMkbrrWorkersInput"
+              type="number"
+              min="0"
+              step="1"
+              placeholder="1 (0=Auto)"
+            />
+          </div>
+        </div>
+        <div class="row">
+          <label class="checkbox">
+            <input id="settingsTorrentPrivateToggle" type="checkbox" checked />
+            Torrent privato (default)
+          </label>
+        </div>
+      </div>
+      <div class="settings-block" data-settings-scope="all">
+        <h3 class="settings-title">Tools</h3>
+        <div class="row settings-grid">
+          <div class="field">
+            <label for="ffmpegPathInput">Percorso FFmpeg</label>
+            <div class="input-with-action">
+              <input id="ffmpegPathInput" type="text" placeholder="Seleziona ffmpeg.exe" />
+              <button id="browseFfmpegBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+            <div id="ffmpegHint" class="hint"></div>
+          </div>
+          <div class="field">
+            <label for="settingsBdinfoPathInput">Percorso BDInfo (opzionale)</label>
+            <div class="input-with-action">
+              <input id="settingsBdinfoPathInput" type="text" placeholder="Seleziona BDInfoCLI.exe" />
+              <button id="browseBdinfoPathBtn" class="secondary small" type="button">Sfoglia</button>
+            </div>
+            <div class="hint">Puoi scaricarlo <a href="https://github.com/Audionut/BDInfoCLI-ng/releases" data-external="https://github.com/Audionut/BDInfoCLI-ng/releases">QUI</a>.</div>
+          </div>
           <div class="field">
             <label for="settingsMkvpropeditPathInput">Percorso mkvpropedit (opzionale)</label>
             <div class="input-with-action">
@@ -682,49 +728,6 @@
             </div>
             <div class="hint">Lascia vuoto per usare mkvpropedit dal PATH di sistema.</div>
           </div>
-        </div>
-      </div>
-      <div class="settings-block" data-settings-scope="all">
-        <h3 class="settings-title">Upload API (UNIT3D)</h3>
-        <div class="row settings-grid">
-          <div class="field">
-            <label for="unit3dBaseUrlInput">Base URL</label>
-            <input id="unit3dBaseUrlInput" type="text" placeholder="https://shareisland.org" />
-          </div>
-          <div class="field">
-            <label for="unit3dApiKeyInput">API Key</label>
-            <div class="input-with-icon">
-              <input id="unit3dApiKeyInput" type="password" placeholder="API key UNIT3D" />
-              <button class="icon-button key-verify" type="button" data-service="unit3d" data-input="unit3dApiKeyInput" data-base="unit3dBaseUrlInput" aria-label="Verifica chiave UNIT3D">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M5 12l4 4 10-10"></path>
-                </svg>
-              </button>
-              <button class="icon-button" type="button" data-target="unit3dApiKeyInput" aria-label="Mostra chiave UNIT3D">
-                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                  <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z"></path>
-                  <circle cx="12" cy="12" r="3.5"></circle>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-        <div class="row settings-row">
-          <label class="checkbox">
-            <input id="unit3dAnonymousToggle" type="checkbox" />
-            Upload anonimo
-          </label>
-          <label class="checkbox">
-            <input id="unit3dPersonalReleaseToggle" type="checkbox" />
-            Personal release
-          </label>
-          <label class="checkbox">
-            <input id="unit3dModQueueToggle" type="checkbox" />
-            Coda moderazione
-          </label>
-        </div>
-        <div class="row">
-          <div class="hint">Usata solo per l’upload automatico (Step 3).</div>
         </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
@@ -1199,6 +1202,32 @@
                   </div>
                   <div class="field">
                     <input id="uploadReleaseNotesInput" type="text" placeholder="Aggiungi note da inserire in release notes" />
+                  </div>
+                </section>
+                <section id="uploadEncodeExtrasSection" class="upload-section full hidden">
+                  <div class="section-header">
+                    <h3>Extra Encode (opzionale)</h3>
+                  </div>
+                  <div class="field">
+                    <label class="checkbox">
+                      <input id="uploadIncludeSourceToggle" type="checkbox" />
+                      Vuoi inserire la sorgente?
+                    </label>
+                    <input id="uploadSourceInput" type="text" placeholder="Es. Disclosure Day 2026 1080p EUR Blu-ray AVC TrueHD 7.1 Atmos-CYBER | (Thanks!)" />
+                  </div>
+                  <div class="field">
+                    <label class="checkbox">
+                      <input id="uploadIncludeComparisonToggle" type="checkbox" />
+                      Vuoi inserire la comparazione degli screen?
+                    </label>
+                    <input id="uploadComparisonInput" type="text" placeholder="URL comparazione, es. https://slow.pics/c/..." />
+                  </div>
+                  <div class="field">
+                    <label class="checkbox">
+                      <input id="uploadIncludeEncodeLogToggle" type="checkbox" />
+                      Vuoi inserire il log dell'encode?
+                    </label>
+                    <textarea id="uploadEncodeLogInput" rows="4" placeholder="Incolla il log x264/x265"></textarea>
                   </div>
                 </section>
                 <section class="upload-section full">

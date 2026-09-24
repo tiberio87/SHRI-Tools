@@ -1297,6 +1297,14 @@ export function createUploadKit(deps) {
     if (tmdbId) {
       lines += `[size=11][color=#FFFFFF]TMDb: https://www.themoviedb.org/${type}/${tmdbId}[/color][/size]\n`;
     }
+    const tvdbSeriesId = state.metadata?.tvdbSeriesId || '';
+    if (type === 'tv' && tvdbSeriesId) {
+      const tvdbSlug = state.metadata?.tvdbSeriesSlug;
+      const tvdbLink = tvdbSlug
+        ? `https://www.thetvdb.com/series/${tvdbSlug}`
+        : `https://www.thetvdb.com/?tab=series&id=${tvdbSeriesId}`;
+      lines += `[size=11][color=#FFFFFF]TheTVDB: ${tvdbLink}[/color][/size]\n`;
+    }
     lines += '\n';
     return lines;
   }
@@ -1362,6 +1370,46 @@ export function createUploadKit(deps) {
     return '--- FILM ---';
   }
 
+  function isEncodeRelease(form) {
+    return String(form?.format || '').toLowerCase() === 'encode';
+  }
+
+  function buildEncodeExtrasSection(form) {
+    if (!isEncodeRelease(form)) {
+      return '';
+    }
+    const blocks = [];
+    const source = ui.uploadIncludeSourceToggle?.checked
+      ? (ui.uploadSourceInput?.value.trim() || '')
+      : '';
+    if (source) {
+      blocks.push(
+        `[size=13][b][color=#e8024b]--- SORGENTE ---[/color][/b][/size]\n[size=11][color=#FFFFFF]Sorgente...: ${source}[/color][/size]`
+      );
+    }
+    const comparison = ui.uploadIncludeComparisonToggle?.checked
+      ? (ui.uploadComparisonInput?.value.trim() || '')
+      : '';
+    if (comparison) {
+      const tag = (form.tag || '').replace(/^-/, '').trim() || 'iSlaNd';
+      blocks.push(
+        `[size=13][b][color=#e8024b]--- COMPARAZIONE ---[/color][/b][/size]\n[size=11][color=#FFFFFF]Source vs ${tag}: ${comparison}[/color][/size]`
+      );
+    }
+    const encodeLog = ui.uploadIncludeEncodeLogToggle?.checked
+      ? (ui.uploadEncodeLogInput?.value.trim() || '')
+      : '';
+    if (encodeLog) {
+      blocks.push(
+        `[size=13][b][color=#e8024b]--- ENCODE NOTES ---[/color][/b][/size]\n[size=11][color=#FFFFFF]${encodeLog}[/color][/size]`
+      );
+    }
+    if (!blocks.length) {
+      return '';
+    }
+    return `\n\n${blocks.join('\n\n')}`;
+  }
+
   function buildUploadDescription(form, opts = {}) {
     const title = state.metadata?.title || form.title || 'Unknown';
     const rawSummary = state.metadata?.tmdbOverview || '';
@@ -1374,6 +1422,7 @@ export function createUploadKit(deps) {
     const logoSection = logoUrl ? `[center][img=250]${logoUrl}[/img][/center]\n` : '';
     const linksSection = buildLinksSection(form);
     const releaseNotesSection = buildReleaseNotesSection(form);
+    const encodeExtrasSection = buildEncodeExtrasSection(form);
     const shoutouts = buildShoutouts(form);
     const categoryHeader = buildCategoryHeader(form);
 
@@ -1425,7 +1474,7 @@ ${summary}
 
 [center][size=13][b][color=#e8024b]--- SCREENS ---[/color][/b][/size][/center]
 ${screens}
-${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSection}
+${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSection}${encodeExtrasSection}
 
 [size=13][b][color=#e8024b]--- SHOUTOUTS ---[/color][/b][/size]
 [size=11][color=#FFFFFF]${shoutouts}[/color][/size]
@@ -2194,6 +2243,10 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     ui.uploadDescText.value = descText || '-';
     refreshUploadDescription();
 
+    if (ui.uploadEncodeExtrasSection) {
+      ui.uploadEncodeExtrasSection.classList.toggle('hidden', !isEncodeRelease(form));
+    }
+
     setUploadKitCollapsed('uploadMiSection', true);
     setUploadKitCollapsed('uploadDescSection', true);
     return true;
@@ -2439,6 +2492,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       videoPath,
       ffmpegPath: settings.ffmpegPath,
       count: settings.screenshotsCount >= 2 ? settings.screenshotsCount : 6,
+      tonemap: settings.screenshotTonemap !== false,
       primaryHost: settings.imageHostPrimary || 'imgbb',
       fallbackHost: settings.imageHostFallback || 'ptscreens',
       imgbbKey: settings.imgbbKey || '',
@@ -2702,6 +2756,22 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         refreshUploadDescription();
       });
     }
+    [
+      ui.uploadIncludeSourceToggle,
+      ui.uploadSourceInput,
+      ui.uploadIncludeComparisonToggle,
+      ui.uploadComparisonInput,
+      ui.uploadIncludeEncodeLogToggle,
+      ui.uploadEncodeLogInput
+    ].forEach((el) => {
+      if (!el) {
+        return;
+      }
+      const evt = el.type === 'checkbox' ? 'change' : 'input';
+      el.addEventListener(evt, () => {
+        refreshUploadDescription();
+      });
+    });
     if (ui.previewUploadDescBtn) {
       ui.previewUploadDescBtn.addEventListener('click', () => {
         if (!ui.bbcodePreviewModal || !ui.bbcodePreviewContent) {

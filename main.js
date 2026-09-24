@@ -2395,7 +2395,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
     const scaledHeight = Math.round(height * hSar);
     const needsScale = Boolean(scaledWidth && scaledHeight) &&
       (Math.round(width) !== scaledWidth || Math.round(height) !== scaledHeight);
-    let tonemapEnabled = detectHdr(mediaInfo);
+    let tonemapEnabled = detectHdr(mediaInfo) && payload?.tonemap !== false;
     let tonemapApplied = false;
 
     sendProgress({
