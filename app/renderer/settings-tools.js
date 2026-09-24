@@ -25,6 +25,7 @@ const DEFAULT_SETTINGS = {
   torrentPrivate: true,
   ffmpegPath: _isLinux ? '/usr/bin/ffmpeg' : '',
   screenshotsCount: 6,
+  screenshotTonemap: true,
   imageHostPrimary: 'imgbb',
   imageHostFallback: 'ptscreens',
   imgbbKey: '',
@@ -612,6 +613,9 @@ export function createSettingsTools({
     if (ui.screenshotsCountInput) {
       ui.screenshotsCountInput.value = settings.screenshotsCount || 6;
     }
+    if (ui.screenshotTonemapToggle) {
+      ui.screenshotTonemapToggle.checked = settings.screenshotTonemap !== false;
+    }
     if (ui.imageHostPrimarySelect) {
       ui.imageHostPrimarySelect.value = settings.imageHostPrimary || 'imgbb';
     }
@@ -774,6 +778,7 @@ export function createSettingsTools({
       autoNoGroupTag: Boolean(ui.autoNoGroupTagToggle?.checked),
       ffmpegPath: ui.ffmpegPathInput?.value.trim() || '',
       screenshotsCount: Math.max(2, parseInt(ui.screenshotsCountInput?.value || '6', 10) || 6),
+      screenshotTonemap: Boolean(ui.screenshotTonemapToggle?.checked),
       imageHostPrimary: ui.imageHostPrimarySelect?.value || 'imgbb',
       imageHostFallback: ui.imageHostFallbackSelect?.value || 'ptscreens',
       unit3dBaseUrl: ui.unit3dBaseUrlInput?.value.trim() || 'https://shareisland.org',

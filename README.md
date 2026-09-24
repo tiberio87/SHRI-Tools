@@ -19,8 +19,14 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 ### 1. Rinomina file/cartelle
 - Auto-detect di titolo, anno, stagione, episodio dal nome file e dai metadata.
 - Parsing MediaInfo/BDInfo per codec, audio, HDR e sorgente.
-- Rilevamento automatico del tag servizio streaming dal nome originale (NF, AMZN, HMAX, ATVP, DSNP, ecc.) — il tag viene sempre preservato nel nome rinominato anche se non selezionato manualmente.
+- Rilevamento automatico del tag servizio streaming dal nome originale (NF, AMZN, HMAX, ATVP, DSNP, Paramount+, TIMvision, Rakuten TV, Pluto TV, MUBI, ecc.) — il tag viene sempre preservato nel nome rinominato anche se non selezionato manualmente.
 - **Popup disambiguazione formato**: quando il formato non è rilevabile dal nome file o da MediaInfo, compare un popup che chiede di selezionare il formato corretto (WEB-DL, WEBRip, Encode, Remux, Full Disc). Se si seleziona Encode viene chiesta anche la sorgente (BluRay, UHD BluRay, WEBRip, DVD, HDTV). Il popup compare anche per contenuti rilevati come Encode che potrebbero essere WEB-DL (es. NF/HMAX).
+- **Full Disc Blu-ray/DVD**: naming dedicato, regione obbligatoria, gestione della traccia audio italiana e rilevamento del tag gruppo dal nome cartella. Distinzione automatica della sorgente **DVD5/DVD9**.
+- **Tag UHD** applicato nel titolo solo per i formati da disco in 2160p.
+- **Ordinamento dei tag lingua audio** in base alla qualità della traccia.
+- **Rinomina automatica dei singoli episodi** all'interno delle cartelle di stagioni serie TV.
+- **Rilevamento release Scene** (srrdb + predb): riconosce automaticamente le release Scene.
+- Correzione automatica di titolo/anno quando il titolo inizia con un anno.
 - Gestione multi-episode (es. S01E01-E02).
 - Anteprima del piano di rinomina prima di applicare.
 - Regole di naming allineate al tracker (vedi `docs/RULES.txt`).
@@ -32,6 +38,12 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Dupe check automatico sul tracker con filtri dedicati.
 - Upload diretto al tracker + invio al client torrent (qBittorrent / Transmission).
 - Compatibile con **qBittorrent 5.2.0+** (gestione cookie `QBT_SID_<porta>`, header CSRF, risposta HTTP 204).
+- **Seed immediato**: opzione `skip_checking` per inviare il torrent a qBittorrent già in seeding, senza ricontrollo hash dei file locali.
+- **Flag upload avanzati** nella schermata di conferma: Upload anonimo, Personal release, Coda moderazione, Internal, Refundable, Free (%), Double Upload.
+- **Mapping percorsi multipli** locale/remoto quando il client gira su un'altra macchina.
+- **BBCode con link tracker**: la sezione LINKS include IMDb, TMDb e — per le serie TV — TheTVDB.
+- **Sezioni Extra Encode**: per le release **Encode** (x264/x265) il wizard chiede se inserire nel BBCode la **sorgente** (`--- SORGENTE ---`), la **comparazione screen** (`--- COMPARAZIONE ---`, es. link slow.pics) e il **log dell'encode** (`--- ENCODE NOTES ---`). Le sezioni compaiono tra RELEASE NOTES e SHOUTOUTS solo quando compilate.
+- La sezione BBCode resta aperta durante la modifica della descrizione.
 - **Cartella job**: al termine del flusso viene creata automaticamente una cartella `<OutputDir>/<Titolo>/` con file a nome fisso:
   - `BASE.torrent` — torrent generato localmente
   - `MEDIAINFO.txt` — output MediaInfo completo
@@ -56,7 +68,8 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 
 ### 4. Generazione Screenshot
 - Cattura automatica dei frame tramite FFmpeg con tempi ottimizzati.
-- Supporto HDR con tonemapping automatico (fallback senza tonemap se necessario).
+- **Generazione automatica in background** alla selezione del file/cartella, senza attendere l'ultimo step del wizard.
+- Supporto HDR con **tonemapping HDR → SDR** (abilitabile/disabilitabile dalle Impostazioni) e fallback senza tonemap se necessario.
 - Upload su imgBB o PTScreens con fallback automatico.
 - I file screenshot vengono nominati automaticamente con il titolo e l'anno del contenuto (es. `Cast_Away_1996_01.png`, `The_Flash_2022_01.png`).
 - **Pannello log diagnostico** (Impostazioni -> Apri log) per analizzare ogni fase: durata rilevata, calcolo tempi, esito cattura e upload per ogni screen.
@@ -75,47 +88,59 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 
 ## Impostazioni (panoramica)
 
-### Generali (valide in tutte le modalita`)
+Dalla versione 5.0 le impostazioni sono riorganizzate in sezioni tematiche che seguono il flusso di lavoro.
+
+### Generale
+- **Lingua preferita**: influenza titoli/descrizioni recuperate (es. `it-IT`).
+- **Cartella output job**: destinazione di torrent, screenshot e BBCode.
+
+### Tracker & Upload (Shareisland / Unit3D)
+- **PID announce**: passkey per la generazione del `.torrent`.
+- **Base URL**: URL del tracker di destinazione.
+- **API key**: necessaria per upload, analisi e dupe check.
+- **Upload anonimo** / **Personal release** / **Coda moderazione**: flag upload.
+
+### Metadata API
 - **TMDb key**: auto-matching e metadata film/serie.
 - **TVDb key**: auto-matching per serie/episodi.
 - **OMDb key**: fallback metadata via IMDb.
-- **Lingua preferita**: influenza titoli/descrizioni recuperate (es. `it-IT`).
-- **Lista servizi**: elenco personalizzato servizi streaming per dropdown.
-- **Lista tag gruppo**: elenco personalizzato tag gruppo.
-- **Auto-detect tag gruppo**: rileva il tag dal nome file/cartella.
-- **Auto-NoGroup**: applica NoGroup se non esiste un tag gruppo.
+
+### Impostazioni di rinomina
 - **Lingua nei nomi cartella / file**: include o omette il tag lingua.
 - **Ometti NoGroup in file/cartelle**: non scrive NoGroup nei nomi (resta valido nei titoli).
-- **Auto-apply suggerimenti**: applica automaticamente i suggerimenti di formato/source/codec.
-- **Percorso BDInfo**: eseguibile BDInfo (per dischi Blu-ray).
-- **Percorso FFmpeg**: necessario per la generazione degli screenshot.
+
+### Screenshot & Image Host
 - **Numero screenshot**: quanti frame catturare.
+- **Tonemapping screenshot HDR → SDR**: abilita/disabilita la conversione tonemap sugli screen HDR.
 - **Host immagini primario / fallback**: imgBB o PTScreens.
 - **imgBB key** / **PTScreens key**: API key per l'upload degli screenshot.
 
-### Modalita` Integrata (Upload Wizard)
-- **Unit3D Base URL**: URL del tracker di destinazione.
-- **Unit3D API key**: necessaria per upload, analisi e dupe check.
-- **Upload anonimo** / **Personal release** / **Mod queue**: flag upload.
-- **Override category / type / resolution**: mapping custom ID Unit3D.
-- **Announce URL / passkey**: per la generazione del `.torrent`.
-- **Output torrent**: cartella di destinazione del file `.torrent`.
-- **mkbrr path** / **mkbrr workers**: eseguibile e parallelismo per hashing.
-- **Torrent private**: flag private nel `.torrent`.
-- **Client torrent**: qBittorrent o Transmission.
+### Creazione torrent
+- **mkbrr path** / **mkbrr workers**: eseguibile e parallelismo per l'hashing.
+- **Torrent privato**: flag private nel `.torrent`.
 
+### Tools
+- **Percorso FFmpeg**: necessario per la generazione degli screenshot.
+- **Percorso BDInfo**: eseguibile BDInfo (per dischi Blu-ray).
+- **Percorso mkvpropedit**: MKVToolNix per i tag MKV.
+
+### Client torrent
 **qBittorrent**
 - Host / Porta / HTTPS, Username / Password.
 - Save path, Categoria (supporto **categorie multiple** separate da virgola), Auto-start.
-- Path mapping locale/remoto (quando il client e` su altra macchina).
+- **Salta controllo hash (seed immediato)**.
+- Mapping percorsi **multipli** locale/remoto (quando il client e` su altra macchina).
 
 **Transmission**
 - Host / Porta / HTTPS, Username / Password.
 - Save path, Auto-start.
-- Path mapping locale/remoto.
+- Mapping percorsi multipli locale/remoto.
 
 ### Impostazioni avanzate
-- Override ID Unit3D (category/type/resolution) se l'istanza ha ID diversi dagli standard SHRI.
+- **Lista servizi**: elenco personalizzato servizi streaming per il dropdown.
+- **Lista tag gruppo**: elenco personalizzato tag gruppo.
+- **Auto-detect tag gruppo** / **Auto-NoGroup** / **Auto-apply suggerimenti**.
+- **Override ID Unit3D** (category/type/resolution) se l'istanza ha ID diversi dagli standard SHRI.
 - Dettagli path mapping client remoto.
 
 ---
@@ -215,6 +240,17 @@ services:
     environment:
       - PUID=1000   # sostituisci con il tuo UID
       - PGID=1000   # sostituisci con il tuo GID
+```
+
+#### Timezone (TZ)
+
+Per avere log e orari coerenti con il tuo fuso orario, imposta la variabile `TZ` nel file `docker-compose.override.yml`:
+
+```yaml
+services:
+  shri-tools:
+    environment:
+      - TZ=Europe/Rome
 ```
 
 #### Volumi personalizzati
