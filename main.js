@@ -396,6 +396,37 @@ function detectHdr(mediaInfo) {
   );
 }
 
+// Dolby Vision Profile 5: il frame è codificato in spazio IPT-PQ-C2, una matrice
+// che zscale non sa convertire → serve forzare la matrice d'ingresso a BT.2020.
+function isDolbyVisionProfile5(mediaInfo) {
+  const videoTrack = getVideoTrack(mediaInfo);
+  if (!videoTrack) {
+    return false;
+  }
+  const hdr = [
+    videoTrack.HDR_Format,
+    videoTrack.HDR_Format_String,
+    videoTrack['HDR format'],
+    videoTrack['HDR format string']
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const matrix = String(
+    videoTrack.matrix_coefficients ||
+    videoTrack.MatrixCoefficients ||
+    videoTrack['Matrix coefficients'] ||
+    ''
+  ).toLowerCase();
+  const isProfile5 =
+    hdr.includes('profile 5') ||
+    hdr.includes('dvhe.05') ||
+    hdr.includes('dvhe.5') ||
+    hdr.includes('.05.');
+  const isIpt = matrix.includes('ipt');
+  return isIpt || (hdr.includes('dolby vision') && isProfile5);
+}
+
 async function verifyImgbbKey(apiKey) {
   const form = createFormData();
   form.append('image', TINY_GIF_BASE64);
@@ -1078,14 +1109,31 @@ function deriveScreenshotBase(title) {
   return value.split(/[.\s]+/).slice(0, 3).join('_').replace(/[^a-zA-Z0-9_]/g, '') || 'shot';
 }
 
-function buildScreenshotFilters({ scaleWidth, scaleHeight, tonemap }) {
+// Filtro libplacebo: tonemap HDR/Dolby Vision → SDR bt709 su GPU (legge l'RPU DV).
+const LIBPLACEBO_TONEMAP = 'libplacebo=tonemapping=bt.2390:colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv:format=yuv420p';
+
+function buildScreenshotFilters({ scaleWidth, scaleHeight, tonemap, dvProfile5, libplacebo }) {
   const filters = [];
+  if (tonemap && libplacebo) {
+    // libplacebo fa scaling e color management insieme; unica via corretta per il DV Profile 5.
+    filters.push(LIBPLACEBO_TONEMAP);
+    if (scaleWidth && scaleHeight) {
+      filters.push(`scale=${scaleWidth}:${scaleHeight}`);
+    }
+    filters.push('format=rgb24');
+    return filters.join(',');
+  }
   if (scaleWidth && scaleHeight) {
     filters.push(`scale=${scaleWidth}:${scaleHeight}`);
   }
   if (tonemap) {
+    // DV Profile 5: forza la matrice d'ingresso a 2020_ncl (il frame è taggato
+    // IPT-PQ-C2, non gestita da zscale), altrimenti la conversione fallisce.
+    const toLinear = dvProfile5
+      ? 'zscale=min=2020_ncl:transfer=linear'
+      : 'zscale=transfer=linear';
     filters.push(
-      'zscale=transfer=linear',
+      toLinear,
       'tonemap=tonemap=hable:desat=0',
       'zscale=transfer=bt709'
     );
@@ -1099,6 +1147,9 @@ async function captureScreenshot(ffmpegPath, videoPath, outputPath, timestamp, o
   const seekMode = options?.seekMode === 'accurate' ? 'accurate' : 'fast';
   const skipFrame = String(options?.skipFrame || '').trim();
   const args = ['-hide_banner', '-y'];
+  if (options?.tonemap && options?.libplacebo) {
+    args.push('-init_hw_device', 'vulkan');
+  }
   if (skipFrame) {
     args.push('-skip_frame', skipFrame);
   }
@@ -2420,10 +2471,12 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       (Math.round(width) !== scaledWidth || Math.round(height) !== scaledHeight);
     let tonemapEnabled = detectHdr(mediaInfo) && payload?.tonemap !== false;
     let tonemapApplied = false;
+    const dvProfile5 = isDolbyVisionProfile5(mediaInfo);
+    const libplacebo = Boolean(payload?.libplacebo);
 
     sendProgress({
       stage: 'debug',
-      message: `[screens:scale] source=${width}x${height} PAR=${par.toFixed(4)} DAR=${dar.toFixed(4)} scaled=${scaledWidth}x${scaledHeight} needsScale=${needsScale} hdr=${tonemapEnabled} seekMode=${payload?.seekMode || 'fast'} skipFrame=${payload?.skipFrame || '(none)'}`
+      message: `[screens:scale] source=${width}x${height} PAR=${par.toFixed(4)} DAR=${dar.toFixed(4)} scaled=${scaledWidth}x${scaledHeight} needsScale=${needsScale} hdr=${tonemapEnabled} dvP5=${dvProfile5} libplacebo=${libplacebo} seekMode=${payload?.seekMode || 'fast'} skipFrame=${payload?.skipFrame || '(none)'}`
     });
 
     const images = [];
@@ -2437,6 +2490,8 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
         scaleWidth: needsScale ? scaledWidth : 0,
         scaleHeight: needsScale ? scaledHeight : 0,
         tonemap: tonemapEnabled,
+        dvProfile5,
+        libplacebo,
         skipFrame: payload?.skipFrame || '',
         seekMode: payload?.seekMode || ''
       };
@@ -2607,7 +2662,8 @@ ipcMain.handle('probe-video', async (_event, payload) => {
       duration,
       scaledWidth: needsScale ? scaledWidth : 0,
       scaledHeight: needsScale ? scaledHeight : 0,
-      isHdr: detectHdr(mediaInfo)
+      isHdr: detectHdr(mediaInfo),
+      dvProfile5: isDolbyVisionProfile5(mediaInfo)
     };
   } catch (error) {
     return { ok: false, error: String(error.message || error) };
@@ -2627,11 +2683,25 @@ ipcMain.handle('preview-frame', async (_event, payload) => {
   const tmpDir = path.join(app.getPath('temp'), 'shri-tools', 'preview');
   await fs.mkdir(tmpDir, { recursive: true });
   const outPath = path.join(tmpDir, `preview_${Date.now()}.jpg`);
+  const dvProfile5 = Boolean(payload?.dvProfile5);
+  const libplacebo = Boolean(payload?.libplacebo);
   const runPreview = async (tonemap) => {
-    const filters = tonemap
-      ? ['zscale=transfer=linear', 'tonemap=tonemap=hable:desat=0', 'zscale=transfer=bt709', `scale=${previewWidth}:-2`]
-      : [`scale=${previewWidth}:-2`];
+    const useLibplacebo = tonemap && libplacebo;
+    const toLinear = dvProfile5
+      ? 'zscale=min=2020_ncl:transfer=linear'
+      : 'zscale=transfer=linear';
+    let filters;
+    if (useLibplacebo) {
+      filters = [LIBPLACEBO_TONEMAP, `scale=${previewWidth}:-2`];
+    } else if (tonemap) {
+      filters = [toLinear, 'tonemap=tonemap=hable:desat=0', 'zscale=transfer=bt709', `scale=${previewWidth}:-2`];
+    } else {
+      filters = [`scale=${previewWidth}:-2`];
+    }
     const args = ['-hide_banner', '-y'];
+    if (useLibplacebo) {
+      args.push('-init_hw_device', 'vulkan');
+    }
     if (skipFrame) {
       args.push('-skip_frame', skipFrame);
     }
@@ -2674,6 +2744,8 @@ ipcMain.handle('capture-frame', async (_event, payload) => {
   const ffmpegPath = payload?.ffmpegPath || '';
   const timeSec = Math.max(0, Number(payload?.timeSec) || 0);
   const tonemap = Boolean(payload?.tonemap);
+  const dvProfile5 = Boolean(payload?.dvProfile5);
+  const libplacebo = Boolean(payload?.libplacebo);
   const skipFrame = String(payload?.skipFrame || '').trim();
   const scaleWidth = Number(payload?.scaleWidth) || 0;
   const scaleHeight = Number(payload?.scaleHeight) || 0;
@@ -2691,7 +2763,7 @@ ipcMain.handle('capture-frame', async (_event, payload) => {
   const base = deriveScreenshotBase(screensJobTitle);
   const fileName = `${base}_manual_${Date.now()}.png`;
   const filePath = path.join(outputDir, fileName);
-  const options = { scaleWidth, scaleHeight, tonemap, skipFrame, seekMode: payload?.seekMode || 'fast' };
+  const options = { scaleWidth, scaleHeight, tonemap, dvProfile5, libplacebo, skipFrame, seekMode: payload?.seekMode || 'fast' };
   try {
     await captureScreenshot(ffmpegPath, videoPath, filePath, timeSec, options);
   } catch (error) {

@@ -2221,6 +2221,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         ffmpegPath: settings.ffmpegPath,
         timeSec,
         tonemap: manualProbe.isHdr && settings.screenshotTonemap !== false,
+        dvProfile5: Boolean(manualProbe.dvProfile5),
+        libplacebo: settings.screenshotLibplacebo === true,
         skipFrame: manualProbe.skipFrame || '',
         previewWidth: 720
       }), 40000, 'anteprima frame');
@@ -2278,6 +2280,8 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         ffmpegPath: settings.ffmpegPath,
         timeSec,
         tonemap: manualProbe.isHdr && settings.screenshotTonemap !== false,
+        dvProfile5: Boolean(manualProbe.dvProfile5),
+        libplacebo: settings.screenshotLibplacebo === true,
         skipFrame: manualProbe.skipFrame || '',
         seekMode: 'fast',
         scaleWidth: manualProbe.scaledWidth || 0,
@@ -2768,6 +2772,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       ffmpegPath: settings.ffmpegPath,
       count: settings.screenshotsCount >= 2 ? settings.screenshotsCount : 6,
       tonemap: settings.screenshotTonemap !== false,
+      libplacebo: settings.screenshotLibplacebo === true,
       primaryHost: settings.imageHostPrimary || 'imgbb',
       fallbackHost: settings.imageHostFallback || 'ptscreens',
       imgbbKey: settings.imgbbKey || '',
