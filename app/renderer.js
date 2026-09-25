@@ -22,6 +22,7 @@ import {
   isBdmvStructure
 } from './renderer/parsing-tools.js';
 import { createUploadKit } from './renderer/upload-kit.js';
+import { createUploadHistory } from './renderer/upload-history.js';
 import { createMetadataTools, hasCjkChars } from './renderer/metadata.js';
 import { createRenameTools } from './renderer/rename.js';
 import { getParentPath, getPathBaseName, stripExtension } from './renderer/path-utils.js';
@@ -2277,6 +2278,16 @@ const uploadKit = createUploadKit({
 });
 uploadKit.initUploadKitEvents();
 
+// ===== Storico upload =====
+const uploadHistory = createUploadHistory({
+  ui,
+  showToast,
+  copyToClipboard,
+  logDebug
+});
+uploadHistory.init();
+
+
 // ===== Scene detection (srrdb + predb) =====
 const sceneManager = createSceneManager({
   ui,
@@ -2967,7 +2978,8 @@ if (ui.qbitTestBtn) {
         port: settings.qbitPort,
         https: settings.qbitHttps,
         username: settings.qbitUsername,
-        password: settings.qbitPassword
+        password: settings.qbitPassword,
+        allowInsecure: settings.qbitAllowSelfSigned === true
       });
       if (result?.ok) {
         const version = result.version ? ` (v${result.version})` : '';

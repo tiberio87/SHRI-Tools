@@ -998,7 +998,8 @@ export function createUploadKit(deps) {
           savePath,
           category: qbitCategory,
           paused: settings.qbitAutoStart === false,
-          skipChecking: settings.qbitSkipChecking !== false
+          skipChecking: settings.qbitSkipChecking !== false,
+          allowInsecure: settings.qbitAllowSelfSigned === true
         });
         logDebug?.('qbit add payload', {
           baseUrl,
@@ -1964,6 +1965,31 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         writeLastUpload(snapshot);
         updateReopenUploadButton();
         openPostUploadModal(result, settings);
+        try {
+          let trackerHost = settings.unit3dBaseUrl || '';
+          try { trackerHost = new URL(settings.unit3dBaseUrl).host; } catch {}
+          const historyEntry = {
+            title: snapshot.title || summary.title || '',
+            trackerBaseUrl: settings.unit3dBaseUrl || '',
+            tracker: trackerHost,
+            status: 'success',
+            statusText: result?.message || 'Upload completato.',
+            moderation: Boolean(flagOverrides.modQueue),
+            torrentPageUrl: snapshot.torrentPageUrl || '',
+            downloadUrl: snapshot.downloadUrl || '',
+            category: summary.category || '',
+            type: summary.type || '',
+            resolution: summary.resolution || '',
+            ids: { tmdb: data.tmdb, imdb: data.imdb, tvdb: data.tvdb, mal: data.mal },
+            bbcode: data.description || '',
+            mediainfo: data.mediainfo || data.bdinfo || '',
+            isBdInfo: Boolean(data.bdinfo && !data.mediainfo),
+            screenshots: (state.screenshots || [])
+              .filter((s) => s.ok && s.displayUrl)
+              .map((s) => ({ displayUrl: s.displayUrl || '', viewerUrl: s.viewerUrl || '', host: s.host || '' }))
+          };
+          window.api?.addUploadHistory?.(historyEntry).catch(() => {});
+        } catch {}
       } else {
         const error = result?.error || result?.message || 'Errore upload.';
         const details = result?.details ? `\n${result.details}` : '';

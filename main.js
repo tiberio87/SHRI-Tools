@@ -5,6 +5,7 @@ const path = require('path');
 const os = require('os');
 const fs = require('fs/promises');
 const fsSync = require('fs');
+const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { buildUaScreenshotTimes, buildUaScreenshotTimesDebug } = require('./app/screenshot-times');
 const { loadStoredSecrets, saveStoredSecrets } = require('./app/secret-store');
@@ -731,7 +732,9 @@ function _httpRequest(url, options, body) {
       path: url.pathname + (url.search || ''),
       method: options.method || 'GET',
       headers: options.headers || {},
-      rejectUnauthorized: false
+      // Validazione certificato attiva di default; disattivabile solo su richiesta
+      // esplicita (client con certificato self-signed).
+      rejectUnauthorized: options.rejectUnauthorized !== false
     }, (res) => {
       let data = '';
       res.on('data', chunk => { data += chunk; });
@@ -743,7 +746,7 @@ function _httpRequest(url, options, body) {
   });
 }
 
-async function loginQbittorrent(baseUrl, username, password) {
+async function loginQbittorrent(baseUrl, username, password, allowInsecure = false) {
   const body = new URLSearchParams({ username, password }).toString();
   let res;
   try {
@@ -754,7 +757,8 @@ async function loginQbittorrent(baseUrl, username, password) {
         'content-length': Buffer.byteLength(body),
         'referer': baseUrl,
         'origin': baseUrl
-      }
+      },
+      rejectUnauthorized: !allowInsecure
     }, body);
   } catch (err) {
     return { ok: false, error: err.message };
@@ -785,14 +789,14 @@ async function loginQbittorrent(baseUrl, username, password) {
   return { ok: true, cookie: `${match[1]}=${match[2]}` };
 }
 
-async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused, skipChecking }) {
+async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused, skipChecking, allowInsecure }) {
   if (!baseUrl || !username || !password) {
     return { ok: false, error: 'Credenziali qBittorrent mancanti.' };
   }
   if (!torrentPath) {
     return { ok: false, error: 'File .torrent mancante.' };
   }
-  const login = await loginQbittorrent(baseUrl, username, password);
+  const login = await loginQbittorrent(baseUrl, username, password, allowInsecure === true);
   if (!login.ok) {
     return login;
   }
@@ -863,7 +867,7 @@ function buildQbitBaseUrl(host, port, useHttps) {
   return `${protocol}://${hostTrim}${portPart}`;
 }
 
-async function testQbittorrentConnection({ host, port, https, username, password }) {
+async function testQbittorrentConnection({ host, port, https, username, password, allowInsecure }) {
   const baseUrl = buildQbitBaseUrl(host, port, https);
   if (!baseUrl) {
     return { ok: false, error: 'Host qBittorrent non valido.' };
@@ -871,7 +875,7 @@ async function testQbittorrentConnection({ host, port, https, username, password
   if (!username || !password) {
     return { ok: false, error: 'Credenziali mancanti.' };
   }
-  const login = await loginQbittorrent(baseUrl, username, password);
+  const login = await loginQbittorrent(baseUrl, username, password, allowInsecure === true);
   if (!login.ok) {
     return login;
   }
@@ -2811,6 +2815,71 @@ ipcMain.handle('delete-file', async (_event, filePath) => {
     return { ok: false, error: String(error.message || error) };
   }
 });
+
+// --- Storico upload: persistito in userData/upload-history.json ------------
+function getUploadHistoryPath() {
+  return path.join(app.getPath('userData'), 'upload-history.json');
+}
+
+async function readUploadHistory() {
+  try {
+    const raw = await fs.readFile(getUploadHistoryPath(), 'utf8');
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function writeUploadHistory(list) {
+  const filePath = getUploadHistoryPath();
+  await fs.mkdir(path.dirname(filePath), { recursive: true });
+  await fs.writeFile(filePath, JSON.stringify(list, null, 2));
+}
+
+ipcMain.handle('upload-history:get', async () => {
+  try {
+    return { ok: true, entries: await readUploadHistory() };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error), entries: [] };
+  }
+});
+
+ipcMain.handle('upload-history:add', async (_event, entry) => {
+  try {
+    const list = await readUploadHistory();
+    const item = {
+      id: entry?.id || crypto.randomUUID(),
+      createdAt: entry?.createdAt || Date.now(),
+      ...entry
+    };
+    list.unshift(item);
+    await writeUploadHistory(list);
+    return { ok: true, entry: item };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('upload-history:delete', async (_event, id) => {
+  try {
+    const list = await readUploadHistory();
+    await writeUploadHistory(list.filter((e) => e && e.id !== id));
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('upload-history:clear', async () => {
+  try {
+    await writeUploadHistory([]);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
 
 ipcMain.handle('reupload-screenshots', async (_event, payload) => {
   const images = payload?.images || [];
