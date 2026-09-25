@@ -620,6 +620,15 @@ function setWizardStep(index) {
   if (clamped === 0) {
     updateWizardRulesCheck(getFormState());
     dupeCheck?.runWizardDupeCheck?.();
+    // La generazione screenshot in background parte entrando nell'Upload Wizard
+    // (step Rules Check), non alla selezione del file: così non va in conflitto
+    // con la rinomina file/cartella (FFmpeg terrebbe occupato il file) ed evita
+    // lavoro inutile per chi usa solo il tool di rinomina.
+    if (state.mainVideo && !isDiscStructure()) {
+      uploadKit.autoGenerateScreens?.().catch((err) => {
+        logDebug('screens: auto-generazione fallita', { error: err?.message || String(err) });
+      });
+    }
   } else if (clamped === 1) {
     prepareTorrentStep();
   } else if (clamped === 2) {
@@ -2238,16 +2247,9 @@ async function loadPath(targetPath) {
   await sceneManager.runSceneDetection();
   mkvTagger?.syncMetadata();
   mkvTagger?.syncTitle();
-  // Finalizza il piano di rinomina (format/source/nome) prima di generare gli
-  // screenshot, così vengono salvati nella stessa cartella job del torrent.
+  // Finalizza il piano di rinomina (format/source/nome) prima di eventuali
+  // operazioni successive.
   await refreshPreview();
-  // Avvia la generazione screenshot in background appena il file/cartella è
-  // analizzato (esclusi i Full Disc BDMV/VIDEO_TS che richiedono la scelta della playlist).
-  if (scan.mainVideo && !isDiscStructure()) {
-    uploadKit.autoGenerateScreens?.().catch((err) => {
-      logDebug('screens: auto-generazione fallita', { error: err?.message || String(err) });
-    });
-  }
   schedulePreview();
 }
 
