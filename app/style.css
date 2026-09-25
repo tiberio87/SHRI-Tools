@@ -2141,6 +2141,10 @@ body.light .badge.error {
   z-index: 145;
 }
 
+#bbcodePreviewModal {
+  z-index: 150;
+}
+
 .modal.hidden {
   display: none;
 }
@@ -2928,6 +2932,241 @@ textarea.text-output:not([readonly]) {
 .wizard-step[data-step="2"] {
   padding-bottom: 0;
 }
+
+/* ===== Storico upload ===== */
+.history-modal {
+  max-height: 90vh;
+  overflow: hidden;
+}
+
+.history-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.history-body {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.history-list {
+  overflow-y: auto;
+  min-height: 0;
+  border-right: 1px solid var(--border);
+  padding-right: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-list-empty,
+.history-empty,
+.history-muted {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  cursor: pointer;
+}
+
+.history-item:hover {
+  border-color: var(--accent);
+}
+
+.history-item.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset;
+}
+
+.history-item-title {
+  font-weight: 600;
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.history-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.history-item-date,
+.history-item-tracker {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.history-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.history-badge.success {
+  color: #0a7c2f;
+  background: rgba(16, 185, 129, 0.15);
+}
+
+.history-badge.moderation {
+  color: #b45309;
+  background: rgba(245, 158, 11, 0.15);
+}
+
+.history-badge.error {
+  color: #b91c1c;
+  background: rgba(239, 68, 68, 0.15);
+}
+
+.history-detail {
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  padding-right: 6px;
+  min-width: 0;
+}
+
+.history-detail-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.history-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.history-detail-header h3 {
+  margin: 0;
+  word-break: break-word;
+}
+
+.history-detail-meta {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  font-size: 12px;
+}
+
+.history-status-text {
+  margin: 0;
+  font-size: 13px;
+}
+
+.history-links {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.history-section h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+
+.history-section {
+  min-width: 0;
+}
+
+.history-detail-header,
+.history-detail-meta,
+.history-links,
+.history-ids {
+  min-width: 0;
+}
+
+.history-ids {
+  margin: 0;
+  font-size: 13px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.history-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.history-shot img {
+  width: 140px;
+  height: auto;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  display: block;
+}
+
+.history-bbcode-actions {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.history-collapse {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  min-width: 0;
+}
+
+.history-collapse summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.history-pre {
+  margin: 8px 0 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  max-height: 320px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.danger-outline {
+  border-color: rgba(239, 68, 68, 0.5);
+  color: #b91c1c;
+}
+
+@media (max-width: 720px) {
+  .history-body {
+    grid-template-columns: 1fr;
+  }
+  .history-list {
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    max-height: 30vh;
+  }
+}
+
 
 .upload-section {
   background: var(--surface-contrast);

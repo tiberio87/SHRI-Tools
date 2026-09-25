@@ -45,6 +45,7 @@ const DEFAULT_SETTINGS = {
   qbitUsername: '',
   qbitPassword: '',
   qbitHttps: false,
+  qbitAllowSelfSigned: false,
   qbitSavePath: '',
   qbitCategories: '',
   qbitAutoStart: true,
@@ -262,11 +263,8 @@ export function createSettingsTools({
       return;
     }
     const hasPath = Boolean(settings?.ffmpegPath);
-    if (hasPath) {
-      ui.ffmpegHint.textContent = '';
-      return;
-    }
-    ui.ffmpegHint.innerHTML = `FFmpeg non configurato. Scaricalo da <a href="https://ffmpeg.org/download.html" data-external="https://ffmpeg.org/download.html">ffmpeg.org</a> e inserisci il percorso completo del file eseguibile (es. ffmpeg.exe).`;
+    const prefix = hasPath ? '' : 'FFmpeg non configurato. ';
+    ui.ffmpegHint.innerHTML = `${prefix}Puoi scaricarlo <a href="https://github.com/BtbN/FFmpeg-Builds/releases" data-external="https://github.com/BtbN/FFmpeg-Builds/releases">QUI</a>.`;
   }
 
   function pathMapContainer(client) {
@@ -632,15 +630,6 @@ export function createSettingsTools({
     if (ui.unit3dApiKeyInput) {
       ui.unit3dApiKeyInput.value = settings.unit3dApiKey || '';
     }
-    if (ui.unit3dAnonymousToggle) {
-      ui.unit3dAnonymousToggle.checked = settings.unit3dAnonymous === true;
-    }
-    if (ui.unit3dPersonalReleaseToggle) {
-      ui.unit3dPersonalReleaseToggle.checked = settings.unit3dPersonalRelease === true;
-    }
-    if (ui.unit3dModQueueToggle) {
-      ui.unit3dModQueueToggle.checked = settings.unit3dModQueue === true;
-    }
     if (ui.unit3dCategoryOverridesInput) {
       ui.unit3dCategoryOverridesInput.value = settings.unit3dCategoryOverrides || '';
     }
@@ -668,6 +657,9 @@ export function createSettingsTools({
     }
     if (ui.qbitHttpsToggle) {
       ui.qbitHttpsToggle.checked = settings.qbitHttps === true;
+    }
+    if (ui.qbitAllowSelfSignedToggle) {
+      ui.qbitAllowSelfSignedToggle.checked = settings.qbitAllowSelfSigned === true;
     }
     if (ui.qbitSavePathInput) {
       ui.qbitSavePathInput.value = settings.qbitSavePath || '';
@@ -729,9 +721,6 @@ export function createSettingsTools({
     if (ui.settingsBdinfoPathInput) {
       ui.settingsBdinfoPathInput.value = settings.bdinfoPath || '';
     }
-    if (ui.settingsTorrentPrivateToggle) {
-      ui.settingsTorrentPrivateToggle.checked = settings.torrentPrivate !== false;
-    }
     if (ui.autoTagDetectToggle) {
       ui.autoTagDetectToggle.checked = settings.autoTagDetect !== false;
     }
@@ -788,9 +777,6 @@ export function createSettingsTools({
       imageHostFallback: ui.imageHostFallbackSelect?.value || 'ptscreens',
       unit3dBaseUrl: ui.unit3dBaseUrlInput?.value.trim() || 'https://shareisland.org',
       unit3dApiKey: ui.unit3dApiKeyInput?.value.trim() || '',
-      unit3dAnonymous: Boolean(ui.unit3dAnonymousToggle?.checked),
-      unit3dPersonalRelease: Boolean(ui.unit3dPersonalReleaseToggle?.checked),
-      unit3dModQueue: Boolean(ui.unit3dModQueueToggle?.checked),
       unit3dCategoryOverrides: ui.unit3dCategoryOverridesInput?.value.trim() || '',
       unit3dTypeOverrides: ui.unit3dTypeOverridesInput?.value.trim() || '',
       unit3dResolutionOverrides: ui.unit3dResolutionOverridesInput?.value.trim() || '',
@@ -800,6 +786,7 @@ export function createSettingsTools({
       qbitUsername: ui.qbitUsernameInput?.value.trim() || '',
       qbitPassword: ui.qbitPasswordInput?.value.trim() || '',
       qbitHttps: Boolean(ui.qbitHttpsToggle?.checked),
+      qbitAllowSelfSigned: Boolean(ui.qbitAllowSelfSignedToggle?.checked),
       qbitSavePath: ui.qbitSavePathInput?.value.trim() || '',
       qbitCategories: ui.qbitCategoriesInput?.value.trim() || '',
       qbitAutoStart: Boolean(ui.qbitAutoStartToggle?.checked),
@@ -818,7 +805,6 @@ export function createSettingsTools({
       torrentOutputDir: ui.settingsTorrentOutputInput?.value.trim() || '',
       torrentMkbrrPath: ui.settingsMkbrrPathInput?.value.trim() || '',
       torrentMkbrrWorkers: mkbrrWorkers,
-      torrentPrivate: Boolean(ui.settingsTorrentPrivateToggle?.checked),
       mkvpropeditPath: ui.settingsMkvpropeditPathInput?.value.trim() || '',
     };
   }

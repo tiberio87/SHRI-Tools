@@ -23,6 +23,7 @@
           <span class="app-health-label">Health Check</span>
           <div id="appHealthTooltip" class="app-health-tooltip"></div>
         </div>
+        <button id="openHistoryBtn" class="secondary">Storico</button>
         <button id="openSettingsBtn" class="secondary">Impostazioni</button>
         <button id="themeToggle" class="theme-toggle" type="button" aria-label="Attiva tema chiaro">
           <svg class="icon-sun" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
@@ -513,22 +514,8 @@
             </div>
           </div>
         </div>
-        <div class="row settings-row">
-          <label class="checkbox">
-            <input id="unit3dAnonymousToggle" type="checkbox" />
-            Upload anonimo
-          </label>
-          <label class="checkbox">
-            <input id="unit3dPersonalReleaseToggle" type="checkbox" />
-            Personal release
-          </label>
-          <label class="checkbox">
-            <input id="unit3dModQueueToggle" type="checkbox" />
-            Coda moderazione
-          </label>
-        </div>
         <div class="row">
-          <div class="hint">PID e API key sono usati per l’upload automatico (Step 3).</div>
+          <div class="hint">PID e API key sono usati per l’upload automatico.</div>
         </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
@@ -688,6 +675,7 @@
               <input id="settingsMkbrrPathInput" type="text" placeholder="Seleziona mkbrr.exe" />
               <button id="browseMkbrrPathBtn" class="secondary small" type="button">Sfoglia</button>
             </div>
+            <div class="hint">Puoi scaricarlo <a href="https://github.com/autobrr/mkbrr/releases" data-external="https://github.com/autobrr/mkbrr/releases">QUI</a>.</div>
           </div>
           <div class="field">
             <label for="settingsMkbrrWorkersInput">Workers mkbrr</label>
@@ -699,12 +687,6 @@
               placeholder="1 (0=Auto)"
             />
           </div>
-        </div>
-        <div class="row">
-          <label class="checkbox">
-            <input id="settingsTorrentPrivateToggle" type="checkbox" checked />
-            Torrent privato (default)
-          </label>
         </div>
       </div>
       <div class="settings-block" data-settings-scope="all">
@@ -732,7 +714,7 @@
               <input id="settingsMkvpropeditPathInput" type="text" placeholder="Seleziona mkvpropedit.exe" />
               <button id="browseMkvpropeditPathBtn" class="secondary small" type="button">Sfoglia</button>
             </div>
-            <div class="hint">Lascia vuoto per usare mkvpropedit dal PATH di sistema.</div>
+            <div class="hint">Puoi scaricarlo <a href="https://mkvtoolnix.download/downloads.html" data-external="https://mkvtoolnix.download/downloads.html">QUI</a>.</div>
           </div>
         </div>
       </div>
@@ -801,6 +783,10 @@
           <label class="checkbox">
             <input id="qbitHttpsToggle" type="checkbox" />
             Usa HTTPS
+          </label>
+          <label class="checkbox">
+            <input id="qbitAllowSelfSignedToggle" type="checkbox" />
+            Consenti certificati HTTPS self-signed
           </label>
           <label class="checkbox">
             <input id="qbitAutoStartToggle" type="checkbox" checked />
@@ -1355,6 +1341,25 @@
         <button id="closeHealthCheckBtn" class="secondary">Chiudi</button>
       </div>
       <div id="healthCheckBody" class="health-check-body"></div>
+    </div>
+  </div>
+
+  <div id="uploadHistoryModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content modal-wide history-modal">
+      <div class="modal-header">
+        <h2>Storico upload</h2>
+        <div class="history-header-actions">
+          <button id="clearHistoryBtn" class="secondary danger-outline" type="button">Svuota</button>
+          <button id="closeHistoryBtn" class="secondary" type="button">Chiudi</button>
+        </div>
+      </div>
+      <div class="history-body">
+        <div id="historyList" class="history-list"></div>
+        <div id="historyDetail" class="history-detail">
+          <p id="historyEmpty" class="history-empty">Seleziona un upload per vederne i dettagli.</p>
+        </div>
+      </div>
     </div>
   </div>
 

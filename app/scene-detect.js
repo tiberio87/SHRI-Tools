@@ -15,18 +15,27 @@ function quote(value) {
 }
 
 function decodeHtmlEntities(text) {
+  // `&amp;` va sostituito per ultimo per evitare il doppio unescape (es. `&amp;lt;`).
   return String(text || '')
-    .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#0?39;/g, "'")
     .replace(/&#x27;/gi, "'")
-    .replace(/&nbsp;/g, ' ');
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&');
 }
 
 function stripTags(html) {
-  return String(html || '').replace(/<[^>]*>/g, '');
+  let out = String(html || '');
+  let prev;
+  // Ripete finché stabile (gestisce tag annidati/ricostruiti) e infine
+  // rimuove eventuali `<`/`>` orfani rimasti da tag non chiusi.
+  do {
+    prev = out;
+    out = out.replace(/<[^>]*>/g, '');
+  } while (out !== prev);
+  return out.replace(/[<>]/g, '');
 }
 
 async function readJsonCache(file) {
