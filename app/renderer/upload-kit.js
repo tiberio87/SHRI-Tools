@@ -56,6 +56,11 @@ export function createUploadKit(deps) {
   let screensProgressRequestId = '';
   let screensBusy = false;
   let screensSourcePath = '';
+  let manualProbe = null;
+  let manualProbePath = '';
+  let manualPreviewSeq = 0;
+  let manualPreviewTimer = null;
+  let manualBusy = false;
   let uploadTitleOverride = '';
   let uploadTitleBase = '';
   let uploadTitleFallback = false;
@@ -2035,22 +2040,272 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       const row = document.createElement('div');
       row.className = `screens-item ${shot.ok ? 'ok' : 'error'}`;
       const label = document.createElement('div');
-      label.textContent = shot.ok ? `Screenshot ${index + 1}` : `Screenshot ${index + 1} (errore)`;
+      label.className = 'screens-label';
+      const base = shot.ok ? `Screenshot ${index + 1}` : `Screenshot ${index + 1} (errore)`;
+      label.textContent = shot.manual ? `${base} · manuale` : base;
       const status = document.createElement('div');
       status.className = 'status';
       status.textContent = shot.ok ? shot.host.toUpperCase() : 'Errore';
       const url = document.createElement('div');
       url.className = 'screens-url';
       url.textContent = shot.ok ? (shot.displayUrl || '') : (shot.error || '');
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'screens-remove';
+      remove.textContent = '✕';
+      remove.title = 'Elimina screenshot';
+      remove.setAttribute('aria-label', 'Elimina screenshot');
+      remove.addEventListener('click', (event) => {
+        event.stopPropagation();
+        deleteScreenshot(index);
+      });
       row.appendChild(label);
       row.appendChild(url);
       row.appendChild(status);
+      row.appendChild(remove);
       if (shot.ok && shot.viewerUrl) {
         row.setAttribute('data-external', shot.viewerUrl);
         row.classList.add('fetch-link');
       }
       ui.screensList.appendChild(row);
     });
+  }
+
+  // Persiste gli screenshot correnti su image_data.json per il ripristino job.
+  function persistScreenshotsData() {
+    const settings = loadSettings();
+    const jobDir = buildTrackerOutputDir(settings, getJobFileTitle());
+    if (!jobDir) {
+      return;
+    }
+    const sep = jobDir.includes('\\') ? '\\' : '/';
+    const screensJson = JSON.stringify({ screenshots: state.screenshots, meta: state.screenshotsMeta });
+    try { window.api?.saveFileDirect({ filePath: `${jobDir}${sep}image_data.json`, content: screensJson }); } catch {}
+  }
+
+  function updateScreensHintCount() {
+    if (!ui.screensHint) {
+      return;
+    }
+    if (!state.screenshots.length) {
+      ui.screensHint.textContent = '';
+      return;
+    }
+    const okCount = state.screenshots.filter((s) => s.ok).length;
+    ui.screensHint.textContent = `Screenshot disponibili: ${okCount}/${state.screenshots.length}`;
+  }
+
+  function deleteScreenshot(index) {
+    if (index < 0 || index >= state.screenshots.length) {
+      return;
+    }
+    const [removed] = state.screenshots.splice(index, 1);
+    const localPath = String(removed?.filePath || '').trim();
+    if (localPath) {
+      window.api.deleteFile(localPath).catch(() => {});
+    }
+    renderScreensList();
+    refreshUploadDescription();
+    updateScreensHintCount();
+    persistScreenshotsData();
+  }
+
+  // Rete di sicurezza: risolve con errore se una chiamata IPC non risponde.
+  function withTimeout(promise, ms, label) {
+    return Promise.race([
+      promise,
+      new Promise((resolve) => setTimeout(() => resolve({ ok: false, error: `Timeout ${label} (${ms / 1000}s). Riprova o riavvia l'app.` }), ms))
+    ]);
+  }
+
+  function formatHms(totalSeconds) {
+    const sec = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+
+  function updateManualTimeLabel() {
+    if (!ui.manualCaptureTime || !ui.manualCaptureSlider) {
+      return;
+    }
+    const current = Number(ui.manualCaptureSlider.value) || 0;
+    const total = manualProbe?.duration || 0;
+    ui.manualCaptureTime.textContent = `${formatHms(current)} / ${formatHms(total)}`;
+  }
+
+  async function toggleManualCapture() {
+    if (!ui.manualCapturePanel) {
+      return;
+    }
+    const willOpen = ui.manualCapturePanel.classList.contains('hidden');
+    ui.manualCapturePanel.classList.toggle('hidden', !willOpen);
+    if (willOpen) {
+      await initManualCapture();
+    }
+  }
+
+  async function initManualCapture() {
+    const settings = loadSettings();
+    const form = getFormState();
+    const source = resolveScreensSource(form);
+    if (!source.videoPath) {
+      if (ui.screensHint) ui.screensHint.textContent = 'Nessun file video disponibile per la cattura manuale.';
+      return;
+    }
+    if (!settings.ffmpegPath) {
+      if (ui.screensHint) ui.screensHint.textContent = 'FFmpeg non configurato.';
+      return;
+    }
+    // Riusa la sonda esistente se la sorgente non è cambiata.
+    if (manualProbe && manualProbePath === source.videoPath) {
+      updateManualTimeLabel();
+      return;
+    }
+    if (ui.manualCaptureLoading) ui.manualCaptureLoading.classList.remove('hidden');
+    let probe = null;
+    try {
+      probe = await withTimeout(window.api.probeVideo({
+        videoPath: source.videoPath,
+        ffmpegPath: settings.ffmpegPath
+      }), 40000, 'analisi video');
+    } catch (err) {
+      probe = { ok: false, error: `Handler non disponibile (riavvia l'app): ${err?.message || err}` };
+    }
+    if (!probe?.ok) {
+      if (ui.manualCaptureLoading) ui.manualCaptureLoading.classList.add('hidden');
+      if (ui.screensHint) ui.screensHint.textContent = probe?.error || 'Impossibile analizzare il video.';
+      logDebug?.('manual-capture: probe error', { error: probe?.error || 'unknown' });
+      return;
+    }
+    manualProbe = { ...probe, ...source };
+    manualProbePath = source.videoPath;
+    if (ui.manualCaptureSlider) {
+      ui.manualCaptureSlider.min = '0';
+      ui.manualCaptureSlider.max = String(Math.max(1, Math.floor(probe.duration)));
+      ui.manualCaptureSlider.step = '1';
+      ui.manualCaptureSlider.value = String(Math.floor(probe.duration * 0.1));
+    }
+    updateManualTimeLabel();
+    await loadManualPreview(Number(ui.manualCaptureSlider?.value) || 0);
+  }
+
+  function scheduleManualPreview(timeSec) {
+    if (manualPreviewTimer) {
+      clearTimeout(manualPreviewTimer);
+    }
+    manualPreviewTimer = setTimeout(() => {
+      loadManualPreview(timeSec);
+    }, 220);
+  }
+
+  async function loadManualPreview(timeSec) {
+    if (!manualProbe) {
+      return;
+    }
+    const settings = loadSettings();
+    if (!settings.ffmpegPath) {
+      return;
+    }
+    const seq = ++manualPreviewSeq;
+    if (ui.manualCaptureLoading) {
+      ui.manualCaptureLoading.textContent = 'Caricamento frame...';
+      ui.manualCaptureLoading.classList.remove('hidden');
+    }
+    let result = null;
+    try {
+      result = await withTimeout(window.api.previewFrame({
+        videoPath: manualProbe.videoPath,
+        ffmpegPath: settings.ffmpegPath,
+        timeSec,
+        tonemap: manualProbe.isHdr && settings.screenshotTonemap !== false,
+        skipFrame: manualProbe.skipFrame || '',
+        previewWidth: 720
+      }), 40000, 'anteprima frame');
+    } catch (err) {
+      result = { ok: false, error: `Handler non disponibile (riavvia l'app): ${err?.message || err}` };
+    }
+    // Ignora risposte obsolete (scrubbing rapido).
+    if (seq !== manualPreviewSeq) {
+      return;
+    }
+    if (result?.ok && result.dataUrl && ui.manualCaptureImg) {
+      ui.manualCaptureImg.onload = () => {
+        if (ui.manualCaptureLoading) ui.manualCaptureLoading.classList.add('hidden');
+      };
+      ui.manualCaptureImg.onerror = () => {
+        if (ui.manualCaptureLoading) {
+          ui.manualCaptureLoading.classList.remove('hidden');
+          ui.manualCaptureLoading.textContent = 'Immagine non renderizzata.';
+        }
+      };
+      ui.manualCaptureImg.src = result.dataUrl;
+    } else {
+      const msg = result?.error || 'Anteprima frame non disponibile.';
+      console.error('[manual-capture] preview error:', msg);
+      logDebug?.('manual-capture: preview error', { timeSec, error: msg });
+      // Mostra l'errore dentro il riquadro anteprima invece di lasciarlo nero.
+      if (ui.manualCaptureLoading) {
+        ui.manualCaptureLoading.classList.remove('hidden');
+        ui.manualCaptureLoading.textContent = `Errore anteprima: ${msg}`;
+      }
+      if (ui.screensHint) ui.screensHint.textContent = msg;
+    }
+  }
+
+  async function captureManualFrame() {
+    if (manualBusy || !manualProbe) {
+      return;
+    }
+    const settings = loadSettings();
+    if (!settings.ffmpegPath) {
+      return;
+    }    const primaryHost = settings.imageHostPrimary || 'imgbb';
+    const primaryKey = primaryHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
+    if (!primaryKey) {
+      showToast?.('Host immagini non configurato.', 'warning');
+      return;
+    }
+    const timeSec = Number(ui.manualCaptureSlider?.value) || 0;
+    manualBusy = true;
+    if (ui.manualCaptureShotBtn) ui.manualCaptureShotBtn.disabled = true;
+    if (ui.screensHint) ui.screensHint.textContent = `Cattura frame a ${formatHms(timeSec)}...`;
+    try {
+      const result = await window.api.captureFrame({
+        videoPath: manualProbe.videoPath,
+        ffmpegPath: settings.ffmpegPath,
+        timeSec,
+        tonemap: manualProbe.isHdr && settings.screenshotTonemap !== false,
+        skipFrame: manualProbe.skipFrame || '',
+        seekMode: 'fast',
+        scaleWidth: manualProbe.scaledWidth || 0,
+        scaleHeight: manualProbe.scaledHeight || 0,
+        primaryHost,
+        imgbbKey: settings.imgbbKey || '',
+        ptscreensKey: settings.ptscreensKey || '',
+        screensOutputDir: buildTrackerOutputDir(settings, getJobFileTitle()),
+        screensJobTitle: getJobFileTitle()
+      });
+      if (result?.ok && result.image) {
+        state.screenshots.push(result.image);
+        if (!state.screenshotsMeta) {
+          state.screenshotsMeta = { tonemapped: false };
+        }
+        renderScreensList();
+        refreshUploadDescription();
+        updateScreensHintCount();
+        persistScreenshotsData();
+        showToast?.(`Frame catturato (${formatHms(timeSec)}).`, 'success');
+      } else {
+        if (ui.screensHint) ui.screensHint.textContent = result?.error || 'Cattura frame non riuscita.';
+        showToast?.('Cattura frame non riuscita.', 'error');
+      }
+    } finally {
+      manualBusy = false;
+      if (ui.manualCaptureShotBtn) ui.manualCaptureShotBtn.disabled = false;
+    }
   }
 
   function buildScreensBbcode() {
@@ -2135,6 +2390,15 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       if (screensSourcePath !== state.targetPath) {
         state.screenshots = [];
         state.screenshotsMeta = null;
+      }
+      // Reset del selettore frame manuale per la nuova sorgente.
+      manualProbe = null;
+      manualProbePath = '';
+      if (ui.manualCapturePanel) {
+        ui.manualCapturePanel.classList.add('hidden');
+      }
+      if (ui.manualCaptureImg) {
+        ui.manualCaptureImg.removeAttribute('src');
       }
     }
     // Popup repack solo per stagioni TV/anime (chiedi solo alla prima apertura per ogni cartella)
@@ -2411,49 +2675,13 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     return header + out.join('\n');
   }
 
-  async function runScreenshots(options = {}) {
-    const { auto = false } = options;
-    if (screensBusy) {
-      return;
-    }
-    const settings = loadSettings();
-    const form = getFormState();
-    let videoPath = state.mainVideo || state.videoFiles[0];
-    if (!videoPath) {
-      if (!auto) {
-        ui.screensHint.textContent = 'Nessun file video disponibile.';
-      }
-      return;
-    }
-    if (!settings.ffmpegPath) {
-      if (auto) {
-        showToast?.('FFmpeg non configurato: screenshot automatici non generati.', 'warning');
-      } else {
-        ui.screensHint.textContent = 'FFmpeg non configurato.';
-      }
-      return;
-    }
-    if (auto) {
-      const primaryHost = settings.imageHostPrimary || 'imgbb';
-      const primaryKey = primaryHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
-      if (!primaryKey) {
-        showToast?.('Host immagini non configurato: screenshot automatici non generati.', 'warning');
-        return;
-      }
-    }
-
-    screensBusy = true;
-    if (ui.generateScreensBtn) {
-      ui.generateScreensBtn.disabled = true;
-    }
-    screensProgressRequestId = String(Date.now());
-    resetScreensProgress();
-    setScreensProgress(0);
-    setScreensStage('start');
-    ui.screensHint.textContent = 'Generazione screenshot in corso...';
-    showToast?.('Generazione screenshot iniziata...', 'info');
+  // Risolve il file video sorgente e lo skipFrame per gli screenshot,
+  // gestendo il caso Full Disc (playlist BDInfo più lunga). Riusato da
+  // generazione automatica e cattura manuale.
+  function resolveScreensSource(form) {
+    let videoPath = state.mainVideo || state.videoFiles[0] || '';
     let skipFrame = '';
-    let seekMode = 'fast';
+    const seekMode = 'fast';
     if (isFullDisc(form) && state.bdInfoRaw) {
       const files = parseBdInfoFiles(state.bdInfoRaw, state.bdInfoSelectedPlaylist);
       if (files.length) {
@@ -2487,6 +2715,53 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       }
       skipFrame = detectBdInfoSkipFrame(state.bdInfoRaw);
     }
+    return { videoPath, skipFrame, seekMode };
+  }
+
+  async function runScreenshots(options = {}) {
+    const { auto = false } = options;
+    if (screensBusy) {
+      return;
+    }
+    const settings = loadSettings();
+    const form = getFormState();
+    const source = resolveScreensSource(form);
+    const videoPath = source.videoPath;
+    if (!videoPath) {
+      if (!auto) {
+        ui.screensHint.textContent = 'Nessun file video disponibile.';
+      }
+      return;
+    }
+    if (!settings.ffmpegPath) {
+      if (auto) {
+        showToast?.('FFmpeg non configurato: screenshot automatici non generati.', 'warning');
+      } else {
+        ui.screensHint.textContent = 'FFmpeg non configurato.';
+      }
+      return;
+    }
+    if (auto) {
+      const primaryHost = settings.imageHostPrimary || 'imgbb';
+      const primaryKey = primaryHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
+      if (!primaryKey) {
+        showToast?.('Host immagini non configurato: screenshot automatici non generati.', 'warning');
+        return;
+      }
+    }
+
+    screensBusy = true;
+    if (ui.generateScreensBtn) {
+      ui.generateScreensBtn.disabled = true;
+    }
+    screensProgressRequestId = String(Date.now());
+    resetScreensProgress();
+    setScreensProgress(0);
+    setScreensStage('start');
+    ui.screensHint.textContent = 'Generazione screenshot in corso...';
+    showToast?.('Generazione screenshot iniziata...', 'info');
+    const skipFrame = source.skipFrame;
+    const seekMode = source.seekMode;
 
     const payload = {
       videoPath,
@@ -2617,6 +2892,15 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       return;
     }
     if (state.screenshots && state.screenshots.some((s) => s.ok)) {
+      return;
+    }
+    // Riusa gli screenshot già generati in un workflow precedente (image_data.json).
+    await restoreJobStateIfNeeded();
+    if (state.screenshots && state.screenshots.some((s) => s.ok)) {
+      renderScreensList();
+      refreshUploadDescription();
+      updateScreensHintCount();
+      logDebug?.('screens: riuso screenshot esistenti', { count: state.screenshots.length });
       return;
     }
     logDebug?.('screens: auto-generazione avviata', { targetPath: state.targetPath });
@@ -2833,6 +3117,37 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
 
     if (ui.generateScreensBtn) {
       ui.generateScreensBtn.addEventListener('click', generateScreenshots);
+    }
+    if (ui.manualCaptureBtn) {
+      ui.manualCaptureBtn.addEventListener('click', () => {
+        toggleManualCapture();
+      });
+    }
+    if (ui.manualCaptureSlider) {
+      ui.manualCaptureSlider.addEventListener('input', () => {
+        updateManualTimeLabel();
+        scheduleManualPreview(Number(ui.manualCaptureSlider.value) || 0);
+      });
+    }
+    if (ui.manualCaptureShotBtn) {
+      ui.manualCaptureShotBtn.addEventListener('click', () => {
+        captureManualFrame();
+      });
+    }
+    if (ui.manualCapturePanel) {
+      ui.manualCapturePanel.querySelectorAll('.manual-capture-steps button[data-seek]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (!ui.manualCaptureSlider) {
+            return;
+          }
+          const delta = Number(btn.dataset.seek) || 0;
+          const max = Number(ui.manualCaptureSlider.max) || 0;
+          const next = Math.max(0, Math.min(max, (Number(ui.manualCaptureSlider.value) || 0) + delta));
+          ui.manualCaptureSlider.value = String(next);
+          updateManualTimeLabel();
+          scheduleManualPreview(next);
+        });
+      });
     }
     if (ui.copyScreensBbcodeBtn) {
       ui.copyScreensBbcodeBtn.addEventListener('click', () => {

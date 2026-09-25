@@ -51,6 +51,7 @@ const TINY_GIF_BASE64 = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA
 // ===== Runtime state =====
 let mediaInfoInstance = null;
 let mediaInfoTextInstance = null;
+let analyzeMediaChain = Promise.resolve();
 let createTorrentModule = null;
 const transmissionSessions = new Map();
 const bdinfoJobs = new Map();
@@ -194,6 +195,15 @@ async function getMediaInfoText() {
 }
 
 async function analyzeMedia(filePath) {
+  // MediaInfo usa un'istanza WASM singleton non rientrante: serializza le
+  // chiamate per evitare deadlock quando arrivano richieste concorrenti
+  // (es. generazione screenshot automatica + probe cattura manuale).
+  const run = analyzeMediaChain.then(() => analyzeMediaInternal(filePath));
+  analyzeMediaChain = run.then(() => {}, () => {});
+  return run;
+}
+
+async function analyzeMediaInternal(filePath) {
   const stats = await fs.stat(filePath);
   const handle = await fs.open(filePath, 'r');
   const size = stats.size;
@@ -1053,6 +1063,19 @@ function buildScreenshotTimes(duration, count) {
   const end = duration * 0.9;
   const step = safeCount > 1 ? (end - start) / (safeCount - 1) : 0;
   return Array.from({ length: safeCount }, (_, index) => start + step * index);
+}
+
+function deriveScreenshotBase(title) {
+  const value = String(title || '').trim();
+  if (!value || value === 'job') return 'shot';
+  const yearMatch = value.match(/\b((?:19|20)\d{2})\b/);
+  if (yearMatch) {
+    const yearIndex = value.indexOf(yearMatch[0]);
+    const titlePart = value.substring(0, yearIndex).replace(/[.\s]+$/, '');
+    const safe = titlePart.replace(/[.\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
+    return safe ? `${safe}_${yearMatch[0]}` : `title_${yearMatch[0]}`;
+  }
+  return value.split(/[.\s]+/).slice(0, 3).join('_').replace(/[^a-zA-Z0-9_]/g, '') || 'shot';
 }
 
 function buildScreenshotFilters({ scaleWidth, scaleHeight, tonemap }) {
@@ -2405,18 +2428,7 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
 
     const images = [];
     let index = 0;
-    const screenshotBase = (() => {
-      const title = screensJobTitle;
-      if (!title || title === 'job') return 'shot';
-      const yearMatch = title.match(/\b((?:19|20)\d{2})\b/);
-      if (yearMatch) {
-        const yearIndex = title.indexOf(yearMatch[0]);
-        const titlePart = title.substring(0, yearIndex).replace(/[.\s]+$/, '');
-        const safe = titlePart.replace(/[.\s]+/g, '_').replace(/[^a-zA-Z0-9_]/g, '');
-        return safe ? `${safe}_${yearMatch[0]}` : `title_${yearMatch[0]}`;
-      }
-      return title.split(/[.\s]+/).slice(0, 3).join('_').replace(/[^a-zA-Z0-9_]/g, '') || 'shot';
-    })();
+    const screenshotBase = deriveScreenshotBase(screensJobTitle);
     for (const time of times) {
       index += 1;
       const fileName = `${screenshotBase}_${String(index).padStart(2, '0')}.png`;
@@ -2551,6 +2563,180 @@ ipcMain.handle('generate-screenshots', async (_event, payload) => {
       : errMsg;
     sendProgress({ stage: 'error', error: friendlyError });
     return { ok: false, error: friendlyError };
+  }
+});
+
+// Analizza il video una sola volta per il selettore frame manuale:
+// restituisce durata e parametri di scala/HDR riusati da preview e cattura.
+ipcMain.handle('probe-video', async (_event, payload) => {
+  const videoPath = payload?.videoPath || '';
+  const ffmpegPath = payload?.ffmpegPath || '';
+  if (!videoPath) {
+    return { ok: false, error: 'File video mancante.' };
+  }
+  if (!ffmpegPath) {
+    return { ok: false, error: 'FFmpeg non configurato.' };
+  }
+  const ffprobePath = resolveFfprobePath(ffmpegPath);
+  if (!fsSync.existsSync(ffprobePath)) {
+    return { ok: false, error: 'FFprobe non trovato vicino a FFmpeg.' };
+  }
+  try {
+    const duration = await getVideoDurationSeconds(ffprobePath, videoPath);
+    let mediaInfo = null;
+    try {
+      mediaInfo = await analyzeMedia(videoPath);
+    } catch {
+      mediaInfo = null;
+    }
+    const videoTrack = getVideoTrack(mediaInfo);
+    const width = parseNumber(videoTrack?.Width, 1920);
+    const height = parseNumber(videoTrack?.Height, 1080);
+    const par = parseNumber(videoTrack?.PixelAspectRatio, 1);
+    const dar = parseRatio(
+      videoTrack?.DisplayAspectRatio,
+      width && height ? width / height : 16 / 9
+    );
+    const { wSar, hSar } = deriveSar(width, height, par, dar);
+    const scaledWidth = Math.round(width * wSar);
+    const scaledHeight = Math.round(height * hSar);
+    const needsScale = Boolean(scaledWidth && scaledHeight) &&
+      (Math.round(width) !== scaledWidth || Math.round(height) !== scaledHeight);
+    return {
+      ok: true,
+      duration,
+      scaledWidth: needsScale ? scaledWidth : 0,
+      scaledHeight: needsScale ? scaledHeight : 0,
+      isHdr: detectHdr(mediaInfo)
+    };
+  } catch (error) {
+    return { ok: false, error: String(error.message || error) };
+  }
+});
+
+// Estrae un singolo frame ridimensionato per l'anteprima veloce (JPEG base64).
+ipcMain.handle('preview-frame', async (_event, payload) => {
+  const videoPath = payload?.videoPath || '';
+  const ffmpegPath = payload?.ffmpegPath || '';
+  const timeSec = Math.max(0, Number(payload?.timeSec) || 0);
+  const skipFrame = String(payload?.skipFrame || '').trim();
+  const previewWidth = Math.max(160, Math.min(1280, Number(payload?.previewWidth) || 720));
+  if (!videoPath || !ffmpegPath) {
+    return { ok: false, error: 'Parametri mancanti.' };
+  }
+  const tmpDir = path.join(app.getPath('temp'), 'shri-tools', 'preview');
+  await fs.mkdir(tmpDir, { recursive: true });
+  const outPath = path.join(tmpDir, `preview_${Date.now()}.jpg`);
+  const runPreview = async (tonemap) => {
+    const filters = tonemap
+      ? ['zscale=transfer=linear', 'tonemap=tonemap=hable:desat=0', 'zscale=transfer=bt709', `scale=${previewWidth}:-2`]
+      : [`scale=${previewWidth}:-2`];
+    const args = ['-hide_banner', '-y'];
+    if (skipFrame) {
+      args.push('-skip_frame', skipFrame);
+    }
+    args.push(
+      '-ss', String(timeSec),
+      '-i', videoPath,
+      '-map', '0:v:0',
+      '-an', '-sn',
+      '-frames:v', '1',
+      '-vf', filters.join(','),
+      '-q:v', '4',
+      '-update', '1',
+      outPath
+    );
+    await runProcess(ffmpegPath, args);
+    const buffer = await fs.readFile(outPath);
+    fs.unlink(outPath).catch(() => {});
+    return `data:image/jpeg;base64,${buffer.toString('base64')}`;
+  };
+  try {
+    const dataUrl = await runPreview(Boolean(payload?.tonemap));
+    return { ok: true, dataUrl };
+  } catch (error) {
+    if (payload?.tonemap) {
+      try {
+        const dataUrl = await runPreview(false);
+        return { ok: true, dataUrl };
+      } catch (err2) {
+        return { ok: false, error: String(err2.message || err2) };
+      }
+    }
+    return { ok: false, error: String(error.message || error) };
+  }
+});
+
+// Cattura full-res il frame scelto manualmente (stessa scala/tonemap degli
+// screenshot automatici), lo salva nella cartella job e lo carica sull'host.
+ipcMain.handle('capture-frame', async (_event, payload) => {
+  const videoPath = payload?.videoPath || '';
+  const ffmpegPath = payload?.ffmpegPath || '';
+  const timeSec = Math.max(0, Number(payload?.timeSec) || 0);
+  const tonemap = Boolean(payload?.tonemap);
+  const skipFrame = String(payload?.skipFrame || '').trim();
+  const scaleWidth = Number(payload?.scaleWidth) || 0;
+  const scaleHeight = Number(payload?.scaleHeight) || 0;
+  const primaryHost = payload?.primaryHost || 'imgbb';
+  const imgbbKey = payload?.imgbbKey || '';
+  const ptscreensKey = payload?.ptscreensKey || '';
+  const screensOutputDir = String(payload?.screensOutputDir || '').trim();
+  const screensJobTitle = String(payload?.screensJobTitle || '').trim();
+  if (!videoPath || !ffmpegPath) {
+    return { ok: false, error: 'Parametri mancanti.' };
+  }
+  const outputDir = screensOutputDir ||
+    path.join(app.getPath('temp'), 'shri-tools', 'screenshots', String(Date.now()));
+  await fs.mkdir(outputDir, { recursive: true });
+  const base = deriveScreenshotBase(screensJobTitle);
+  const fileName = `${base}_manual_${Date.now()}.png`;
+  const filePath = path.join(outputDir, fileName);
+  const options = { scaleWidth, scaleHeight, tonemap, skipFrame, seekMode: payload?.seekMode || 'fast' };
+  try {
+    await captureScreenshot(ffmpegPath, videoPath, filePath, timeSec, options);
+  } catch (error) {
+    if (tonemap) {
+      try {
+        await captureScreenshot(ffmpegPath, videoPath, filePath, timeSec, { ...options, tonemap: false });
+      } catch (err2) {
+        return { ok: false, error: String(err2.message || err2) };
+      }
+    } else {
+      return { ok: false, error: String(error.message || error) };
+    }
+  }
+  const upload = await uploadWithFallback(filePath, primaryHost, null, { imgbbKey, ptscreensKey });
+  return {
+    ok: upload.ok,
+    error: upload.error || '',
+    image: {
+      ok: upload.ok,
+      host: upload.host,
+      filePath,
+      displayUrl: upload.displayUrl || '',
+      viewerUrl: upload.viewerUrl || '',
+      rawUrl: upload.rawUrl || '',
+      error: upload.error || '',
+      manual: true,
+      timeSec
+    }
+  };
+});
+
+// Elimina un file locale (usato quando si rimuove uno screenshot dalla lista).
+ipcMain.handle('delete-file', async (_event, filePath) => {
+  const target = String(filePath || '').trim();
+  if (!target) {
+    return { ok: false, error: 'Percorso mancante.' };
+  }
+  try {
+    await fs.unlink(target);
+    return { ok: true };
+  } catch (error) {
+    if (error && error.code === 'ENOENT') {
+      return { ok: true };
+    }
+    return { ok: false, error: String(error.message || error) };
   }
 });
 

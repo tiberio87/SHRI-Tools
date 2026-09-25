@@ -1235,6 +1235,7 @@
                     <h3>Screenshots</h3>
                     <div class="section-actions">
                       <button id="generateScreensBtn" class="primary small" type="button">Genera & Carica</button>
+                      <button id="manualCaptureBtn" class="secondary small" type="button">Cattura manuale</button>
                       <button id="copyScreensBbcodeBtn" class="secondary small" type="button">Copia BBCode Screens</button>
                     </div>
                   </div>
@@ -1253,6 +1254,25 @@
                       </svg>
                     </div>
                     <div id="screensProgressStageText" class="progress-stage-text">Preparazione...</div>
+                  </div>
+                  <div id="manualCapturePanel" class="manual-capture hidden">
+                    <div class="manual-capture-preview">
+                      <img id="manualCaptureImg" alt="Anteprima frame" />
+                      <div id="manualCaptureLoading" class="manual-capture-loading hidden">Caricamento frame...</div>
+                    </div>
+                    <input id="manualCaptureSlider" type="range" min="0" max="1000" value="0" step="1" />
+                    <div class="manual-capture-controls">
+                      <div class="manual-capture-steps">
+                        <button data-seek="-60" class="secondary small" type="button">-60s</button>
+                        <button data-seek="-10" class="secondary small" type="button">-10s</button>
+                        <button data-seek="-1" class="secondary small" type="button">-1s</button>
+                        <button data-seek="1" class="secondary small" type="button">+1s</button>
+                        <button data-seek="10" class="secondary small" type="button">+10s</button>
+                        <button data-seek="60" class="secondary small" type="button">+60s</button>
+                      </div>
+                      <div id="manualCaptureTime" class="manual-capture-time">00:00:00 / 00:00:00</div>
+                      <button id="manualCaptureShotBtn" class="primary small" type="button">Cattura questo frame</button>
+                    </div>
                   </div>
                   <div id="screensList" class="screens-list"></div>
                 </section>
