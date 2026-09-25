@@ -66,6 +66,7 @@ RUN set -eux; \
     ffmpeg -hide_banner -filters | grep -q libplacebo || { echo "libplacebo missing in ffmpeg build" >&2; exit 1; }
 
 RUN set -eux; \
+    mkbrr_redirect_url="$(curl --max-time 15 -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)" \
         || { echo "Failed to query mkbrr latest release redirect" >&2; exit 1; }; \
     mkbrr_tag="$(basename "$mkbrr_redirect_url")"; \
     mkbrr_version="${mkbrr_tag#v}"; \
