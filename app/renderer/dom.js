@@ -142,6 +142,7 @@ export const ui = {
   ffmpegHint: document.getElementById('ffmpegHint'),
   screenshotsCountInput: document.getElementById('screenshotsCountInput'),
   screenshotTonemapToggle: document.getElementById('screenshotTonemapToggle'),
+  screenshotLibplaceboToggle: document.getElementById('screenshotLibplaceboToggle'),
   imageHostPrimarySelect: document.getElementById('imageHostPrimarySelect'),
   imageHostFallbackSelect: document.getElementById('imageHostFallbackSelect'),
   imgbbKeyInput: document.getElementById('imgbbKeyInput'),

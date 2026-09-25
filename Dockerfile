@@ -17,6 +17,7 @@ RUN apt-get update \
         curl \
         wget \
         unzip \
+        xz-utils \
         gnupg \
         tzdata \
     && mkdir -p /usr/share/keyrings \
@@ -32,7 +33,6 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         tigervnc-standalone-server \
         fluxbox \
-        ffmpeg \
         mkvtoolnix \
         novnc \
         websockify \
@@ -44,6 +44,8 @@ RUN apt-get update \
         libxtst6 \
         libgbm1 \
         libasound2 \
+        libvulkan1 \
+        mesa-vulkan-drivers \
         xauth \
         x11-utils \
         dbus-x11 \
@@ -52,7 +54,18 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 RUN set -eux; \
-    mkbrr_redirect_url="$(curl --max-time 15 -fsSLI -o /dev/null -w '%{url_effective}' https://github.com/autobrr/mkbrr/releases/latest)" \
+    mkdir -p /tmp/ffmpeg-extract; \
+    curl --max-time 300 -fsSL "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz" -o /tmp/ffmpeg.tar.xz; \
+    tar -xJf /tmp/ffmpeg.tar.xz -C /tmp/ffmpeg-extract; \
+    ff_bin="$(find /tmp/ffmpeg-extract -type f -name ffmpeg | head -n 1)"; \
+    ffp_bin="$(find /tmp/ffmpeg-extract -type f -name ffprobe | head -n 1)"; \
+    [ -n "$ff_bin" ] && [ -n "$ffp_bin" ] || { echo "Unable to find ffmpeg/ffprobe in static build" >&2; exit 1; }; \
+    install -m 0755 "$ff_bin" /usr/bin/ffmpeg; \
+    install -m 0755 "$ffp_bin" /usr/bin/ffprobe; \
+    rm -rf /tmp/ffmpeg.tar.xz /tmp/ffmpeg-extract; \
+    ffmpeg -hide_banner -filters | grep -q libplacebo || { echo "libplacebo missing in ffmpeg build" >&2; exit 1; }
+
+RUN set -eux; \
         || { echo "Failed to query mkbrr latest release redirect" >&2; exit 1; }; \
     mkbrr_tag="$(basename "$mkbrr_redirect_url")"; \
     mkbrr_version="${mkbrr_tag#v}"; \
