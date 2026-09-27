@@ -42,6 +42,21 @@ export function createUploadHistory(deps) {
   const { ui, showToast, copyToClipboard, logDebug } = deps;
   let entries = [];
   let selectedId = null;
+  const filters = { category: 'all', type: 'all' };
+
+  function matchesFilters(entry) {
+    if (filters.category !== 'all' && entry.category !== filters.category) {
+      return false;
+    }
+    if (filters.type !== 'all' && entry.type !== filters.type) {
+      return false;
+    }
+    return true;
+  }
+
+  function visibleEntries() {
+    return entries.filter(matchesFilters);
+  }
 
   function openExternal(url) {
     const target = String(url || '').trim();
@@ -64,11 +79,12 @@ export function createUploadHistory(deps) {
     if (!ui.historyList) {
       return;
     }
-    if (!entries.length) {
-      ui.historyList.innerHTML = '<p class="history-list-empty">Nessun upload registrato.</p>';
+    const list = visibleEntries();
+    if (!list.length) {
+      ui.historyList.innerHTML = '<p class="history-list-empty">Nessun upload per questo filtro.</p>';
       return;
     }
-    ui.historyList.innerHTML = entries
+    ui.historyList.innerHTML = list
       .map((entry) => {
         const meta = statusMeta(entry);
         const active = entry.id === selectedId ? ' active' : '';
@@ -214,7 +230,8 @@ export function createUploadHistory(deps) {
 
   async function open() {
     await loadEntries();
-    selectedId = entries[0]?.id || null;
+    const firstVisible = visibleEntries()[0];
+    selectedId = firstVisible?.id || null;
     renderList();
     renderDetail(entries.find((e) => e.id === selectedId) || null);
     ui.uploadHistoryModal?.classList.remove('hidden');
@@ -232,6 +249,27 @@ export function createUploadHistory(deps) {
       if (event.target.classList.contains('modal-backdrop')) {
         close();
       }
+    });
+
+    ui.historyFilters?.addEventListener('click', (event) => {
+      const btn = event.target.closest('.history-filter');
+      const group = event.target.closest('.history-filter-group');
+      if (!btn || !group) {
+        return;
+      }
+      const key = group.dataset.filter;
+      if (key !== 'category' && key !== 'type') {
+        return;
+      }
+      filters[key] = btn.dataset.value;
+      group.querySelectorAll('.history-filter').forEach((el) => {
+        el.classList.toggle('active', el === btn);
+      });
+      if (!visibleEntries().some((e) => e.id === selectedId)) {
+        selectedId = visibleEntries()[0]?.id || null;
+      }
+      renderList();
+      renderDetail(entries.find((e) => e.id === selectedId) || null);
     });
 
     ui.historyList?.addEventListener('click', (event) => {

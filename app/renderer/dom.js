@@ -10,6 +10,7 @@ export const ui = {
   uploadHistoryModal: document.getElementById('uploadHistoryModal'),
   closeHistoryBtn: document.getElementById('closeHistoryBtn'),
   clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+  historyFilters: document.getElementById('historyFilters'),
   historyList: document.getElementById('historyList'),
   historyDetail: document.getElementById('historyDetail'),
   historyEmpty: document.getElementById('historyEmpty'),

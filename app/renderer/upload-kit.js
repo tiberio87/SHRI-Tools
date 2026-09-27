@@ -712,7 +712,22 @@ export function createUploadKit(deps) {
       .filter(Boolean);
   }
 
-  function populateQbitCategorySelect(settings) {
+  // Sceglie la categoria qBittorrent più adatta in base alla categoria upload (TV/MOVIE).
+  function pickQbitCategoryForUpload(cats, uploadCategory) {
+    const key = String(uploadCategory || '').toUpperCase();
+    if (key !== 'TV' && key !== 'MOVIE') {
+      return '';
+    }
+    const keywords = key === 'TV'
+      ? ['tv', 'serie', 'series', 'show', 'episod', 'anime']
+      : ['movie', 'film'];
+    return cats.find((cat) => {
+      const c = cat.toLowerCase();
+      return keywords.some((k) => c.includes(k));
+    }) || '';
+  }
+
+  function populateQbitCategorySelect(settings, uploadCategory) {
     const categoryRow = document.getElementById('qbitCategoryRow');
     if (!ui.qbitCategorySelect) return;
     const cats = parseQbitCategories(settings);
@@ -727,6 +742,10 @@ export function createUploadKit(deps) {
       opt.textContent = cat;
       ui.qbitCategorySelect.appendChild(opt);
     });
+    const autoMatch = pickQbitCategoryForUpload(cats, uploadCategory);
+    if (autoMatch) {
+      ui.qbitCategorySelect.value = autoMatch;
+    }
     if (categoryRow) categoryRow.classList.remove('hidden');
   }
 
@@ -757,7 +776,7 @@ export function createUploadKit(deps) {
     return `${trimmed}${separator}${safeTitle}`;
   }
 
-  function openPostUploadModal(result, settings) {
+  function openPostUploadModal(result, settings, uploadCategory) {
     if (!ui.postUploadModal) {
       return;
     }
@@ -776,7 +795,7 @@ export function createUploadKit(deps) {
     if (ui.sendToClientBtn) {
       ui.sendToClientBtn.disabled = !canSendToClient(settings);
     }
-    populateQbitCategorySelect(settings);
+    populateQbitCategorySelect(settings, uploadCategory);
     if (!outputDir) {
     } else if (!lastUploadDownloadUrl) {
       setPostUploadHint('URL di download non disponibile nella risposta del tracker.');
@@ -810,7 +829,7 @@ export function createUploadKit(deps) {
     if (ui.sendToClientBtn) {
       ui.sendToClientBtn.disabled = !canSendToClient(settings);
     }
-    populateQbitCategorySelect(settings);
+    populateQbitCategorySelect(settings, last.category);
     const timeLabel = last.createdAt ? new Date(last.createdAt).toLocaleString() : '';
     const titleLabel = last.title ? `Ultimo upload: ${last.title}` : 'Ultimo upload';
     const hintParts = [titleLabel, timeLabel].filter(Boolean);
@@ -1960,11 +1979,12 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
           downloadUrl: extractDownloadUrl(result),
           torrentPageUrl: extractTorrentPageUrl(result, settings.unit3dBaseUrl || ''),
           torrentPath: '',
+          category: summary.category || '',
           createdAt: Date.now()
         };
         writeLastUpload(snapshot);
         updateReopenUploadButton();
-        openPostUploadModal(result, settings);
+        openPostUploadModal(result, settings, summary.category);
         try {
           let trackerHost = settings.unit3dBaseUrl || '';
           try { trackerHost = new URL(settings.unit3dBaseUrl).host; } catch {}
