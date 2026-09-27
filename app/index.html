@@ -1355,7 +1355,23 @@
         </div>
       </div>
       <div class="history-body">
-        <div id="historyList" class="history-list"></div>
+        <div class="history-sidebar">
+          <div id="historyFilters" class="history-filters">
+            <div class="history-filter-group" data-filter="category">
+              <span class="history-filter-label">Categoria</span>
+              <button type="button" class="history-filter active" data-value="all">Tutti</button>
+              <button type="button" class="history-filter" data-value="MOVIE">Film</button>
+              <button type="button" class="history-filter" data-value="TV">Serie TV</button>
+            </div>
+            <div class="history-filter-group" data-filter="type">
+              <span class="history-filter-label">Tipo</span>
+              <button type="button" class="history-filter active" data-value="all">Tutti</button>
+              <button type="button" class="history-filter" data-value="WEBDL">WEB-DL</button>
+              <button type="button" class="history-filter" data-value="ENCODE">Encode</button>
+            </div>
+          </div>
+          <div id="historyList" class="history-list"></div>
+        </div>
         <div id="historyDetail" class="history-detail">
           <p id="historyEmpty" class="history-empty">Seleziona un upload per vederne i dettagli.</p>
         </div>
