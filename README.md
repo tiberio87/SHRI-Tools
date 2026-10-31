@@ -38,7 +38,7 @@ Scarica l'ultima versione dalla pagina [Releases](../../releases/latest) e lanci
 - Dupe check automatico sul tracker con filtri dedicati.
 - Upload diretto al tracker + invio al client torrent (qBittorrent / Transmission).
 - Compatibile con **qBittorrent 5.2.0+** (gestione cookie `QBT_SID_<porta>`, header CSRF, risposta HTTP 204).
-- **Seed immediato**: opzione `skip_checking` per inviare il torrent a qBittorrent già in seeding, senza ricontrollo hash dei file locali.
+- **Seed immediato**: SHRI-Tools rileva la versione WebAPI di qBittorrent e usa `skip_checking` fino alla WebAPI 2.15.x oppure `seedMode` dalla WebAPI 2.16.0 (qBittorrent 5.3+). In questo modo i torrent creati da file già presenti possono partire in seeding senza un nuovo controllo hash.
 - **Flag upload avanzati** nella schermata di conferma: Upload anonimo, Personal release, Coda moderazione, Internal, Refundable, Free (%), Double Upload.
 - **Mapping percorsi multipli** locale/remoto quando il client gira su un'altra macchina.
 - **BBCode con link tracker**: la sezione LINKS include IMDb, TMDb e — per le serie TV — TheTVDB.
@@ -128,7 +128,7 @@ Dalla versione 5.0 le impostazioni sono riorganizzate in sezioni tematiche che s
 **qBittorrent**
 - Host / Porta / HTTPS, Username / Password.
 - Save path, Categoria (supporto **categorie multiple** separate da virgola), Auto-start.
-- **Salta controllo hash (seed immediato)**.
+- **Salta controllo hash (seed immediato)**: attivo di default; la compatibilità fra `skip_checking` e `seedMode` è automatica. Da usare solo quando i file sono già presenti e corrispondono esattamente al torrent (save path e nomi corretti).
 - Mapping percorsi **multipli** locale/remoto (quando il client e` su altra macchina).
 
 **Transmission**
@@ -142,6 +142,16 @@ Dalla versione 5.0 le impostazioni sono riorganizzate in sezioni tematiche che s
 - **Auto-detect tag gruppo** / **Auto-NoGroup** / **Auto-apply suggerimenti**.
 - **Override ID Unit3D** (category/type/resolution) se l'istanza ha ID diversi dagli standard SHRI.
 - Dettagli path mapping client remoto.
+
+---
+
+## Test
+
+```bash
+npm test
+```
+
+I test includono la compatibilita` dei parametri di seed immediato con le versioni WebAPI di qBittorrent.
 
 ---
 
@@ -173,6 +183,7 @@ Il file viene generato in `dist/SHRI-Tools <versione>.exe`.
 Il repository include una configurazione Docker per eseguire l'app Electron in un container Ubuntu 22.04 con:
 - **TigerVNC** (`Xtigervnc` + `fluxbox`) — accesso GUI via client VNC sulla porta `5901`;
 - **noVNC** — accesso GUI via browser sulla porta `6080` (nessuna installazione richiesta);
+- **Fluxbox senza wallpaper** — la configurazione `background: unset` viene impostata automaticamente in `/data/.fluxbox/overlay`, evitando i popup `fbsetbg`/`xmessage` anche quando il volume `/data` e' gia' esistente;
 - `ffmpeg`, `mkvtoolnix` installati via apt;
 - `mkbrr` e `bdinfo` scaricati automaticamente durante il build come binari di sistema;
 - percorsi degli strumenti preconfigurati automaticamente al primo avvio su Linux.

@@ -55,6 +55,7 @@ export function createUploadKit(deps) {
   let screensProgressUnsub = null;
   let screensProgressRequestId = '';
   let screensBusy = false;
+  let screensGenerationSeq = 0;
   let screensSourcePath = '';
   let manualProbe = null;
   let manualProbePath = '';
@@ -750,10 +751,13 @@ export function createUploadKit(deps) {
   }
 
   function getJobFileTitle() {
-    let raw = String(ui.torrentNameInput?.value || '').trim();
+    // Il campo del wizard puo' contenere ancora il nome del torrent precedente.
+    // Accettalo solo se era stato compilato per la sorgente corrente.
+    const isCurrentInput = Boolean(state.targetPath) &&
+      ui.torrentNameInput?.dataset.sourcePath === state.targetPath;
+    let raw = isCurrentInput ? String(ui.torrentNameInput?.value || '').trim() : '';
     if (!raw) {
-      // Durante la generazione in background il campo non è ancora popolato:
-      // ricava il nome dalla proposta di rinomina per usare la cartella corretta.
+      // Durante Rules Check il campo non e' ancora popolato per il nuovo file.
       raw = String(getTorrentNameSuggestion?.() || '').trim();
     }
     return raw
@@ -2422,6 +2426,25 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     ui.screensProgressStageText.textContent = text;
   }
 
+  // La generazione precedente puo' terminare dopo il cambio sorgente:
+  // invalida i callback e sblocca subito il pulsante per il nuovo file.
+  function resetScreensForSource() {
+    screensGenerationSeq += 1;
+    screensBusy = false;
+    screensSourcePath = '';
+    screensProgressRequestId = '';
+    state.screenshots = [];
+    state.screenshotsMeta = null;
+    if (ui.generateScreensBtn) {
+      ui.generateScreensBtn.disabled = false;
+    }
+    if (ui.screensHint) {
+      ui.screensHint.textContent = '';
+    }
+    resetScreensProgress();
+    renderScreensList();
+  }
+
   async function prepareUploadKitStep() {
     if (!state.targetPath) {
       setHint(ui.renameHint, 'Seleziona un file o una cartella.');
@@ -2582,6 +2605,9 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
 
   async function restoreJobStateIfNeeded() {
     if (!state.targetPath) return;
+    const requestedPath = state.targetPath;
+    const requestedSeq = screensGenerationSeq;
+    const isCurrentSource = () => state.targetPath === requestedPath && screensGenerationSeq === requestedSeq;
     const settings = loadSettings();
     const jobDir = buildTrackerOutputDir(settings, getJobFileTitle());
     if (!jobDir) return;
@@ -2591,6 +2617,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     // Ripristina .torrent dalla cartella job
     if (!state.lastTorrentPath) {
       const dirResult = await window.api?.listDir?.(jobDir).catch(() => null);
+      if (!isCurrentSource()) return;
       if (dirResult?.ok && Array.isArray(dirResult.files)) {
         const torrentFile = dirResult.files.find((f) => String(f).toLowerCase().endsWith('.torrent'));
         if (torrentFile) {
@@ -2604,6 +2631,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     if (!state.screenshots.length) {
       const jsonPath = `${jobDir}${sep}image_data.json`;
       const res = await window.api?.readFileText?.(jsonPath).catch(() => null);
+      if (!isCurrentSource()) return;
       if (res?.ok && res.content) {
         try {
           const saved = JSON.parse(res.content);
@@ -2801,115 +2829,137 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     }
 
     screensBusy = true;
-    if (ui.generateScreensBtn) {
-      ui.generateScreensBtn.disabled = true;
-    }
-    screensProgressRequestId = String(Date.now());
-    resetScreensProgress();
-    setScreensProgress(0);
-    setScreensStage('start');
-    ui.screensHint.textContent = 'Generazione screenshot in corso...';
-    showToast?.('Generazione screenshot iniziata...', 'info');
-    const skipFrame = source.skipFrame;
-    const seekMode = source.seekMode;
+    const runSeq = ++screensGenerationSeq;
+    const runSourcePath = state.targetPath;
+    const isCurrentRun = () => runSeq === screensGenerationSeq && runSourcePath === state.targetPath;
+    try {
+      if (ui.generateScreensBtn) {
+        ui.generateScreensBtn.disabled = true;
+      }
+      screensProgressRequestId = `${Date.now()}-${runSeq}`;
+      resetScreensProgress();
+      setScreensProgress(0);
+      setScreensStage('start');
+      ui.screensHint.textContent = 'Generazione screenshot in corso...';
+      showToast?.('Generazione screenshot iniziata...', 'info');
+      const skipFrame = source.skipFrame;
+      const seekMode = source.seekMode;
 
-    const payload = {
-      videoPath,
-      ffmpegPath: settings.ffmpegPath,
-      count: settings.screenshotsCount >= 2 ? settings.screenshotsCount : 6,
-      tonemap: settings.screenshotTonemap !== false,
-      libplacebo: settings.screenshotLibplacebo === true,
-      primaryHost: settings.imageHostPrimary || 'imgbb',
-      fallbackHost: settings.imageHostFallback || 'ptscreens',
-      imgbbKey: settings.imgbbKey || '',
-      ptscreensKey: settings.ptscreensKey || '',
-      requestId: screensProgressRequestId,
-      isDisc: isFullDisc(form),
-      category: form.type || 'Movie',
-      seekMode,
-      skipFrame,
-      screensOutputDir: buildTrackerOutputDir(settings, getJobFileTitle()),
-      screensJobTitle: getJobFileTitle()
-    };
-    const result = await window.api.generateScreenshots(payload);
-    if (result?.ok) {
-      state.screenshots = result.images || [];
-      state.screenshotsMeta = { tonemapped: Boolean(result.tonemapped) };
-      screensSourcePath = state.targetPath || '';
+      const payload = {
+        videoPath,
+        ffmpegPath: settings.ffmpegPath,
+        count: settings.screenshotsCount >= 2 ? settings.screenshotsCount : 6,
+        tonemap: settings.screenshotTonemap !== false,
+        libplacebo: settings.screenshotLibplacebo === true,
+        primaryHost: settings.imageHostPrimary || 'imgbb',
+        fallbackHost: settings.imageHostFallback || 'ptscreens',
+        imgbbKey: settings.imgbbKey || '',
+        ptscreensKey: settings.ptscreensKey || '',
+        requestId: screensProgressRequestId,
+        isDisc: isFullDisc(form),
+        category: form.type || 'Movie',
+        seekMode,
+        skipFrame,
+        screensOutputDir: buildTrackerOutputDir(settings, getJobFileTitle()),
+        screensJobTitle: getJobFileTitle()
+      };
+      const result = await window.api.generateScreenshots(payload);
+      if (!isCurrentRun()) return;
+      if (result?.ok) {
+        state.screenshots = result.images || [];
+        state.screenshotsMeta = { tonemapped: Boolean(result.tonemapped) };
+        screensSourcePath = state.targetPath || '';
 
-      // Offer fallback host if any upload failed and fallback is configured.
-      const failedCount = state.screenshots.filter((s) => !s.ok).length;
-      const fallbackHost = settings.imageHostFallback;
-      const fallbackKey = fallbackHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
-      if (!auto && failedCount > 0 && fallbackHost && fallbackKey && fallbackHost !== (settings.imageHostPrimary || 'imgbb')) {
-        const primaryLabel = (settings.imageHostPrimary || 'imgbb').toUpperCase();
-        const fallbackLabel = fallbackHost.toUpperCase();
-        const switchConfirmed = await openConfirmModal(
-          `${failedCount} screenshot non caricati su ${primaryLabel}.\nVuoi caricare tutti gli screenshot su ${fallbackLabel}?`,
-          { html: false }
-        );
-        if (switchConfirmed) {
-          setScreensStage('uploading');
-          const reuploadResult = await window.api.reuploadScreenshots({
-            images: state.screenshots,
-            host: fallbackHost,
-            imgbbKey: settings.imgbbKey || '',
-            ptscreensKey: settings.ptscreensKey || ''
-          });
-          if (reuploadResult?.images?.length) {
-            state.screenshots = reuploadResult.images;
-            logDebug?.('screens: reupload result', {
+        // Offer fallback host if any upload failed and fallback is configured.
+        const failedCount = state.screenshots.filter((s) => !s.ok).length;
+        const fallbackHost = settings.imageHostFallback;
+        const fallbackKey = fallbackHost === 'imgbb' ? settings.imgbbKey : settings.ptscreensKey;
+        if (!auto && failedCount > 0 && fallbackHost && fallbackKey && fallbackHost !== (settings.imageHostPrimary || 'imgbb')) {
+          const primaryLabel = (settings.imageHostPrimary || 'imgbb').toUpperCase();
+          const fallbackLabel = fallbackHost.toUpperCase();
+          const switchConfirmed = await openConfirmModal(
+            `${failedCount} screenshot non caricati su ${primaryLabel}.\nVuoi caricare tutti gli screenshot su ${fallbackLabel}?`,
+            { html: false }
+          );
+          if (!isCurrentRun()) return;
+          if (switchConfirmed) {
+            setScreensStage('uploading');
+            const reuploadResult = await window.api.reuploadScreenshots({
+              images: state.screenshots,
               host: fallbackHost,
-              ok: reuploadResult.images.filter((s) => s.ok).length,
-              total: reuploadResult.images.length
+              imgbbKey: settings.imgbbKey || '',
+              ptscreensKey: settings.ptscreensKey || ''
             });
+            if (!isCurrentRun()) return;
+            if (reuploadResult?.images?.length) {
+              state.screenshots = reuploadResult.images;
+              logDebug?.('screens: reupload result', {
+                host: fallbackHost,
+                ok: reuploadResult.images.filter((s) => s.ok).length,
+                total: reuploadResult.images.length
+              });
+            }
           }
         }
-      }
 
-      const okImages = state.screenshots.filter((s) => s.ok);
-      logDebug?.('screens: result', {
-        total: state.screenshots.length,
-        ok: okImages.length,
-        tonemapped: result.tonemapped || false,
-        images: state.screenshots.map((s, i) => ({
-          n: i + 1,
-          ok: s.ok,
-          host: s.host || '',
-          url: s.displayUrl || s.rawUrl || '',
-          error: s.error || ''
-        }))
-      });
-      ui.screensHint.textContent = `Screenshot caricati: ${okImages.length}/${state.screenshots.length}`;
-      showToast?.(`Generazione screenshot completata: ${okImages.length}/${state.screenshots.length}`, 'success');
-      refreshUploadDescription();
-      setScreensProgress(1);
-      setScreensStage('done');
-      // auto-save log nella cartella job
-      const settingsForLog = loadSettings();
-      const jobDirLog = buildTrackerOutputDir(settingsForLog, getJobFileTitle());
-      if (jobDirLog && debugState.buffer.length) {
-        const safeTitleLog = getJobFileTitle();
-        const sepLog = jobDirLog.includes('\\') ? '\\' : '/';
-        const debugContent = buildDebugFileContent(debugState.buffer, safeTitleLog);
-        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}DEBUG.txt`, content: debugContent }); } catch {}
+        const okImages = state.screenshots.filter((s) => s.ok);
+        logDebug?.('screens: result', {
+          total: state.screenshots.length,
+          ok: okImages.length,
+          tonemapped: result.tonemapped || false,
+          images: state.screenshots.map((s, i) => ({
+            n: i + 1,
+            ok: s.ok,
+            host: s.host || '',
+            url: s.displayUrl || s.rawUrl || '',
+            error: s.error || ''
+          }))
+        });
+        ui.screensHint.textContent = `Screenshot caricati: ${okImages.length}/${state.screenshots.length}`;
+        showToast?.(`Generazione screenshot completata: ${okImages.length}/${state.screenshots.length}`, 'success');
+        refreshUploadDescription();
+        setScreensProgress(1);
+        setScreensStage('done');
+        // auto-save log nella cartella job
+        const settingsForLog = loadSettings();
+        const jobDirLog = buildTrackerOutputDir(settingsForLog, getJobFileTitle());
+        if (jobDirLog && debugState.buffer.length) {
+          const safeTitleLog = getJobFileTitle();
+          const sepLog = jobDirLog.includes('\\') ? '\\' : '/';
+          const debugContent = buildDebugFileContent(debugState.buffer, safeTitleLog);
+          try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}DEBUG.txt`, content: debugContent }); } catch {}
+        }
+        if (!isCurrentRun()) return;
+        // salva metadata screenshots per ripristino automatico
+        if (jobDirLog && state.screenshots.length) {
+          const sepScreens = jobDirLog.includes('\\') ? '\\' : '/';
+          const screensJson = JSON.stringify({ screenshots: state.screenshots, meta: state.screenshotsMeta });
+          try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepScreens}image_data.json`, content: screensJson }); } catch {}
+        }
+      } else {
+        logDebug?.('screens: error', { error: result?.error || 'unknown' });
+        ui.screensHint.textContent = result?.error || 'Errore durante la generazione.';
+        setScreensStage('error', { error: result?.error });
+        showToast?.('Errore durante la generazione degli screenshot.', 'error');
       }
-      // salva metadata screenshots per ripristino automatico
-      if (jobDirLog && state.screenshots.length) {
-        const sepScreens = jobDirLog.includes('\\') ? '\\' : '/';
-        const screensJson = JSON.stringify({ screenshots: state.screenshots, meta: state.screenshotsMeta });
-        try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepScreens}image_data.json`, content: screensJson }); } catch {}
+      if (!isCurrentRun()) return;
+      renderScreensList();
+    } catch (err) {
+      if (isCurrentRun()) {
+        logDebug?.('screens: exception', { error: err?.message || String(err) });
+        ui.screensHint.textContent = err?.message || 'Errore durante la generazione.';
+        setScreensStage('error', { error: err?.message || String(err) });
+        showToast?.('Errore durante la generazione degli screenshot.', 'error');
       }
-    } else {
-      logDebug?.('screens: error', { error: result?.error || 'unknown' });
-      ui.screensHint.textContent = result?.error || 'Errore durante la generazione.';
-      setScreensStage('error', { error: result?.error });
-      showToast?.('Errore durante la generazione degli screenshot.', 'error');
-    }
-    renderScreensList();
-    screensBusy = false;
-    if (ui.generateScreensBtn) {
-      ui.generateScreensBtn.disabled = false;
+    } finally {
+      // Un IPC vecchio non deve sbloccare una generazione successiva.
+      if (isCurrentRun()) {
+        screensBusy = false;
+        screensProgressRequestId = '';
+        if (ui.generateScreensBtn) {
+          ui.generateScreensBtn.disabled = false;
+        }
+      }
     }
   }
 
@@ -2946,7 +2996,10 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
       return;
     }
     // Riusa gli screenshot già generati in un workflow precedente (image_data.json).
+    const sourcePath = state.targetPath;
+    const sourceSeq = screensGenerationSeq;
     await restoreJobStateIfNeeded();
+    if (state.targetPath !== sourcePath || screensGenerationSeq !== sourceSeq) return;
     if (state.screenshots && state.screenshots.some((s) => s.ok)) {
       renderScreensList();
       refreshUploadDescription();
@@ -3219,7 +3272,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
         if (!data) {
           return;
         }
-        if (screensProgressRequestId && data.requestId && data.requestId !== screensProgressRequestId) {
+        if (!screensProgressRequestId || data.requestId !== screensProgressRequestId) {
           return;
         }
         if (data.stage === 'debug' && data.message) {
@@ -3281,6 +3334,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
     closeUploadKitModal,
     generateScreenshots,
     autoGenerateScreens,
+    resetScreensForSource,
     initUploadKitEvents,
     openUploadKitModal,
     prepareUploadKitStep,

@@ -717,6 +717,8 @@ async function downloadUnit3dTorrent({ baseUrl, apiKey, downloadUrl, outputDir, 
 }
 
 // ===== Torrent client integrations =====
+const { getQbitSeedingParameterName } = require('./app/qbittorrent-api');
+
 
 // Use Node.js native http/https for login to avoid Electron's Chromium session
 // intercepting Set-Cookie headers before they reach the fetch response object.
@@ -789,6 +791,29 @@ async function loginQbittorrent(baseUrl, username, password, allowInsecure = fal
   return { ok: true, cookie: `${match[1]}=${match[2]}` };
 }
 
+async function getQbitSeedingParameter(baseUrl, cookie, allowInsecure) {
+  // qBittorrent WebAPI 2.16.0 (qBittorrent 5.3+) replaced skip_checking
+  // with seedMode. Use the negotiated WebAPI version, not the app version.
+  let response;
+  try {
+    response = await _httpRequest(new URL(`${baseUrl}/api/v2/app/webapiVersion`), {
+      method: 'GET',
+      headers: {
+        cookie,
+        referer: baseUrl,
+        origin: baseUrl
+      },
+      rejectUnauthorized: !allowInsecure
+    });
+  } catch (error) {
+    throw new Error(`Impossibile rilevare la versione WebAPI qBittorrent: ${error.message || error}`);
+  }
+  if (response.status !== 200) {
+    throw new Error(`Impossibile rilevare la versione WebAPI qBittorrent: ${normalizeHttpError(response.body, response.status)}`);
+  }
+  return getQbitSeedingParameterName(response.body);
+}
+
 async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath, savePath, category, paused, skipChecking, allowInsecure }) {
   if (!baseUrl || !username || !password) {
     return { ok: false, error: 'Credenziali qBittorrent mancanti.' };
@@ -800,6 +825,12 @@ async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath,
   if (!login.ok) {
     return login;
   }
+  // Non perdere silenziosamente il seed immediato sulle API nuove:
+  // se la versione non e' rilevabile, mostra un errore invece di inviare
+  // un parametro ignorato da qBittorrent e avviare una verifica completa.
+  const seedingParameter = skipChecking
+    ? await getQbitSeedingParameter(baseUrl, login.cookie, allowInsecure === true)
+    : '';
   const torrentBytes = await fs.readFile(torrentPath);
   const form = createFormData();
   const torrentBlob = new global.Blob([torrentBytes], { type: 'application/x-bittorrent' });
@@ -813,8 +844,8 @@ async function addQbittorrentTorrent({ baseUrl, username, password, torrentPath,
   if (paused) {
     form.append('paused', 'true');
   }
-  if (skipChecking) {
-    form.append('skip_checking', 'true');
+  if (seedingParameter) {
+    form.append(seedingParameter, 'true');
   }
   const response = await fetch(`${baseUrl}/api/v2/torrents/add`, {
     method: 'POST',
