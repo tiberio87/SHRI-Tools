@@ -307,6 +307,12 @@ function resetAllInputs(options = {}) {
   if (ui.openUploadWizardBtn) {
     ui.openUploadWizardBtn.disabled = false;
   }
+  // Non usare il titolo del torrent del job precedente durante Rules Check:
+  // getJobFileTitle lo userebbe per ripristinare gli screenshot sbagliati.
+  if (ui.torrentNameInput) {
+    ui.torrentNameInput.value = '';
+    ui.torrentNameInput.dataset.sourcePath = '';
+  }
 
   if (ui.renameHint) {
     setHint(ui.renameHint, '');
@@ -350,6 +356,7 @@ function resetAllInputs(options = {}) {
 }
 
 function resetSource() {
+  uploadKit?.resetScreensForSource?.();
   state.targetPath = null;
   state.kind = null;
   state.videoFiles = [];
@@ -385,7 +392,6 @@ function resetSource() {
   sourceAskedForPath = '';
   state.lastTorrentPath = '';
   state.screenshots = [];
-  state.screenshotsMeta = null;
   state.screenshotsMeta = null;
   state.trackerId = '';
   state.trackerName = '';
@@ -853,6 +859,7 @@ function prepareTorrentStep() {
   }
   if (ui.torrentNameInput) {
     ui.torrentNameInput.value = renameTools.getTorrentNameSuggestion() || '';
+    ui.torrentNameInput.dataset.sourcePath = state.targetPath;
   }
   if (ui.torrentRootName) {
     const rootName = state.kind === 'dir'
@@ -2142,6 +2149,7 @@ async function loadPath(targetPath) {
     return;
   }
 
+  uploadKit?.resetScreensForSource?.();
   resetAllInputs({ skipPreview: true });
   clearWizardRulesCheck();
 
@@ -2171,6 +2179,7 @@ async function loadPath(targetPath) {
   state.metadata = null;
   state.sceneInfo = null;
   state.screenshots = [];
+  state.screenshotsMeta = null;
   state.lastTorrentPath = '';
   state.episodeMap = {};
   state.lastTagSuggestion = '';
