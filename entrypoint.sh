@@ -57,6 +57,23 @@ fi
 # Allow appuser to connect to the X display
 chmod o+rw /tmp/.X11-unix/X1 2>/dev/null || true
 
+# The noVNC container does not need a desktop wallpaper. Fluxbox otherwise
+# launches fbsetbg automatically and shows xmessage popups when no wallpaper
+# setter (e.g. feh/Esetroot) is installed. The documented overlay setting
+# "background: unset" tells Fluxbox to skip fbsetbg entirely.
+#
+# /data is persistent: update existing overlays without deleting unrelated
+# Fluxbox preferences, and keep this idempotent across container restarts.
+FLUXBOX_DIR="${HOME}/.fluxbox"
+FLUXBOX_OVERLAY="${FLUXBOX_DIR}/overlay"
+mkdir -p "${FLUXBOX_DIR}"
+touch "${FLUXBOX_OVERLAY}"
+sed -i '/^[[:space:]]*background[[:space:]]*:/d' "${FLUXBOX_OVERLAY}"
+printf 'background: unset\n' >> "${FLUXBOX_OVERLAY}"
+if [ "${PUID}" != "0" ]; then
+  chown "${PUID}:${PGID}" "${FLUXBOX_DIR}" "${FLUXBOX_OVERLAY}"
+fi
+
 # Start window manager as appuser
 gosu "${RUN_AS}" fluxbox &
 
