@@ -2929,6 +2929,7 @@ ${linksSection}${useBdInfo ? bdinfoSection : mediainfoSection}${releaseNotesSect
           const debugContent = buildDebugFileContent(debugState.buffer, safeTitleLog);
           try { await window.api?.saveFileDirect({ filePath: `${jobDirLog}${sepLog}DEBUG.txt`, content: debugContent }); } catch {}
         }
+        if (!isCurrentRun()) return;
         // salva metadata screenshots per ripristino automatico
         if (jobDirLog && state.screenshots.length) {
           const sepScreens = jobDirLog.includes('\\') ? '\\' : '/';
