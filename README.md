@@ -183,6 +183,7 @@ Il file viene generato in `dist/SHRI-Tools <versione>.exe`.
 Il repository include una configurazione Docker per eseguire l'app Electron in un container Ubuntu 22.04 con:
 - **TigerVNC** (`Xtigervnc` + `fluxbox`) — accesso GUI via client VNC sulla porta `5901`;
 - **noVNC** — accesso GUI via browser sulla porta `6080` (nessuna installazione richiesta);
+- **Fluxbox senza wallpaper** — la configurazione `background: unset` viene impostata automaticamente in `/data/.fluxbox/overlay`, evitando i popup `fbsetbg`/`xmessage` anche quando il volume `/data` e' gia' esistente;
 - `ffmpeg`, `mkvtoolnix` installati via apt;
 - `mkbrr` e `bdinfo` scaricati automaticamente durante il build come binari di sistema;
 - percorsi degli strumenti preconfigurati automaticamente al primo avvio su Linux.
