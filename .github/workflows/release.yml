@@ -5,8 +5,69 @@ on:
     tags:
       - 'v*.*.*'
 
+    # Publish v5.4.1 automatically when its release notes reach main.
+    branches:
+      - main
+    paths:
+      - 'docs/RELEASE_NOTES_v5.4.1.md'
+
 jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Verify release version
+        id: version
+        shell: bash
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          tag="v${version}"
+          if [[ "${REF_TYPE}" == "tag" && "${REF_NAME}" != "${tag}" ]]; then
+            echo "::error::Tag ${REF_NAME} does not match package.json (${tag})."
+            exit 1
+          fi
+          if [[ "${REF_TYPE}" == "branch" && "${tag}" != "v5.4.1" ]]; then
+            echo "::error::Unexpected branch-triggered release version ${tag}."
+            exit 1
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if gh release view "${TAG}" >/dev/null 2>&1; then
+            echo "Release ${TAG} already exists."
+            exit 0
+          fi
+          notes="docs/RELEASE_NOTES_${TAG}.md"
+          if [[ -f "${notes}" ]]; then
+            gh release create "${TAG}" --title "${TAG}" --target "${GITHUB_SHA}" --notes-file "${notes}"
+          else
+            gh release create "${TAG}" --title "${TAG}" --target "${GITHUB_SHA}" --generate-notes
+          fi
+
   build-windows:
+    needs: prepare-release
     runs-on: windows-latest
     permissions:
       contents: write
@@ -30,11 +91,13 @@ jobs:
       - name: Upload EXE to release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
           files: dist/*.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   build-linux:
+    needs: prepare-release
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -67,6 +130,7 @@ jobs:
       - name: Upload Linux artifacts to release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.prepare-release.outputs.tag }}
           files: |
             dist/*.AppImage
             dist/*.deb
