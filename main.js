@@ -10,6 +10,7 @@ const { spawn } = require('child_process');
 const { buildUaScreenshotTimes, buildUaScreenshotTimesDebug } = require('./app/screenshot-times');
 const { loadStoredSecrets, saveStoredSecrets } = require('./app/secret-store');
 const { detectScene } = require('./app/scene-detect');
+const { selectExecutableFile } = require('./app/file-dialogs');
 
 function createFormData() {
   if (!global.FormData) {
@@ -2198,19 +2199,7 @@ ipcMain.handle('select-file', async () => {
   return result.filePaths[0];
 });
 
-ipcMain.handle('select-any-file', async () => {
-  const result = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [
-      { name: 'Executable', extensions: ['exe'] },
-      { name: 'All files', extensions: ['*'] }
-    ]
-  });
-  if (result.canceled || !result.filePaths.length) {
-    return null;
-  }
-  return result.filePaths[0];
-});
+ipcMain.handle('select-any-file', () => selectExecutableFile(dialog));
 
 ipcMain.handle('app-version', () => app.getVersion());
 

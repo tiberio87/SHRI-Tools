@@ -5,11 +5,11 @@ on:
     tags:
       - 'v*.*.*'
 
-    # Publish v5.4.1 automatically when its release notes reach main.
+    # Publish v5.4.2 automatically when its release notes reach main.
     branches:
       - main
     paths:
-      - 'docs/RELEASE_NOTES_v5.4.1.md'
+      - 'docs/RELEASE_NOTES_v5.4.2.md'
 
 jobs:
   prepare-release:
@@ -43,7 +43,7 @@ jobs:
             echo "::error::Tag ${REF_NAME} does not match package.json (${tag})."
             exit 1
           fi
-          if [[ "${REF_TYPE}" == "branch" && "${tag}" != "v5.4.1" ]]; then
+          if [[ "${REF_TYPE}" == "branch" && "${tag}" != "v5.4.2" ]]; then
             echo "::error::Unexpected branch-triggered release version ${tag}."
             exit 1
           fi
