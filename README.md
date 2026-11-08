@@ -124,6 +124,8 @@ Dalla versione 5.0 le impostazioni sono riorganizzate in sezioni tematiche che s
 - **Percorso BDInfo**: eseguibile BDInfo (per dischi Blu-ray).
 - **Percorso mkvpropedit**: MKVToolNix per i tag MKV.
 
+I pulsanti **Sfoglia** per mkbrr, FFmpeg, BDInfo e mkvpropedit mostrano tutti i file su macOS e Linux, inclusi gli eseguibili senza estensione. Su Windows resta predefinito il filtro `.exe`, con la possibilità di scegliere tutti i file. Su macOS e Linux seleziona il binario dello strumento e assicurati che abbia i permessi di esecuzione.
+
 ### Client torrent
 **qBittorrent**
 - Host / Porta / HTTPS, Username / Password.
